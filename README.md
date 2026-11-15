@@ -6,7 +6,7 @@ Use agreement, disagreement, and calibrated trust scoring to decide when LLM ann
 **Interactive Dashboard**: [https://one684proj.onrender.com/](https://one684proj.onrender.com/)  
 *Available for research purposes. Text content is not displayed. Not intended for public distribution.*
 
-[Replay the saved predictions on CPU](#offline-evaluation)
+[CPU policy comparison](#cpu-policy-comparison) · [GPU answer-token pilot](#gpu-answer-token-pilot)
 
 ---
 
@@ -162,6 +162,8 @@ For detailed metrics, predictions, plots, and ablation studies, explore the `res
 
 # Offline Evaluation
 
+## CPU policy comparison
+
 Run the CPU evaluation from the repository root with Python 3.10 or later.
 
 ```bash
@@ -200,10 +202,25 @@ The [Jigsaw sampling record](results/llm_annotations_7b/jigsaw/jigsaw_sample/jig
 shows that the course sample included rows from the original train,
 development, and test splits.
 
-The [answer-token pilot](results/answer_token_pilot/README.md) uses a local GPU
-to rescore 400 saved Jigsaw labels with Qwen2.5-7B-Instruct. It compares the raw
-answer-token probability with Qwen's saved self-report and the original trust
-scorer using Brier loss and risk–coverage.
+## GPU answer-token pilot
+
+The pilot scores the original Qwen2.5-7B-Instruct labels for 400 saved Jigsaw
+examples. The error rate at 75% coverage uses uniform tie-breaking in
+expectation.
+
+| Confidence score | Brier score | Error rate at 75% coverage |
+| --- | ---: | ---: |
+| A/B answer-token probability | 0.2217 | 19.33% |
+| Saved self-reported confidence | 0.1569 | 14.88% |
+| Original trust scorer | 0.0380 | 0.56% |
+
+Run the pilot from the repository root with the [GPU setup and pinned dependencies](results/answer_token_pilot/README.md#reproduce).
+
+```bash
+python scripts/run_answer_token_pilot.py --batch-size 16 --gpu-memory 10GiB --output-dir replay/answer_token_pilot
+```
+
+[Pilot record](results/answer_token_pilot/README.md) · [Risk–coverage plot](results/answer_token_pilot/risk_coverage.png) · [Per-example scores](results/answer_token_pilot/scores.csv)
 
 ---
 
