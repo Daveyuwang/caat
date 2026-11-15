@@ -200,9 +200,10 @@ For dataset structure, statistics, label mappings, and download information, see
 
 # Installation
 
-```
-git clone https://github.com/Metrossa/1684Proj
-pip install -r requirements.txt
+```bash
+git clone https://github.com/Daveyuwang/caat.git
+cd caat
+python -m pip install -r requirements.txt
 ```
 
 ---
