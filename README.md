@@ -6,6 +6,8 @@ Use agreement, disagreement, and calibrated trust scoring to decide when LLM ann
 **Interactive Dashboard**: [https://one684proj.onrender.com/](https://one684proj.onrender.com/)  
 *Available for research purposes. Text content is not displayed. Not intended for public distribution.*
 
+[Replay the saved predictions on CPU](#offline-evaluation)
+
 ---
 
 # Contents
@@ -16,6 +18,7 @@ Use agreement, disagreement, and calibrated trust scoring to decide when LLM ann
 - [Trust Scorer](#trust-scorer)
 - [Dashboard](#dashboard)
 - [Results](#results)
+- [Offline Evaluation](#offline-evaluation)
 - [Datasets](#datasets)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -154,6 +157,53 @@ Selective annotation highlights:
 </table>
 
 For detailed metrics, predictions, plots, and ablation studies, explore the `results/` directory.
+
+---
+
+# Offline Evaluation
+
+Run the CPU evaluation from the repository root with Python 3.10 or later.
+
+```bash
+python -m pip install matplotlib
+python scripts/eval_saved_predictions.py
+```
+
+The script compares the policies on the same saved predictions for IMDb,
+Jigsaw, and FEVER. Python and Matplotlib are enough to run it.
+
+- **Trust scorer** keeps Qwen's label and ranks examples by the saved calibrated
+  trust score. The marked point uses the saved balanced policy.
+- **Two-model agreement** accepts an example only when Qwen and DeBERTa predict
+  the same label. This rule gives a single operating point.
+- **DeBERTa-only** uses DeBERTa's own label and its saved probability. The marked
+  point gives the highest attainable coverage at or below the trust scorer's
+  balanced coverage. The curve also includes accepting every example.
+
+The script writes two files to [`results/offline_eval/`](results/offline_eval/).
+Use `--output-dir PATH` to write them elsewhere.
+
+- [`risk_coverage.png`](results/offline_eval/risk_coverage.png) plots the share
+  of accepted examples against the error rate among accepted labels. Each panel
+  has its own error scale. The curves connect distinct thresholds and keep tied
+  scores together.
+- [`class_errors.csv`](results/offline_eval/class_errors.csv) reports totals,
+  accepted counts, errors, coverage, and accepted error rates overall and by
+  gold class. An empty error rate means the policy accepted no examples in that
+  group. DeBERTa-only has rows at matched and full coverage.
+
+On Jigsaw, the original trust scorer and DeBERTa-only each accepted 2,311 of
+3,000 examples. DeBERTa-only made 14 errors overall, compared with 62 for the
+trust scorer. Among the 230 gold-toxic examples, DeBERTa-only accepted 14 and
+misclassified all 14. The trust scorer accepted 128 and misclassified 29.
+The [Jigsaw sampling record](results/llm_annotations_7b/jigsaw/jigsaw_sample/jigsaw_20k_sampling_report.json)
+shows that the course sample included rows from the original train,
+development, and test splits.
+
+The [answer-token pilot](results/answer_token_pilot/README.md) uses a local GPU
+to rescore 400 saved Jigsaw labels with Qwen2.5-7B-Instruct. It compares the raw
+answer-token probability with Qwen's saved self-report and the original trust
+scorer using Brier loss and risk–coverage.
 
 ---
 

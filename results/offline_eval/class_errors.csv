@@ -1,0 +1,41 @@
+dataset,method,policy,gold_class,total,accepted,errors,coverage,error_rate
+imdb,trust_scorer,balanced,overall,1816,1806,77,0.9944933920704846,0.04263565891472868
+imdb,trust_scorer,balanced,negative,889,885,37,0.9955005624296963,0.04180790960451977
+imdb,trust_scorer,balanced,positive,927,921,40,0.9935275080906149,0.04343105320304017
+imdb,agreement,labels_agree,overall,1816,1733,45,0.954295154185022,0.025966532025389497
+imdb,agreement,labels_agree,negative,889,847,26,0.952755905511811,0.030696576151121605
+imdb,agreement,labels_agree,positive,927,886,19,0.9557713052858684,0.02144469525959368
+imdb,deberta_only,matched_trust_coverage,overall,1816,1806,88,0.9944933920704846,0.048726467331118496
+imdb,deberta_only,matched_trust_coverage,negative,889,886,54,0.9966254218222722,0.060948081264108354
+imdb,deberta_only,matched_trust_coverage,positive,927,920,34,0.9924487594390508,0.03695652173913044
+imdb,deberta_only,full_coverage,overall,1816,1816,95,1.0,0.05231277533039647
+imdb,deberta_only,full_coverage,negative,889,889,56,1.0,0.06299212598425197
+imdb,deberta_only,full_coverage,positive,927,927,39,1.0,0.042071197411003236
+jigsaw,trust_scorer,balanced,overall,3000,2311,62,0.7703333333333333,0.026828212894850715
+jigsaw,trust_scorer,balanced,non-toxic,2770,2183,33,0.788086642599278,0.015116811726981219
+jigsaw,trust_scorer,balanced,toxic,230,128,29,0.5565217391304348,0.2265625
+jigsaw,agreement,labels_agree,overall,3000,2312,63,0.7706666666666667,0.027249134948096887
+jigsaw,agreement,labels_agree,non-toxic,2770,2183,33,0.788086642599278,0.015116811726981219
+jigsaw,agreement,labels_agree,toxic,230,129,30,0.5608695652173913,0.23255813953488372
+jigsaw,deberta_only,matched_trust_coverage,overall,3000,2311,14,0.7703333333333333,0.006057983556901774
+jigsaw,deberta_only,matched_trust_coverage,non-toxic,2770,2297,0,0.8292418772563177,0.0
+jigsaw,deberta_only,matched_trust_coverage,toxic,230,14,14,0.06086956521739131,1.0
+jigsaw,deberta_only,full_coverage,overall,3000,3000,143,1.0,0.04766666666666667
+jigsaw,deberta_only,full_coverage,non-toxic,2770,2770,54,1.0,0.019494584837545126
+jigsaw,deberta_only,full_coverage,toxic,230,230,89,1.0,0.3869565217391304
+fever,trust_scorer,balanced,overall,1500,839,239,0.5593333333333333,0.28486293206197855
+fever,trust_scorer,balanced,supports,493,255,62,0.5172413793103449,0.24313725490196078
+fever,trust_scorer,balanced,NOT ENOUGH INFO,529,309,111,0.5841209829867675,0.3592233009708738
+fever,trust_scorer,balanced,refutes,478,275,66,0.5753138075313807,0.24
+fever,agreement,labels_agree,overall,1500,843,239,0.562,0.2835112692763938
+fever,agreement,labels_agree,supports,493,255,62,0.5172413793103449,0.24313725490196078
+fever,agreement,labels_agree,NOT ENOUGH INFO,529,313,111,0.5916824196597353,0.3546325878594249
+fever,agreement,labels_agree,refutes,478,275,66,0.5753138075313807,0.24
+fever,deberta_only,matched_trust_coverage,overall,1500,839,226,0.5593333333333333,0.2693682955899881
+fever,deberta_only,matched_trust_coverage,supports,493,259,49,0.5253549695740365,0.1891891891891892
+fever,deberta_only,matched_trust_coverage,NOT ENOUGH INFO,529,279,110,0.5274102079395085,0.3942652329749104
+fever,deberta_only,matched_trust_coverage,refutes,478,301,67,0.6297071129707112,0.22259136212624583
+fever,deberta_only,full_coverage,overall,1500,1500,551,1.0,0.36733333333333335
+fever,deberta_only,full_coverage,supports,493,493,147,1.0,0.29817444219066935
+fever,deberta_only,full_coverage,NOT ENOUGH INFO,529,529,226,1.0,0.42722117202268434
+fever,deberta_only,full_coverage,refutes,478,478,178,1.0,0.3723849372384937

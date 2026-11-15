@@ -1,0 +1,47 @@
+{
+  "run": {
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+    "dtype": "bfloat16",
+    "gpu": "NVIDIA GeForce RTX 5080",
+    "gpu_memory_budget": "10GiB",
+    "peak_reserved_gib": 10.93,
+    "load_seconds": 6.5,
+    "inference_seconds": 37.34,
+    "batch_size": 16,
+    "seed": 42,
+    "sample_size": 400,
+    "torch": "2.13.0+cu132",
+    "transformers": "5.16.1",
+    "offloaded_modules": [
+      "model.layers.18",
+      "model.layers.19",
+      "model.layers.20",
+      "model.layers.21",
+      "model.layers.22",
+      "model.layers.23",
+      "model.layers.24",
+      "model.layers.25",
+      "model.layers.26",
+      "model.layers.27",
+      "model.norm",
+      "model.rotary_emb",
+      "lm_head"
+    ]
+  },
+  "saved_qwen_accuracy": 0.7975,
+  "methods": {
+    "answer_token": {
+      "brier_score": 0.22171624284770075,
+      "risk_at_75pct_coverage": 0.19333333333333333
+    },
+    "self_report": {
+      "brier_score": 0.156925,
+      "risk_at_75pct_coverage": 0.1488095238095238
+    },
+    "trust_scorer": {
+      "brier_score": 0.03800477569216907,
+      "risk_at_75pct_coverage": 0.005555555555555555
+    }
+  }
+}
