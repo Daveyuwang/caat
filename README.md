@@ -1,5 +1,5 @@
 # Confidence-Aware Annotation with LLMs  
-*A framework for reliable, auditable, semi-automated dataset labeling*
+**CAAT** (Confidence-Aware Annotation Toolkit) is a framework for reliable, auditable, semi-automated dataset labeling.
 
 Use agreement, disagreement, and calibrated trust scoring to decide when LLM annotations are safe to keep and when humans should intervene.  
 
