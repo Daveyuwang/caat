@@ -2,9 +2,8 @@
 
 import argparse
 import csv
+import sys
 from dataclasses import dataclass
-from itertools import groupby
-from operator import itemgetter
 from pathlib import Path
 
 from matplotlib.backends.backend_agg import FigureCanvasAgg
@@ -13,6 +12,10 @@ from matplotlib.ticker import MultipleLocator, PercentFormatter
 
 
 ROOT = Path(__file__).resolve().parents[1]
+# Let the course replay run directly from a checkout.
+sys.path.insert(0, str(ROOT / "src"))
+from caat.evaluation import grouped_counts, threshold_points
+
 DATASETS = {"imdb": "IMDb", "jigsaw": "Jigsaw", "fever": "FEVER"}
 
 
@@ -25,21 +28,6 @@ class Prediction:
     trust_score: float
     deberta_score: float
     balanced_accept: bool
-
-
-@dataclass(frozen=True)
-class Counts:
-    total: int
-    accepted: int
-    errors: int
-
-    @property
-    def coverage(self) -> float:
-        return self.accepted / self.total
-
-    @property
-    def error_rate(self) -> float | None:
-        return self.errors / self.accepted if self.accepted else None
 
 
 def load_predictions(path):
@@ -58,27 +46,12 @@ def load_predictions(path):
         ]
 
 
-def threshold_points(scored_errors):
-    """Count accepted rows and errors at each distinct score threshold."""
-    ranked = sorted(scored_errors, key=itemgetter(0), reverse=True)
-    accepted = errors = 0
-    points = []
-    for threshold, tied_rows in groupby(ranked, key=itemgetter(0)):
-        for _, is_error in tied_rows:
-            accepted += 1
-            errors += is_error
-        points.append((threshold, Counts(len(ranked), accepted, errors)))
-    return points
-
-
 def counts_by_class(predictions, labels, accept):
-    groups = {"overall": [0, 0, 0]}
-    for row, label, accepted in zip(predictions, labels, accept, strict=True):
-        for group in (groups["overall"], groups.setdefault(row.gold_class, [0, 0, 0])):
-            group[0] += 1
-            group[1] += accepted
-            group[2] += accepted and label != row.gold
-    return {name: Counts(*counts) for name, counts in groups.items()}
+    overall, by_class = grouped_counts(
+        (row.gold_class, accepted, label != row.gold)
+        for row, label, accepted in zip(predictions, labels, accept, strict=True)
+    )
+    return {"overall": overall, **by_class}
 
 
 def evaluate(predictions):

@@ -6,12 +6,46 @@ Use agreement, disagreement, and calibrated trust scoring to decide when LLM ann
 **Interactive Dashboard**: [https://one684proj.onrender.com/](https://one684proj.onrender.com/)  
 *Available for research purposes. Text content is not displayed. Not intended for public distribution.*
 
-[CPU policy comparison](#cpu-policy-comparison) · [GPU answer-token pilot](#gpu-answer-token-pilot)
+[Toolkit setup](#toolkit-setup) · [CPU policy comparison](#cpu-policy-comparison) · [GPU answer-token pilot](#gpu-answer-token-pilot)
+
+---
+
+# Toolkit setup
+
+Run from the repository root with Python 3.10 or later in an active virtual
+environment. The evaluator uses the Python standard library.
+
+```bash
+python -m pip install .
+caat evaluate examples/ticket_triage.csv --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --group-column inbox --threshold 0.75 --probability --output-dir replay/tickets
+```
+
+The example accepts 3 of 5 tickets and makes 1 error. CAAT writes
+`metrics.json` with overall, reference-class, and group counts and
+`risk_coverage.csv` with one row per distinct score.
+
+For your own CSV, use the default columns `id,prediction,reference,score` and
+an optional `group` column, or map your headers with the flags above. IDs must
+be unique. CAAT compares labels exactly and accepts scores at or above
+`--threshold`. Use `--probability` for scores that represent the probability
+of a correct prediction. CAAT then reports Brier score.
+
+### Coding agents
+
+Use an editable install for changes to [the evaluation core](src/caat/evaluation.py)
+or [the CLI](src/caat/cli.py). Run the focused toolkit tests before checking
+the [Jigsaw replay](#jigsaw-cli-replay).
+
+```bash
+python -m pip install -e .
+python -m unittest discover -s tests -p test_caat_evaluate.py
+```
 
 ---
 
 # Contents
 
+- [Toolkit setup](#toolkit-setup)
 - [Overview](#overview)
 - [System Architecture](#system-architecture)
 - [Key Features](#key-features)
@@ -202,6 +236,18 @@ The [Jigsaw sampling record](results/llm_annotations_7b/jigsaw/jigsaw_sample/jig
 shows that the course sample included rows from the original train,
 development, and test splits.
 
+### Jigsaw CLI replay
+
+Run the installed CLI on the saved Jigsaw trust scores at the original
+balanced threshold.
+
+```bash
+caat evaluate results/trust_scorer/jigsaw_lr_predictions.csv --id-column example_id --prediction-column llm_label_str --reference-column gold_label_str --score-column trust_score_calibrated --threshold 0.5 --probability --output-dir replay/jigsaw
+```
+
+The CLI accepts 2,311 of 3,000 labels (77.03% coverage), with 62 errors
+among them (2.68% error rate).
+
 ## GPU answer-token pilot
 
 The pilot scores the original Qwen2.5-7B-Instruct labels for 400 saved Jigsaw
@@ -266,6 +312,9 @@ For dataset structure, statistics, label mappings, and download information, see
 ---
 
 # Installation
+
+Install the course dependencies to run the original training scripts and Dash
+dashboard.
 
 ```bash
 git clone https://github.com/Daveyuwang/caat.git
