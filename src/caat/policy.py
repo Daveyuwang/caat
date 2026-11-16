@@ -1,8 +1,9 @@
 from random import Random
 
-from .audit import AuditRow, audit, validated_rows
-from .evaluation import Counts, ranking_metrics, threshold_points
-from .selection import design_thresholds, select_threshold
+from .audit import audit
+from .metrics import Counts, ranking_metrics, threshold_points
+from .select import design_thresholds, select_threshold
+from .table import GradedRow, validated_rows
 
 
 def split_rows(rows, seed):
@@ -33,7 +34,7 @@ def build_policy(
         for index, name in enumerate(everyone)
     }
     selection = select_threshold(
-        (AuditRow(row.id, row.score, row.outcomes[:len(graders)]) for row in calibration),
+        (GradedRow(row.id, row.score, row.outcomes[:len(graders)]) for row in calibration),
         graders=graders, thresholds=design_thresholds(row.score for row in design),
         risk_target=risk_target, failure_rate=failure_rate, rule=rule,
     )

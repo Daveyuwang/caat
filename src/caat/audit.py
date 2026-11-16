@@ -1,36 +1,12 @@
-from dataclasses import dataclass
 from math import ceil, isfinite
 from random import Random
 from typing import Iterable
 
-from .evaluation import grouped_counts
+from .metrics import grouped_counts
+from .table import GradedRow, validated_rows
 
 
-@dataclass(frozen=True)
-class AuditRow:
-    id: str
-    score: float
-    outcomes: tuple[bool, ...]
-    group: str | None = None
-
-
-def validated_rows(rows, graders, *, minimum_graders=1):
-    if len(graders) < minimum_graders or len(graders) != len(set(graders)) or not all(graders):
-        raise ValueError(f"provide at least {minimum_graders} distinct grader names")
-    rows = list(rows)
-    if not rows:
-        raise ValueError("at least one prediction is required")
-
-    seen = set()
-    for row in rows:
-        if not row.id or row.id in seen:
-            raise ValueError(f"empty or duplicate id: {row.id!r}")
-        seen.add(row.id)
-        if not isfinite(row.score):
-            raise ValueError(f"score for id {row.id!r} must be finite")
-        if len(row.outcomes) != len(graders) or any(type(bit) is not bool for bit in row.outcomes):
-            raise ValueError(f"id {row.id!r} must have one boolean result per grader")
-    return rows
+AuditRow = GradedRow
 
 
 def percentile_interval(values):
@@ -66,7 +42,7 @@ def bootstrap_shifts(pairs, replicates, seed):
 
 
 def audit(
-    rows: Iterable[AuditRow],
+    rows: Iterable[GradedRow],
     *,
     graders: tuple[str, ...],
     threshold: float,
