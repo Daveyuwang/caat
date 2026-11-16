@@ -3,15 +3,25 @@ import csv
 import json
 from importlib.metadata import version
 from pathlib import Path
+from time import perf_counter
 
 from .audit import audit
 from .calibrate import CALIBRATORS, apply_csv, fit_calibration, read_calibration
+from .collect import (
+    DEFAULT_MODEL,
+    DEFAULT_REVISION,
+    TransformersBackend,
+    collect_responses,
+    read_prompts,
+    write_responses,
+)
 from .evaluate import evaluate
-from .features import FEATURES, write_feature_csv
+from .features import DEFAULT_FEATURES, FEATURES, write_feature_csv
 from .html_report import write_html
 from .metrics import Counts, threshold_points
 from .plots import reliability_diagram, write_plot, write_svg
 from .policy import policy, split_rows
+from .queue import review_queue, write_queue
 from .report import emit, make_report, write_curve, write_report
 from .rules import RULES
 from .select import design_thresholds, select
@@ -201,6 +211,145 @@ def run_calibrate(args):
         print(
             f"Fitted {args.method} on {len(rows)} calibration rows. Wrote {args.output}."
         )
+    return 0
+
+
+def group_quota(value):
+    group, separator, limit = value.partition("=")
+    if not group or not separator or not limit.isdecimal():
+        raise argparse.ArgumentTypeError("use GROUP=COUNT for --quota")
+    return group, int(limit)
+
+
+def queue_options(parser):
+    parser.add_argument("predictions", type=Path, metavar="CSV")
+    parser.add_argument("--id-column", default="id")
+    parser.add_argument("--score-column", default="score")
+    parser.add_argument("--group-column")
+    parser.add_argument(
+        "--correct-column", action="append", help="Optional grades for replay."
+    )
+    parser.add_argument("--direction", choices=("higher", "lower"), default="higher")
+    parser.add_argument("--budget", type=int, required=True)
+    parser.add_argument(
+        "--quota", action="append", type=group_quota, metavar="GROUP=COUNT"
+    )
+    parser.add_argument("--output", type=Path, metavar="CSV", required=True)
+    parser.add_argument("--random-output", type=Path, metavar="CSV")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--json", action="store_true")
+
+
+def run_queue(args):
+    paths = [
+        path.resolve()
+        for path in (args.predictions, args.output, args.random_output)
+        if path is not None
+    ]
+    if len(paths) != len(set(paths)):
+        raise ValueError("input and queue output paths must be distinct")
+    quotas = dict(args.quota or ())
+    if len(quotas) != len(args.quota or ()):
+        raise ValueError("give at most one quota per group")
+    graders = tuple(args.correct_column or ())
+    rows, group = read_csv_rows(
+        args.predictions,
+        id_column=args.id_column,
+        score_column=args.score_column,
+        group_column=args.group_column,
+        correct_columns=graders,
+        require_labels=False,
+    )
+    chosen, random_rows, result = review_queue(
+        rows,
+        budget=args.budget,
+        direction=args.direction,
+        quotas=quotas,
+        graders=graders,
+        seed=args.seed,
+    )
+    write_queue(args.output, chosen)
+    if args.random_output is not None:
+        write_queue(args.random_output, random_rows)
+    meta = {
+        "path": str(args.predictions),
+        "id_column": args.id_column,
+        "score_column": args.score_column,
+        "group_column": group,
+        "correct_columns": list(graders),
+        "output_key_column": None,
+    }
+    emit(make_report("queue", meta, result), json_output=args.json)
+    return 0
+
+
+def collect_options(parser):
+    parser.add_argument("prompts", type=Path, metavar="JSONL")
+    parser.add_argument("--output", type=Path, metavar="JSONL", required=True)
+    parser.add_argument("--metadata", type=Path, metavar="JSON")
+    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--revision")
+    parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
+    parser.add_argument(
+        "--gpu-memory", help="Limit GPU model weights and offload to CPU (e.g. 10GiB)."
+    )
+    parser.add_argument("--local-files-only", action="store_true")
+    parser.add_argument("--max-new-tokens", type=int, default=32)
+    parser.add_argument("--p-true", action="store_true")
+    parser.add_argument("--verbalized", action="store_true")
+    parser.add_argument("--samples", type=int, default=0)
+    parser.add_argument("--seed", type=int, default=42)
+
+
+def run_collect(args):
+    paths = [
+        path.resolve()
+        for path in (args.prompts, args.output, args.metadata)
+        if path is not None
+    ]
+    if len(paths) != len(set(paths)):
+        raise ValueError("prompt, output, and metadata paths must be distinct")
+    if args.max_new_tokens < 1 or args.samples < 0:
+        raise ValueError(
+            "collect needs a positive token budget and a nonnegative sample count"
+        )
+    prompts = read_prompts(args.prompts)
+    revision = args.revision or (
+        DEFAULT_REVISION if args.model == DEFAULT_MODEL else None
+    )
+    start = perf_counter()
+    try:
+        backend = TransformersBackend(
+            args.model,
+            revision,
+            device=args.device,
+            seed=args.seed,
+            local_files_only=args.local_files_only,
+            gpu_memory=args.gpu_memory,
+        )
+        load_seconds = perf_counter() - start
+        records, timings = collect_responses(
+            prompts,
+            backend,
+            max_new_tokens=args.max_new_tokens,
+            p_true=args.p_true,
+            verbalized=args.verbalized,
+            samples=args.samples,
+        )
+    except (RuntimeError, TypeError) as exc:
+        raise ValueError(f"local model failed: {exc}") from exc
+    write_responses(args.output, records)
+    if args.metadata is not None:
+        meta = {
+            **backend.metadata,
+            "prompt_count": len(prompts),
+            "max_new_tokens": args.max_new_tokens,
+            "samples_per_prompt": args.samples,
+            "model_load_seconds": load_seconds,
+            "methods": timings,
+        }
+        write_report(args.metadata, json.dumps(meta, indent=2, allow_nan=False))
+    print(f"Collected {len(records)} responses to {args.output}.")
     return 0
 
 
@@ -436,7 +585,7 @@ def main(argv=None):
             )
         commands[name] = command
     feature_command = subcommands.add_parser(
-        "features", help="Compute scores from saved token log probabilities."
+        "features", help="Compute scores from saved responses."
     )
     feature_command.add_argument("predictions", type=Path, metavar="JSONL")
     feature_command.add_argument("--output", type=Path, metavar="CSV", required=True)
@@ -448,16 +597,28 @@ def main(argv=None):
         "calibrate", help="Fit and apply correctness probability maps."
     )
     calibrate_options(commands["calibrate"])
+    commands["queue"] = subcommands.add_parser(
+        "queue", help="Order saved predictions for review or labeling."
+    )
+    queue_options(commands["queue"])
+    commands["collect"] = subcommands.add_parser(
+        "collect", help="Save responses and confidence from a local Transformers model."
+    )
+    collect_options(commands["collect"])
     args = parser.parse_args(argv)
     try:
         if args.command == "features":
             count = write_feature_csv(
-                args.predictions, args.output, args.feature or tuple(FEATURES)
+                args.predictions, args.output, args.feature or DEFAULT_FEATURES
             )
             print(f"Wrote scores for {count} responses to {args.output}.")
             return 0
         if args.command == "calibrate":
             return run_calibrate(args)
+        if args.command == "queue":
+            return run_queue(args)
+        if args.command == "collect":
+            return run_collect(args)
         artifacts = output_paths(args)
         report, curve, curves, status = run(args)
         plot = getattr(args, "plot", None)

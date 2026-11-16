@@ -52,6 +52,16 @@ def describe(report):
         if "ece" in report:
             summary += "\n" + calibration_summary(report)
         return summary
+    if command == "queue":
+        lines = [
+            f"Queued {report['budget']} of {report['total']} rows in order of increasing confidence."
+        ]
+        for grader, counts in report["graders"].items():
+            lines.append(
+                f"{grader}: found {counts['errors_found']} errors. "
+                f"The random queue found {counts['random_errors_found']}."
+            )
+        return "\n".join(lines)
     if command == "audit":
         lines = [f"Threshold {report['threshold']!r}."]
         for grader, counts in report["graders"].items():

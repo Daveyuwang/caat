@@ -326,3 +326,19 @@ python scripts/figures.py --calibration-only
 The reference check compares isotonic and Platt predictions with
 scikit-learn, temperature loss with SciPy, Brier with scikit-learn,
 and ECE, ACE, and fixed-width histogram calculations with NumPy and SciPy.
+
+## Review queues
+
+The course replay orders saved Qwen labels by increasing DeBERTa
+probability of the Qwen label. The queue takes the bottom quarter of each
+archive and checks those rows against the gold labels.
+
+| Archive | Rows reviewed | Errors in confidence queue | Errors in random queue (seed 42) | Expected random errors |
+| --- | ---: | ---: | ---: | ---: |
+| IMDb | 454 | 68 | 23 | 19.5 |
+| Jigsaw | 750 | 633 | 157 | 167.75 |
+| FEVER | 375 | 289 | 189 | 173.25 |
+
+`python scripts/study_queue.py` regenerates the table from the saved
+course predictions. [Replay table](../../results/course/queue.csv) ·
+[Queue guide](../guide/queue.md)
