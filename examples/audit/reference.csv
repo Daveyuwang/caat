@@ -1,0 +1,6 @@
+id,output_key,correct
+1,run-a-ticket-1,1
+2,run-a-ticket-2,1
+3,run-a-ticket-3,0
+4,run-a-ticket-4,0
+5,run-a-ticket-5,1

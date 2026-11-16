@@ -1,6 +1,6 @@
 from dataclasses import asdict, dataclass
 from itertools import groupby
-from math import isfinite
+from math import fsum, isfinite
 from operator import itemgetter
 from statistics import mean
 from typing import Iterable
@@ -9,10 +9,11 @@ from typing import Iterable
 @dataclass(frozen=True)
 class Prediction:
     id: str
-    prediction: str
-    reference: str
+    prediction: str | None
+    reference: str | None
     score: float
     group: str | None = None
+    correct: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -44,6 +45,36 @@ def threshold_points(scored_errors: Iterable[tuple[float, bool]]) -> list[tuple[
             errors += is_error
         points.append((threshold, Counts(len(ranked), accepted, errors)))
     return points
+
+
+def ranking_metrics(points: list[tuple[float, Counts]]) -> dict:
+    """Use the expected prefix risk under uniform tie-breaking."""
+    total = points[-1][1]
+    correct = total.total - total.errors
+    previous_accepted = previous_errors = 0
+    pair_wins = []
+    prefix_risks = []
+    for _, counts in points:
+        size = counts.accepted - previous_accepted
+        tied_errors = counts.errors - previous_errors
+        pair_wins.append((size - tied_errors) * (total.errors - counts.errors + tied_errors / 2))
+        prefix_risks.extend(
+            (previous_errors + tied_errors * i / size) / (previous_accepted + i)
+            for i in range(1, size + 1)
+        )
+        previous_accepted = counts.accepted
+        previous_errors = counts.errors
+    aurc = fsum(prefix_risks) / total.total
+    gain = None
+    if correct and total.errors:
+        random_aurc = total.errors / total.total
+        oracle_aurc = fsum((k - correct) / k for k in range(correct + 1, total.total + 1)) / total.total
+        gain = (random_aurc - aurc) / (random_aurc - oracle_aurc)
+    return {
+        "auroc": fsum(pair_wins) / (correct * total.errors) if correct and total.errors else None,
+        "aurc": aurc,
+        "normalized_aurc_gain": gain,
+    }
 
 
 def grouped_counts(
@@ -78,9 +109,12 @@ def evaluate(
         raise ValueError("at least one prediction is required")
 
     seen = set()
+    errors = []
     for row in rows:
-        if not (row.id and row.prediction and row.reference):
-            raise ValueError("id, prediction, and reference must be nonempty")
+        if not row.id:
+            raise ValueError("id must be nonempty")
+        if row.correct is None and not (row.prediction and row.reference):
+            raise ValueError(f"id {row.id!r} needs a prediction and reference or a correctness result")
         if row.id in seen:
             raise ValueError(f"duplicate id: {row.id!r}")
         seen.add(row.id)
@@ -88,7 +122,8 @@ def evaluate(
             expected = "between 0 and 1" if probability else "finite"
             raise ValueError(f"score for id {row.id!r} must be {expected}")
 
-    errors = [row.prediction != row.reference for row in rows]
+        errors.append(not row.correct if row.correct is not None else row.prediction != row.reference)
+
     accepted = [row.score >= threshold for row in rows]
     overall, by_reference = grouped_counts(
         (row.reference, accept, error)
@@ -109,4 +144,4 @@ def evaluate(
         ),
     }
     curve = threshold_points((row.score, error) for row, error in zip(rows, errors, strict=True))
-    return metrics, curve
+    return {**metrics, **ranking_metrics(curve)}, curve

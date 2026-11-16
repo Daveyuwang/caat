@@ -38,6 +38,28 @@ class EvaluationTests(unittest.TestCase):
         self.assertIsNone(metrics["overall"]["error_rate"])
         self.assertIsNone(metrics["brier_score"])
 
+    def test_external_evaluator_results(self):
+        with TemporaryDirectory() as temp, redirect_stdout(StringIO()):
+            root = Path(temp)
+            predictions = root / "checks.csv"
+            predictions.write_text(
+                "id,score,strict_pass,group\n1,0.9,0,format\n2,0.8,1,format\n3,0.6,1,length\n",
+                encoding="utf-8",
+            )
+            main(["evaluate", str(predictions), "--correct-column", "strict_pass",
+                  "--threshold", "0.75", "--output-dir", temp])
+            metrics = json.loads((root / "metrics.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(metrics["overall"]["accepted"], 2)
+        self.assertEqual(metrics["overall"]["error_rate"], 0.5)
+        self.assertEqual(metrics["by_group"]["format"]["errors"], 1)
+        self.assertEqual(metrics["by_reference"], {})
+
+    def test_external_result_takes_precedence_over_exact_match(self):
+        prediction = Prediction("1", "a", "A", 0.9, correct=True)
+        metrics, _ = evaluate([prediction], threshold=0.5)
+        self.assertEqual(metrics["by_reference"]["A"]["errors"], 0)
+
     def test_invalid_inputs(self):
         row = Prediction("1", "A", "A", 0.9)
         with self.assertRaisesRegex(ValueError, "duplicate id"):
