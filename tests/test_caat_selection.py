@@ -34,6 +34,32 @@ class RankingTests(unittest.TestCase):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_holm_can_accept_a_later_cutoff_than_bonferroni(self):
+        rows = [
+            GradedRow(str(i), score, (correct,))
+            for i, (score, correct) in enumerate(
+                [(0.9, True)] * 12
+                + [(0.8, True)] * 8
+                + [(0.8, False)] * 2
+                + [(0.7, False)] * 10
+            )
+        ]
+        options = {
+            "graders": ("grader",),
+            "thresholds": (0.9, 0.8, 0.7),
+            "risk_target": 0.3,
+        }
+        self.assertEqual(
+            select(rows, rule="ltt-bonferroni", **options)["selected_threshold"], 0.9
+        )
+        report = select(rows, rule="ltt-holm", **options)
+        self.assertEqual(report["selected_threshold"], 0.8)
+        self.assertEqual(
+            [row["passes"] for row in report["candidates"]], [True, True, False]
+        )
+        self.assertEqual(report["guarantee"]["confidence"], 0.95)
+        self.assertIsNone(report["per_candidate_level"])
+
     def test_exact_binomial_tail_and_boundaries(self):
         self.assertAlmostEqual(
             binomial_pvalue(Counts(10, 5, 1), 0.25), 0.75**5 + 5 * 0.25 * 0.75**4
