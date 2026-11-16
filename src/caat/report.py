@@ -1,7 +1,6 @@
 """Render versioned CLI reports."""
 
 import csv
-import json
 
 from importlib.metadata import version
 
@@ -34,15 +33,23 @@ def write_curve(path, curve):
 
 
 def emit(report, *, json_output, output=None):
-    serialized = json.dumps(report, indent=2)
+    from .renderers import render_report
+
+    serialized = render_report("json", report)
     if output is not None:
         write_report(output, serialized)
-    print(serialized if json_output else describe(report))
+    print(serialized if json_output else render_report("text", report))
     return serialized
 
 
 def describe(report):
     command = report["command"]
+    if command == "plugins":
+        return "\n".join(
+            f"{stage}: "
+            + ", ".join(f"{entry['name']} ({entry['source']})" for entry in components)
+            for stage, components in report["stages"].items()
+        )
     if command == "policy":
         return describe_policy(report)
     if command == "evaluate":

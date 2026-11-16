@@ -2,8 +2,10 @@
 
 from dataclasses import dataclass
 from math import exp, expm1, fsum, lgamma, log, log1p
+from typing import Callable
 
 from .metrics import Counts
+from .registry import Registry
 
 
 def log_lower_tail(n, k, log_p, log_q):
@@ -104,9 +106,22 @@ def holm(candidates, risk_target, failure_rate):
     return RuleResult(tuple(decisions), controls_risk=True)
 
 
-RULES = {
-    "empirical": empirical,
-    "ltt-bonferroni": bonferroni,
-    "ltt-fixed-sequence": fixed_sequence,
-    "ltt-holm": holm,
-}
+@dataclass(frozen=True)
+class Rule:
+    choose: Callable
+    assumptions: str | None = None
+
+
+LTT_ASSUMPTIONS = (
+    "IID calibration from the target population and independent candidate thresholds"
+)
+RULES = Registry(
+    "rules",
+    Rule,
+    {
+        "empirical": Rule(empirical),
+        "ltt-bonferroni": Rule(bonferroni, LTT_ASSUMPTIONS),
+        "ltt-fixed-sequence": Rule(fixed_sequence, LTT_ASSUMPTIONS),
+        "ltt-holm": Rule(holm, LTT_ASSUMPTIONS),
+    },
+)

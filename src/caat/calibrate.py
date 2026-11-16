@@ -3,12 +3,15 @@
 import csv
 import json
 from bisect import bisect_right
+from dataclasses import dataclass
 from itertools import groupby
 from math import exp, fsum, isfinite, log, log1p
 from operator import itemgetter
 from pathlib import Path
+from typing import Callable
 
 from .metrics import probability_bin
+from .registry import Registry
 from .table import open_predictions_csv, parse_score
 
 
@@ -31,7 +34,7 @@ def input_values(score, scale):
     return score
 
 
-def fit_temperature(scores, outcomes):
+def fit_temperature(scores, outcomes, *, bins=10):
     # The derivative of the binary log loss increases with inverse temperature.
     if not any(scores):
         return {"inverse_temperature": 1.0}
@@ -50,7 +53,7 @@ def fit_temperature(scores, outcomes):
     return {"inverse_temperature": (lo + hi) / 2}
 
 
-def fit_platt(scores, outcomes):
+def fit_platt(scores, outcomes, *, bins=10):
     scale = max(map(abs, scores)) or 1.0
     pairs = [(score / scale, y) for score, y in zip(scores, outcomes, strict=True)]
     positive = sum(outcomes)
@@ -88,7 +91,7 @@ def fit_platt(scores, outcomes):
     return {"scale": scale, "slope": slope, "intercept": intercept}
 
 
-def fit_isotonic(scores, outcomes):
+def fit_isotonic(scores, outcomes, *, bins=10):
     knots, blocks = [], []
     pairs = sorted(zip(scores, outcomes, strict=True), key=itemgetter(0))
     for score, tied in groupby(pairs, key=itemgetter(0)):
@@ -115,7 +118,7 @@ def fit_isotonic(scores, outcomes):
     }
 
 
-def fit_histogram(scores, outcomes, bins):
+def fit_histogram(scores, outcomes, *, bins=10):
     totals, positive = [0] * bins, [0] * bins
     for score, outcome in zip(scores, outcomes, strict=True):
         index = probability_bin(score, bins)
@@ -129,101 +132,61 @@ def fit_histogram(scores, outcomes, bins):
     }
 
 
-CALIBRATORS = {
-    "temperature": fit_temperature,
-    "platt": fit_platt,
-    "isotonic": fit_isotonic,
-    "histogram": fit_histogram,
-}
+@dataclass(frozen=True)
+class Calibrator:
+    fit: Callable
+    restore: Callable
+    monotone: bool
+    input_scale: str = "score"
+    logits: bool = False
+    probability_only: bool = False
 
 
-def default_scale(method):
-    return "probability" if method in {"temperature", "histogram"} else "score"
+def finite_parameter(value):
+    if type(value) not in (float, int) or not isfinite(value):
+        raise ValueError("map parameters must be finite numbers")
+    return value
 
 
-def fit_calibration(scores, outcomes, *, method, input_scale=None, bins=10):
-    """Return a JSON-serializable map trained only on the supplied rows."""
-    if method not in CALIBRATORS:
-        raise ValueError(f"unknown calibration method: {method!r}")
-    input_scale = input_scale or default_scale(method)
-    if input_scale not in {"score", "probability"}:
-        raise ValueError("input scale must be score or probability")
-    if method == "histogram" and input_scale != "probability":
-        raise ValueError("histogram calibration requires probabilities")
-    if type(bins) is not int or bins < 1:
-        raise ValueError("bins must be a positive integer")
-    pairs = sorted(zip(scores, outcomes, strict=True))
-    if not pairs or any(y not in (0, 1) for _, y in pairs):
-        raise ValueError("calibration requires rows with binary correctness outcomes")
-    scores = [input_values(x, input_scale) for x, _ in pairs]
-    outcomes = [int(y) for _, y in pairs]
-    if input_scale == "probability" and method in {"temperature", "platt"}:
-        scores = [logit(x) for x in scores]
-    fit = CALIBRATORS[method]
-    params = (
-        fit(scores, outcomes, bins) if method == "histogram" else fit(scores, outcomes)
+def saved_probabilities(params):
+    values = [finite_parameter(y) for y in params["probabilities"]]
+    if not values or any(not 0 <= y <= 1 for y in values):
+        raise ValueError("map needs probabilities between 0 and 1")
+    return values
+
+
+def restore_temperature(params):
+    slope = finite_parameter(params["inverse_temperature"])
+    if slope <= 0:
+        raise ValueError("inverse temperature must be positive")
+    return lambda x: sigmoid(x * slope)
+
+
+def restore_platt(params):
+    scale, slope, intercept = (
+        finite_parameter(params[key]) for key in ("scale", "slope", "intercept")
     )
-    return {
-        "schema_version": 1,
-        "method": method,
-        "input_scale": input_scale,
-        "parameters": params,
-    }
+    if scale <= 0:
+        raise ValueError("Platt scale must be positive")
+    return lambda x: sigmoid((x / scale) * slope + intercept if slope else intercept)
 
 
-def calibration_transform(mapping):
-    """Validate a saved map and return its score-to-probability function."""
+def restore_histogram(params):
+    values = saved_probabilities(params)
+    return lambda x: values[probability_bin(x, len(values))]
 
-    def number(value):
-        if type(value) not in (float, int) or not isfinite(value):
-            raise ValueError("map parameters must be finite numbers")
-        return value
 
-    try:
-        if mapping["schema_version"] != 1:
-            raise ValueError("unsupported calibration map schema")
-        method, scale, params = (
-            mapping[k] for k in ("method", "input_scale", "parameters")
-        )
-        if scale not in {"score", "probability"} or method not in CALIBRATORS:
-            raise ValueError("unknown calibration method or input scale")
-        if method == "histogram" and scale != "probability":
-            raise ValueError("histogram calibration requires probabilities")
-        if method == "temperature":
-            slope = number(params["inverse_temperature"])
-            if slope <= 0:
-                raise ValueError("inverse temperature must be positive")
-        elif method == "platt":
-            divisor, slope, intercept = (
-                number(params[k]) for k in ("scale", "slope", "intercept")
-            )
-            if divisor <= 0:
-                raise ValueError("Platt scale must be positive")
-        else:
-            values = [number(y) for y in params["probabilities"]]
-            if not values or any(not 0 <= y <= 1 for y in values):
-                raise ValueError("map needs probabilities between 0 and 1")
-            if method == "isotonic":
-                knots = [number(x) for x in params["scores"]]
-                if (
-                    len(knots) != len(values)
-                    or any(a >= b for a, b in zip(knots, knots[1:]))
-                    or values != sorted(values)
-                ):
-                    raise ValueError("invalid isotonic knots")
-    except (KeyError, TypeError, OverflowError) as exc:
-        raise ValueError("invalid calibration map") from exc
+def restore_isotonic(params):
+    values = saved_probabilities(params)
+    knots = [finite_parameter(x) for x in params["scores"]]
+    if (
+        len(knots) != len(values)
+        or any(a >= b for a, b in zip(knots, knots[1:]))
+        or values != sorted(values)
+    ):
+        raise ValueError("invalid isotonic knots")
 
-    def transform(score):
-        x = input_values(score, scale)
-        if method in {"temperature", "platt"} and scale == "probability":
-            x = logit(x)
-        if method == "temperature":
-            return sigmoid(x * slope)
-        if method == "platt":
-            return sigmoid((x / divisor) * slope + intercept if slope else intercept)
-        if method == "histogram":
-            return values[probability_bin(x, len(values))]
+    def interpolate(x):
         right = bisect_right(knots, x)
         if right == 0:
             return values[0]
@@ -237,6 +200,99 @@ def calibration_transform(mapping):
             else (x - a) / (b - a)
         )
         return values[left] + fraction * (values[right] - values[left])
+
+    return interpolate
+
+
+CALIBRATORS = Registry(
+    "calibrators",
+    Calibrator,
+    {
+        "temperature": Calibrator(
+            fit_temperature, restore_temperature, True, "probability", logits=True
+        ),
+        "platt": Calibrator(fit_platt, restore_platt, False, logits=True),
+        "isotonic": Calibrator(fit_isotonic, restore_isotonic, True),
+        "histogram": Calibrator(
+            fit_histogram,
+            restore_histogram,
+            False,
+            "probability",
+            probability_only=True,
+        ),
+    },
+)
+
+
+def default_scale(method):
+    if method not in CALIBRATORS:
+        raise ValueError(f"unknown calibration method: {method!r}")
+    return CALIBRATORS[method].input_scale
+
+
+def check_scale(component, input_scale):
+    if input_scale not in {"score", "probability"}:
+        raise ValueError("input scale must be score or probability")
+    if component.probability_only and input_scale != "probability":
+        raise ValueError("this calibration method requires probabilities")
+
+
+def fit_calibration(scores, outcomes, *, method, input_scale=None, bins=10):
+    """Return a JSON-serializable map trained only on the supplied rows."""
+    if method not in CALIBRATORS:
+        raise ValueError(f"unknown calibration method: {method!r}")
+    component = CALIBRATORS[method]
+    input_scale = input_scale or component.input_scale
+    check_scale(component, input_scale)
+    if type(bins) is not int or bins < 1:
+        raise ValueError("bins must be a positive integer")
+    pairs = sorted(zip(scores, outcomes, strict=True))
+    if not pairs or any(y not in (0, 1) for _, y in pairs):
+        raise ValueError("calibration requires rows with binary correctness outcomes")
+    scores = [input_values(x, input_scale) for x, _ in pairs]
+    outcomes = [int(y) for _, y in pairs]
+    if input_scale == "probability" and component.logits:
+        scores = [logit(x) for x in scores]
+    params = component.fit(scores, outcomes, bins=bins)
+    if not isinstance(params, dict):
+        raise ValueError("a calibrator must return a dictionary of map parameters")
+    return {
+        "schema_version": 1,
+        "method": method,
+        "input_scale": input_scale,
+        "parameters": params,
+    }
+
+
+def calibration_transform(mapping):
+    """Validate a saved map and return its score-to-probability function."""
+
+    try:
+        if mapping["schema_version"] != 1:
+            raise ValueError("unsupported calibration map schema")
+        method, scale, params = (
+            mapping[k] for k in ("method", "input_scale", "parameters")
+        )
+        if method not in CALIBRATORS:
+            raise ValueError(f"unknown calibration method: {method!r}")
+        component = CALIBRATORS[method]
+        check_scale(component, scale)
+        predict = component.restore(params)
+        if not callable(predict):
+            raise ValueError(
+                "a calibrator must restore a score-to-probability callable"
+            )
+    except (KeyError, TypeError, OverflowError) as exc:
+        raise ValueError("invalid calibration map") from exc
+
+    def transform(score):
+        x = input_values(score, scale)
+        if component.logits and scale == "probability":
+            x = logit(x)
+        probability = float(predict(x))
+        if not 0 <= probability <= 1:
+            raise ValueError("a calibrated probability must be between 0 and 1")
+        return probability
 
     return transform
 

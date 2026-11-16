@@ -5,13 +5,14 @@ from math import exp
 from pathlib import Path
 
 from caat import GradedRow, evaluate
-from caat.calibrate import CALIBRATORS, calibration_transform, fit_calibration
+from caat.calibrate import calibration_transform, fit_calibration
 from caat.policy import split_rows
 
 from common import ROOT, SEED, read_csv, write_report
 
 
 HELM_MODEL = "qwen_qwen2.5-7b-instruct-turbo"
+METHODS = ("temperature", "platt", "isotonic", "histogram")
 
 
 def course_archives():
@@ -66,7 +67,7 @@ def replay_calibration(rows):
         "heldout": len(heldout),
     }
     yield "raw", counts, raw
-    for method in CALIBRATORS:
+    for method in METHODS:
         mapping = fit_calibration(
             scores, outcomes, method=method, input_scale="probability"
         )

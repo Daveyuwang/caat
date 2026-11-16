@@ -21,14 +21,14 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss, roc_auc_score
 
 from caat import load_csv, select
-from caat.calibrate import CALIBRATORS, calibration_transform, fit_calibration
+from caat.calibrate import calibration_transform, fit_calibration
 from caat.metrics import Counts, calibration_metrics
 from caat.policy import split_rows
 from caat.rules import binomial_pvalue
 from caat.select import design_thresholds
 
 from common import ARCHIVES, ROOT, SEED, read_csv, write_report
-from study_calibration import archives
+from study_calibration import METHODS, archives
 from study_modules import course_predictions, load_archive, score_archive
 
 
@@ -287,7 +287,7 @@ def verify_calibration(replay):
         z_clipped = np.clip(z, 1e-12, 1 - 1e-12)
         z_logits = np.log(z_clipped / (1 - z_clipped))
         scale = np.abs(logits).max() or 1
-        for method in ("raw", *CALIBRATORS):
+        for method in ("raw", *METHODS):
             if method == "raw":
                 values = z
             else:

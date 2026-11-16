@@ -210,13 +210,12 @@ def grader_comparison(report):
     return canvas(width, axis + 54, title, marks)
 
 
-def write_plot(path, report, curve=None):
-    data = (
-        risk_coverage(report, curve)
+def render_plot(report, curve=None):
+    return (
+        risk_coverage(report, curve or ())
         if report["command"] == "evaluate"
         else grader_comparison(report)
     )
-    write_svg(path, data)
 
 
 def write_svg(path, data):

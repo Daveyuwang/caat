@@ -15,40 +15,20 @@ fixtures, and replay the three bundled CPU benchmarks. A change to a report
 or a numerical method needs the corresponding test and an explanation of
 the affected fields or results.
 
-## Add a selection rule
+## Extend a pipeline stage
 
-Add a function to [`src/caat/rules.py`](src/caat/rules.py). It receives the
-candidate table in descending threshold order, a risk target, and a
-failure rate. Return a `RuleResult` with one decision per candidate.
-`True` marks a qualifying cutoff, `False` marks a failed test, and
-`None` marks a candidate the rule skipped. CAAT selects the least
-restrictive qualifying threshold.
+Implement a component, register it, and add a hand-checkable case
+and documentation. Use the examples to test a plugin in a separate
+package or register a built-in in the stage's module. The contract
+suite runs against each installed component.
+[Registry contracts and six worked examples](docs/guide/plugins.md) ·
+[Contract tests](tests/contracts/test_components.py)
 
-For example, an empirical rule that divides the target by two can reuse
-the existing rule.
+For a new core component, include an independent reference or a
+hand-checked result and a saved replay on two task types. Document the
+comparison in [benchmark results](docs/research/benchmarks.md).
 
-```python
-def half_target(candidates, risk_target, failure_rate):
-    return empirical(candidates, risk_target / 2, failure_rate)
-
-
-RULES["half-target"] = half_target
-```
-
-Add its name to the README and a hand-checkable case to
-[`tests/test_caat_selection.py`](tests/test_caat_selection.py). The CLI
-reads its choices from the registry. A statistical rule should set
-`controls_risk=True` only when its test controls the stated risk under
-the sampling assumptions. Set `per_candidate_level` when the same
-significance level applies to all candidates.
-
-## Add an input adapter or benchmark
-
-An adapter yields `caat.GradedRow` records with stable IDs, finite scores,
-and Boolean outcomes in grader order. Include output identities when the
-source records them. An adapter can live in `caat/adapters/` and consume
-the existing public API without changes to the policy or metric code.
-[CSV input contract](docs/guide/csv-format.md)
+## Add a benchmark
 
 A benchmark preparation script belongs in `scripts/`. Reuse cached downloads
 and CSV writing from `scripts/common.py`. Document the dataset revision,
@@ -56,6 +36,15 @@ split, saved output run, score definition, grader, and a replay command.
 Fit score functions on design data and choose thresholds on calibration
 data before evaluating held-out rows.
 [Benchmark sources and preparation](docs/research/benchmarks.md)
+
+## Public interface
+
+CAAT versions the names exported from `caat`, the six plugin contracts,
+CLI flags, exit codes, and documented report fields. A flag or report
+field stays available through at least one minor release after
+deprecation. A reporting change that alters the meaning of an existing
+field increments `schema_version`. Keep the [report guide](docs/guide/reports.md),
+[golden reports](tests/golden), and [changelog](CHANGELOG.md) aligned.
 
 ## Build a release
 
@@ -77,6 +66,6 @@ After the maintainer approves PyPI publication, set up a Trusted Publisher
 for project `caat-annotation` with owner `Daveyuwang`, repository `caat`,
 workflow `release.yml`, and environment `pypi`. Run the Release workflow
 from the version tag with `publish` enabled. Then install the exact version
-in a fresh environment with `python -m pip install caat-annotation==0.1.0`
+in a fresh environment with `python -m pip install caat-annotation==VERSION`
 and run the README examples.
 [Create a PyPI project with a Trusted Publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)
