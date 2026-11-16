@@ -15,7 +15,7 @@ def table(headers, rows):
     return f'<div class="scroll"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div>'
 
 
-def write_html(path, report, curve, curves):
+def render_html(report, curve=None, curves=None):
     command = report["command"]
     sections = [f"<pre>{escape(describe(report))}</pre>"]
     charts = 0
@@ -33,7 +33,7 @@ def write_html(path, report, curve, curves):
         )
 
     if command == "evaluate":
-        add_chart(risk_coverage(report, curve))
+        add_chart(risk_coverage(report, curve or ()))
         if "reliability_bins" in report:
             add_chart(reliability_diagram(report["reliability_bins"]))
             sections.append(
@@ -107,7 +107,7 @@ def write_html(path, report, curve, curves):
 
     title = f"CAAT {command} report"
     body = "\n".join(sections)
-    document = f"""<!doctype html>
+    return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -128,5 +128,3 @@ td,th {{border-bottom:1px solid #dbe4e9;padding:.4rem .6rem;text-align:left}}
 </main></body>
 </html>
 """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(document, encoding="utf-8", newline="\n")

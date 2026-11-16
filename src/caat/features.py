@@ -11,6 +11,8 @@ from statistics import mean
 from typing import Callable, Sequence
 from unicodedata import normalize
 
+from .registry import Registry
+
 
 @dataclass(frozen=True)
 class SavedResponse:
@@ -139,7 +141,7 @@ class Feature:
     cost: str = "no-extra-call"
 
 
-FEATURES = {
+_TOKEN_FEATURES = {
     "mean_token_logprob": Feature(mean_token_logprob),
     "sequence_logprob": Feature(sequence_logprob),
     "low_token_logprob": Feature(low_token_logprob),
@@ -150,23 +152,35 @@ FEATURES = {
         answer_span_logprob, requires=("text", "tokens", "answer_span")
     ),
 }
-DEFAULT_FEATURES = tuple(FEATURES)
-FEATURES.update(
-    p_true=Feature(
-        lambda response: response.p_true, requires=("p_true",), cost="one-extra-call"
-    ),
-    verbalized_confidence=Feature(
-        lambda response: parse_confidence(response.verbalized_confidence),
-        requires=("verbalized_confidence",),
-        cost="one-extra-call",
-    ),
-    sample_agreement=Feature(sample_agreement, requires=("samples",), cost="n-samples"),
-    normalized_sample_agreement=Feature(
-        normalized_sample_agreement, requires=("samples",), cost="n-samples"
-    ),
-    semantic_entropy=Feature(
-        semantic_entropy, direction="lower", requires=("clusters",), cost="n-samples"
-    ),
+DEFAULT_FEATURES = tuple(_TOKEN_FEATURES)
+FEATURES = Registry(
+    "features",
+    Feature,
+    {
+        **_TOKEN_FEATURES,
+        "p_true": Feature(
+            lambda response: response.p_true,
+            requires=("p_true",),
+            cost="one-extra-call",
+        ),
+        "verbalized_confidence": Feature(
+            lambda response: parse_confidence(response.verbalized_confidence),
+            requires=("verbalized_confidence",),
+            cost="one-extra-call",
+        ),
+        "sample_agreement": Feature(
+            sample_agreement, requires=("samples",), cost="n-samples"
+        ),
+        "normalized_sample_agreement": Feature(
+            normalized_sample_agreement, requires=("samples",), cost="n-samples"
+        ),
+        "semantic_entropy": Feature(
+            semantic_entropy,
+            direction="lower",
+            requires=("clusters",),
+            cost="n-samples",
+        ),
+    },
 )
 
 FULL_SCORE_FIELDS = (

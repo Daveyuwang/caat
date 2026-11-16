@@ -9,6 +9,7 @@
 - Score saved confidence checks, answer samples, and semantic clusters. Collect model responses with the optional local Transformers backend.
 - Compare candidate scores against random and length controls with paired intervals and a design-only recommendation.
 - Keep only the IDs, outcomes, and scores needed to replay the course comparisons.
+- Discover installed feature, calibrator, metric, rule, adapter, and renderer plugins through Python entry points. List them with `caat plugins`.
 
 ## 0.1.0
 

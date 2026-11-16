@@ -5,6 +5,7 @@ from importlib.metadata import version
 from pathlib import Path
 from time import perf_counter
 
+from .adapters import ADAPTERS
 from .audit import audit
 from .calibrate import CALIBRATORS, apply_csv, fit_calibration, read_calibration
 from .collect import (
@@ -17,11 +18,12 @@ from .collect import (
 )
 from .evaluate import evaluate
 from .features import DEFAULT_FEATURES, FEATURES, write_feature_csv
-from .html_report import write_html
-from .metrics import Counts, threshold_points
-from .plots import reliability_diagram, write_plot, write_svg
+from .metrics import METRICS, Counts, threshold_points
+from .plots import reliability_diagram, write_svg
+from .plugins import catalog
 from .policy import policy, split_rows
 from .queue import review_queue, write_queue
+from .renderers import RENDERERS, render_report
 from .report import emit, make_report, write_curve, write_report
 from .rules import RULES
 from .scores import COSTS, DEFAULT_COVERAGES, compare_scores, read_score_rows
@@ -49,6 +51,11 @@ def column_options(parser):
     parser.add_argument("--score-column", default="score")
     parser.add_argument("--group-column", help="Defaults to 'group' when present.")
     parser.add_argument(
+        "--adapter", choices=ADAPTERS, help="Read input through a registered adapter."
+    )
+    parser.add_argument("--render", choices=RENDERERS, metavar="NAME")
+    parser.add_argument("--render-output", type=Path, metavar="FILE")
+    parser.add_argument(
         "--output-key-column", help="Column identifying the saved output."
     )
     parser.add_argument("--json", action="store_true", help="Print the JSON report.")
@@ -71,6 +78,9 @@ def selection_options(parser):
 
 def evaluate_options(parser):
     parser.add_argument("--threshold", type=float, required=True)
+    parser.add_argument(
+        "--metric", action="append", choices=METRICS, help="Add a registered metric."
+    )
     parser.add_argument(
         "--output-dir", type=Path, help="Also write metrics.json and risk_coverage.csv."
     )
@@ -444,6 +454,8 @@ def load_inputs(args):
         )
     files = getattr(args, "grader_file", None)
     if files:
+        if args.adapter is not None:
+            raise ValueError("separate grader files use the built-in CSV join")
         key = key or "output_sha256"
         rows, group = join_grader_files(
             args.predictions, files, **common, output_key_column=key, selection=selected
@@ -469,8 +481,7 @@ def load_inputs(args):
                     reference or "reference",
                 )
             meta.update(prediction_column=prediction, reference_column=reference)
-        rows, group = read_csv_rows(
-            args.predictions,
+        options = dict(
             **common,
             correct_columns=(*columns, *checks),
             output_key_column=key,
@@ -478,6 +489,14 @@ def load_inputs(args):
             reference_column=reference,
             selection=selected,
         )
+        if args.adapter is None:
+            rows, group = read_csv_rows(args.predictions, **options)
+        else:
+            rows = list(ADAPTERS[args.adapter].read(args.predictions, options))
+            group = args.group_column or (
+                "group" if any(row.group is not None for row in rows) else None
+            )
+            meta["adapter"] = args.adapter
     meta["group_column"] = group
     return rows, meta
 
@@ -487,6 +506,7 @@ def run(args):
     graders = tuple(args.correct_column or ())
     curve = None
     exit_code = 0
+    html = getattr(args, "html", None) is not None or args.render == "html"
     if args.command == "evaluate":
         if (
             args.reliability_plot is not None or args.bins != 10
@@ -495,7 +515,11 @@ def run(args):
                 "calibration bins and reliability plots require --probability"
             )
         result, curve = evaluate(
-            rows, threshold=args.threshold, probability=args.probability, bins=args.bins
+            rows,
+            threshold=args.threshold,
+            probability=args.probability,
+            bins=args.bins,
+            extra_metrics=args.metric or (),
         )
     elif args.command == "audit":
         if args.grader_file:
@@ -548,10 +572,10 @@ def run(args):
             calibration_input=args.calibration_input,
         )
         exit_code = int(not result["confirmed"])
-        if getattr(args, "html", None) is not None:
+        if html:
             _, _, rows = split_rows(rows, args.seed)
             graders = (*graders, *(args.check_column or ()))
-    if getattr(args, "html", None) is not None and args.command in {"audit", "policy"}:
+    if html and args.command in {"audit", "policy"}:
         threshold = (
             result["threshold"]
             if args.command == "audit"
@@ -594,6 +618,8 @@ def output_paths(args):
         else ()
     )
     outputs = {*artifacts}
+    if (args.render is None) != (args.render_output is None):
+        raise ValueError("--render and --render-output are used together")
     if args.output is not None:
         if artifacts and args.output.resolve() == artifacts[1].resolve():
             raise ValueError("--output cannot replace risk_coverage.csv")
@@ -602,12 +628,13 @@ def output_paths(args):
         ("plot", ".svg"),
         ("reliability_plot", ".svg"),
         ("html", ".html"),
+        ("render_output", None),
     ):
         path = getattr(args, option, None)
         if path is None:
             continue
         flag = "--" + option.replace("_", "-")
-        if path.suffix.lower() != suffix:
+        if suffix is not None and path.suffix.lower() != suffix:
             raise ValueError(f"{flag} needs a {suffix} file")
         if path.resolve() in {output.resolve() for output in outputs}:
             raise ValueError(f"{flag} must use a different path from report outputs")
@@ -678,6 +705,10 @@ def main(argv=None):
         "scores", help="Compare saved scores on shared labels and coverage budgets."
     )
     scores_options(commands["scores"])
+    commands["plugins"] = subcommands.add_parser(
+        "plugins", help="List available components and their sources."
+    )
+    commands["plugins"].add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     try:
         if args.command == "features":
@@ -694,17 +725,27 @@ def main(argv=None):
             return run_collect(args)
         if args.command == "scores":
             return run_scores(args)
+        if args.command == "plugins":
+            emit(
+                make_report("plugins", {}, {"stages": catalog()}), json_output=args.json
+            )
+            return 0
         artifacts = output_paths(args)
         report, curve, curves, status = run(args)
         plot = getattr(args, "plot", None)
         if plot is not None:
-            write_plot(plot, report, curve)
+            write_svg(plot, render_report("svg", report, curve=curve))
         reliability = getattr(args, "reliability_plot", None)
         if reliability is not None:
             write_svg(reliability, reliability_diagram(report["reliability_bins"]))
         html = getattr(args, "html", None)
         if html is not None:
-            write_html(html, report, curve, curves)
+            write_svg(html, render_report("html", report, curve=curve, curves=curves))
+        if args.render is not None:
+            write_svg(
+                args.render_output,
+                render_report(args.render, report, curve=curve, curves=curves),
+            )
         if artifacts:
             artifact, curve_path = artifacts
             artifact.parent.mkdir(parents=True, exist_ok=True)

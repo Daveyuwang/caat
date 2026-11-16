@@ -4,7 +4,7 @@ from math import ceil, isfinite
 from operator import attrgetter
 
 from .metrics import Counts
-from .rules import RULES, binomial_pvalue
+from .rules import RULES, RuleResult, binomial_pvalue
 from .table import validated_rows
 
 
@@ -53,7 +53,18 @@ def select(
                 "pvalue": pvalue,
             }
         )
-    decision = RULES[rule](candidates, risk_target, failure_rate)
+    component = RULES[rule]
+    decision = component.choose(candidates, risk_target, failure_rate)
+    if (
+        not isinstance(decision, RuleResult)
+        or len(decision.decisions) != len(candidates)
+        or any(
+            value is not None and type(value) is not bool
+            for value in decision.decisions
+        )
+        or (decision.controls_risk and not component.assumptions)
+    ):
+        raise ValueError(f"selection rule {rule!r} returned invalid decisions")
     for candidate, passes in zip(candidates, decision.decisions, strict=True):
         candidate.update(tested=passes is not None, passes=passes)
     index = decision.selected_index
@@ -67,7 +78,7 @@ def select(
         "per_candidate_level": decision.per_candidate_level,
         "guarantee": {
             "confidence": 1 - failure_rate,
-            "assumptions": "IID calibration from the target population and independent candidate thresholds",
+            "assumptions": component.assumptions,
         }
         if decision.controls_risk and selected is not None
         else None,

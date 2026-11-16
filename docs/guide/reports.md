@@ -9,6 +9,8 @@ code 2 signals invalid input. `evaluate --output-dir DIR` also writes
 per-grader risk at the selected cutoff. Add `--html FILE.html` to any of
 these three commands for an offline report with embedded SVGs. For a
 standalone reliability diagram, use `evaluate --probability --reliability-plot FILE.svg`.
+Use `--render NAME --render-output FILE` for a registered report renderer.
+[Plugins](plugins.md)
 
 Each rate is a fraction between 0 and 1. Risk has value `null` when the
 policy accepts no rows. In the tables, `*` stands for a key in a map and
@@ -114,6 +116,9 @@ policy accepts no rows. In the tables, `*` stands for a key in a map and
 | `confirmed` | True if a cutoff is selected and all graders meet the empirical target on held-out rows. |
 
 `heldout` is null when selection finds no cutoff.
+
+An explicit `--adapter NAME` adds `input.adapter`. Metrics selected with
+`evaluate --metric NAME` appear under `extra_metrics`, keyed by name.
 
 When `--calibrate METHOD` is used, `probability_calibration.graders` contains
 one fitted `map` per selection grader. Each entry reports

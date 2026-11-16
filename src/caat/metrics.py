@@ -5,7 +5,9 @@ from itertools import groupby
 from math import fsum
 from operator import itemgetter
 from statistics import mean
-from typing import Iterable
+from typing import Callable, Iterable
+
+from .registry import Registry
 
 
 def probability_bin(probability, bins):
@@ -161,3 +163,34 @@ def grouped_counts(
     return Counts(total, accepted_total, errors_total), {
         name: Counts(*counts) for name, counts in groups.items()
     }
+
+
+@dataclass(frozen=True)
+class Metric:
+    compute: Callable
+    requires_probability: bool = False
+    direction: str = "none"
+
+
+def ranking_for_rows(rows, *, points=None):
+    if points is None:
+        points = threshold_points((row.score, not row.outcomes[0]) for row in rows)
+    return ranking_metrics(points)
+
+
+def calibration_for_rows(rows, *, bins=10):
+    return calibration_metrics(
+        (row.score for row in rows), (row.outcomes[0] for row in rows), bins=bins
+    )
+
+
+METRICS = Registry(
+    "metrics",
+    Metric,
+    {
+        "ranking": Metric(ranking_for_rows, direction="mixed"),
+        "calibration": Metric(
+            calibration_for_rows, requires_probability=True, direction="lower"
+        ),
+    },
+)

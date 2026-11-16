@@ -5,9 +5,8 @@ from typing import Iterable
 
 from .metrics import (
     Counts,
-    calibration_metrics,
+    METRICS,
     grouped_counts,
-    ranking_metrics,
     threshold_points,
 )
 from .table import GradedRow, validated_rows
@@ -19,6 +18,7 @@ def evaluate(
     threshold: float,
     probability: bool = False,
     bins: int = 10,
+    extra_metrics=(),
 ) -> tuple[dict, list[tuple[float, Counts]]]:
     """Return metrics at a fixed threshold and the attainable risk–coverage points."""
     if not isfinite(threshold):
@@ -48,12 +48,19 @@ def evaluate(
         "brier_score": None,
     }
     if probability:
-        metrics.update(
-            calibration_metrics(
-                (row.score for row in rows), (not error for error in errors), bins=bins
-            )
-        )
+        metrics.update(METRICS["calibration"].compute(rows, bins=bins))
+    if extra_metrics:
+        metrics["extra_metrics"] = {}
+        for name in extra_metrics:
+            if name in metrics["extra_metrics"]:
+                raise ValueError(f"duplicate metric {name!r}")
+            if name not in METRICS:
+                raise ValueError(f"unknown metric {name!r}")
+            metric = METRICS[name]
+            if metric.requires_probability and not probability:
+                raise ValueError(f"metric {name!r} requires --probability")
+            metrics["extra_metrics"][name] = metric.compute(rows)
     curve = threshold_points(
         (row.score, error) for row, error in zip(rows, errors, strict=True)
     )
-    return {**metrics, **ranking_metrics(curve)}, curve
+    return {**metrics, **METRICS["ranking"].compute(rows, points=curve)}, curve
