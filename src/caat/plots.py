@@ -51,8 +51,11 @@ def risk_coverage(report, curve):
     threshold = report["threshold"]
     marks = [
         label(left, 27, "Risk and coverage", size=18, weight="650"),
-        label(left, 47, f"Selected cutoff {threshold:.8g}", color=MUTED),
     ]
+    title = "Risk and coverage"
+    if threshold is not None:
+        title = f"Risk and coverage at cutoff {threshold:.8g}"
+        marks.append(label(left, 47, f"Selected cutoff {threshold:.8g}", color=MUTED))
     for value in (0, 0.25, 0.5, 0.75, 1):
         marks.extend(
             [
@@ -85,13 +88,62 @@ def risk_coverage(report, curve):
         f'<polyline points="{points}" fill="none" stroke="{BLUE}" stroke-width="2.5"/>'
     )
     overall = report["overall"]
-    selected = x(overall["coverage"])
-    marks.append(line(selected, upper, selected, lower, ORANGE, dashed=True))
-    if overall["error_rate"] is not None:
-        marks.append(
-            f'<circle cx="{selected}" cy="{y(overall["error_rate"])}" r="5" fill="{ORANGE}"/>'
+    if threshold is not None:
+        selected = x(overall["coverage"])
+        marks.append(line(selected, upper, selected, lower, ORANGE, dashed=True))
+        if overall["error_rate"] is not None:
+            marks.append(
+                f'<circle cx="{selected}" cy="{y(overall["error_rate"])}" r="5" fill="{ORANGE}"/>'
+            )
+    return canvas(width, height, title, marks)
+
+
+def reliability_diagram(bins):
+    width, height = 670, 350
+    left, right, top, bottom = 66, 642, 66, 283
+
+    def x(value):
+        return round(left + (right - left) * value, 2)
+
+    def y(value):
+        return round(bottom - (bottom - top) * value, 2)
+
+    title = "Reliability diagram"
+    marks = [
+        label(left, 27, title, size=18, weight="650"),
+        label(left, top - 10, "Observed correctness", color=MUTED),
+        label(
+            (left + right) / 2,
+            bottom + 46,
+            "Mean predicted probability",
+            anchor="middle",
+            color=MUTED,
+        ),
+    ]
+    for value in (0, 0.25, 0.5, 0.75, 1):
+        marks.extend(
+            [
+                line(left, y(value), right, y(value)),
+                label(
+                    left - 10, y(value) + 4, f"{value:.0%}", anchor="end", color=MUTED
+                ),
+                label(
+                    x(value), bottom + 20, f"{value:.0%}", anchor="middle", color=MUTED
+                ),
+            ]
         )
-    return canvas(width, height, f"Risk and coverage at cutoff {threshold:.8g}", marks)
+    marks.append(line(left, bottom, right, top, ORANGE, dashed=True))
+    for row in bins:
+        if row["count"]:
+            description = (
+                f"{row['count']} rows, mean probability {row['mean_probability']:.2%}, "
+                f"observed correctness {row['accuracy']:.2%}"
+            )
+            marks.append(
+                f'<circle cx="{x(row["mean_probability"])}" cy="{y(row["accuracy"])}" r="5" fill="{BLUE}">'
+                f"<title>{description}</title></circle>"
+            )
+    return canvas(width, height, title, marks)
 
 
 def grader_comparison(report):
@@ -164,5 +216,9 @@ def write_plot(path, report, curve=None):
         if report["command"] == "evaluate"
         else grader_comparison(report)
     )
+    write_svg(path, data)
+
+
+def write_svg(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(data, encoding="utf-8", newline="\n")

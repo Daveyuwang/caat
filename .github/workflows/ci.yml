@@ -52,7 +52,8 @@ jobs:
       - name: README examples
         run: |
           caat --version
-          caat evaluate examples/ticket_triage.csv --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --group-column inbox --threshold 0.75 --probability --output-dir replay/tickets
+          caat evaluate examples/ticket_triage.csv --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --group-column inbox --threshold 0.75 --probability --output-dir replay/tickets --reliability-plot replay/tickets/reliability.svg --html replay/tickets/report.html
+          git diff --no-index --ignore-cr-at-eol --exit-code docs/figures/calibration-example.svg replay/tickets/reliability.svg
           caat policy examples/ifeval_graders.csv --score-column mean_token_logprob --correct-column strict_pass --check-column helm_strict_pass --risk-target 0.4 --plot replay/readme-policy.svg
           git diff --no-index --ignore-cr-at-eol --exit-code docs/figures/policy-example.svg replay/readme-policy.svg
           audit_status=0

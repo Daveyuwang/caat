@@ -35,3 +35,13 @@ The source is `replay/judge_study/auroc.csv`.
 
 The [policy example](policy-example.svg) is produced separately by
 `caat policy --plot` using the command in the [README](../../README.md).
+
+## Calibration
+
+Run `python scripts/figures.py --calibration-only` to plot the bundled
+held-out calibration bins. The diagonal indicates perfect agreement, and
+larger marks indicate more rows in the bin.
+[SVG](calibration-replay.svg) · [PDF](calibration-replay.pdf)
+
+The [ticket reliability example](calibration-example.svg) comes from the
+README's `caat evaluate` command with `--reliability-plot FILE.svg`.

@@ -285,3 +285,44 @@ answer-token score when a multiple-choice pipeline records aligned token
 probabilities, and evaluate its presence rate as part of onboarding.
 [Risk–coverage and Brier tables](../../results/module_study/ranking.csv) ·
 [Paired score differences](../../results/module_study/ranking_deltas.csv)
+## Correctness calibration
+
+The replay compares temperature, Platt, isotonic, and histogram maps with
+the original probability on five archives. IMDb, Jigsaw, and FEVER have
+two scores for the Qwen label: Qwen's verbalized probability and DeBERTa's
+probability of that label. WildBench and Omni-MATH use archived HELM
+Qwen2.5-7B-Instruct-Turbo responses, with GPT scores of at least 7 and GPT
+answer equivalence as their respective outcomes. For these two archives,
+the geometric mean of response-token probabilities is treated as a
+candidate correctness probability for the comparison.
+
+The replay sorts stable IDs and splits with seed 42 using the same 20/40/40
+procedure as `caat policy`. It fits each map on the middle 40% and computes
+Brier, ECE, ACE, and AUROC on the final 40%. Each method is reported
+alongside the original scores.
+
+Seven of the eight archive–score pairs lower held-out Brier under at least
+one map. On Jigsaw with DeBERTa, the raw Brier score is 0.0309 and the raw
+ECE is 0.0114. All four maps increase both errors on this split.
+[All held-out metrics](../../results/calibration/summary.csv) ·
+[Reliability bins](../../results/calibration/reliability.csv)
+
+![Held-out reliability on FEVER, Jigsaw, and Omni-MATH](../figures/calibration-replay.svg)
+
+Marker size increases with bin count. The figure shows one fixed method,
+Platt scaling, and the raw score on three distinct tasks. The full table
+includes all four fitted methods.
+
+With the prepared HELM archives already cached, replay the study and
+rebuild the figure using the pinned research environment. The figure step
+reads the saved table and runs offline.
+
+```bash
+python scripts/study_calibration.py
+python scripts/verify_toolkit.py
+python scripts/figures.py --calibration-only
+```
+
+The reference check compares isotonic and Platt predictions with
+scikit-learn, temperature loss with SciPy, Brier with scikit-learn,
+and ECE, ACE, and fixed-width histogram calculations with NumPy and SciPy.

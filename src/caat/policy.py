@@ -2,7 +2,8 @@ from operator import attrgetter
 from random import Random
 
 from .audit import audit
-from .metrics import Counts, ranking_metrics, threshold_points
+from .calibrate import calibration_transform, default_scale, fit_calibration
+from .metrics import Counts, calibration_metrics, ranking_metrics, threshold_points
 from .select import design_thresholds, select
 from .table import GradedRow, validated_rows
 
@@ -24,6 +25,8 @@ def policy(
     failure_rate=0.05,
     rule="ltt-bonferroni",
     seed=42,
+    calibrate=None,
+    calibration_input=None,
 ) -> dict:
     """Select a cutoff on calibration rows and replay it unchanged on held-out rows.
 
@@ -79,7 +82,7 @@ def policy(
             check["accepted_comparisons"] = audit(
                 heldout, graders=everyone, threshold=threshold, risk_target=risk_target
             )["accepted_comparisons"]
-    return {
+    report = {
         "schema_version": 1,
         "split": {
             "seed": seed,
@@ -94,3 +97,31 @@ def policy(
         "confirmed": check is not None
         and all(result["meets_target"] is True for result in check["graders"].values()),
     }
+    if calibrate is not None:
+        scale = calibration_input or default_scale(calibrate)
+        estimates = {}
+        for index, name in enumerate(graders):
+            mapping = fit_calibration(
+                (row.score for row in calibration),
+                (row.outcomes[index] for row in calibration),
+                method=calibrate,
+                input_scale=scale,
+            )
+            transform = calibration_transform(mapping)
+            grades = [row.outcomes[index] for row in heldout]
+            scores = [row.score for row in heldout]
+            estimates[name] = {
+                "map": mapping,
+                "heldout_uncalibrated": calibration_metrics(scores, grades)
+                if scale == "probability"
+                else None,
+                "heldout_calibrated": calibration_metrics(
+                    map(transform, scores), grades
+                ),
+            }
+        report["probability_calibration"] = {
+            "method": calibrate,
+            "threshold_scale": "raw",
+            "graders": estimates,
+        }
+    return report

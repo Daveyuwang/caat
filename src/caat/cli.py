@@ -1,17 +1,21 @@
 import argparse
 import csv
+import json
 from importlib.metadata import version
 from pathlib import Path
 
 from .audit import audit
+from .calibrate import CALIBRATORS, apply_csv, fit_calibration, read_calibration
 from .evaluate import evaluate
 from .features import FEATURES, write_feature_csv
-from .plots import write_plot
-from .policy import policy
+from .html_report import write_html
+from .metrics import Counts, threshold_points
+from .plots import reliability_diagram, write_plot, write_svg
+from .policy import policy, split_rows
 from .report import emit, make_report, write_curve, write_report
 from .rules import RULES
 from .select import design_thresholds, select
-from .table import join_grader_files, read_csv_rows, read_design_scores
+from .table import join_grader_files, load_csv, read_csv_rows, read_design_scores
 
 
 def grader_source(value):
@@ -62,7 +66,16 @@ def evaluate_options(parser):
     parser.add_argument(
         "--probability",
         action="store_true",
-        help="Report Brier score for correctness probabilities.",
+        help="Report Brier score, ECE, ACE, and reliability bins for probabilities.",
+    )
+    parser.add_argument(
+        "--bins", type=int, default=10, help="Number of calibration bins."
+    )
+    parser.add_argument(
+        "--reliability-plot",
+        type=Path,
+        metavar="FILE.svg",
+        help="Write a reliability SVG.",
     )
     parser.add_argument(
         "--prediction-column", help="Defaults to 'prediction' for exact matching."
@@ -133,6 +146,62 @@ def policy_options(parser):
     parser.add_argument(
         "--check-column", action="append", help="Repeat for each held-out-only grader."
     )
+    parser.add_argument("--calibrate", choices=CALIBRATORS, metavar="METHOD")
+    parser.add_argument("--calibration-input", choices=("score", "probability"))
+
+
+def calibrate_options(parser):
+    operations = parser.add_subparsers(dest="operation", required=True)
+    fit = operations.add_parser("fit", help="Fit a map using labeled calibration rows.")
+    apply = operations.add_parser("apply", help="Apply a saved map to a CSV.")
+    for command in (fit, apply):
+        command.add_argument("predictions", type=Path, metavar="CSV")
+        command.add_argument("--score-column", default="score")
+        command.add_argument("--output", type=Path, required=True)
+    fit.add_argument("--method", required=True, choices=CALIBRATORS)
+    fit.add_argument("--input-scale", choices=("score", "probability"))
+    fit.add_argument("--id-column", default="id")
+    fit.add_argument("--correct-column", required=True)
+    fit.add_argument("--bins", type=int, default=10, help="Number of histogram bins.")
+    apply.add_argument("--map", type=Path, required=True)
+    apply.add_argument("--probability-column", default="calibrated_probability")
+
+
+def run_calibrate(args):
+    applying = args.operation == "apply"
+    inputs = {args.predictions.resolve()}
+    if applying:
+        inputs.add(args.map.resolve())
+    if args.output.resolve() in inputs:
+        raise ValueError("output would overwrite a calibration input")
+    if applying:
+        count = apply_csv(
+            args.predictions,
+            args.output,
+            read_calibration(args.map),
+            args.score_column,
+            args.probability_column,
+        )
+        print(f"Wrote {count} calibrated probabilities to {args.output}.")
+    else:
+        rows = load_csv(
+            args.predictions,
+            id_column=args.id_column,
+            score_column=args.score_column,
+            correct_columns=(args.correct_column,),
+        )
+        mapping = fit_calibration(
+            (row.score for row in rows),
+            (row.outcomes[0] for row in rows),
+            method=args.method,
+            input_scale=args.input_scale,
+            bins=args.bins,
+        )
+        write_report(args.output, json.dumps(mapping, indent=2, allow_nan=False))
+        print(
+            f"Fitted {args.method} on {len(rows)} calibration rows. Wrote {args.output}."
+        )
+    return 0
 
 
 def load_inputs(args):
@@ -201,8 +270,14 @@ def run(args):
     curve = None
     exit_code = 0
     if args.command == "evaluate":
+        if (
+            args.reliability_plot is not None or args.bins != 10
+        ) and not args.probability:
+            raise ValueError(
+                "calibration bins and reliability plots require --probability"
+            )
         result, curve = evaluate(
-            rows, threshold=args.threshold, probability=args.probability
+            rows, threshold=args.threshold, probability=args.probability, bins=args.bins
         )
     elif args.command == "audit":
         if args.grader_file:
@@ -241,6 +316,8 @@ def run(args):
         )
         exit_code = int(result["selected_threshold"] is None)
     else:
+        if args.calibration_input is not None and args.calibrate is None:
+            raise ValueError("--calibration-input requires --calibrate")
         result = policy(
             rows,
             graders=graders,
@@ -249,9 +326,39 @@ def run(args):
             failure_rate=args.failure_rate,
             rule=args.rule,
             seed=args.seed,
+            calibrate=args.calibrate,
+            calibration_input=args.calibration_input,
         )
         exit_code = int(not result["confirmed"])
-    return make_report(args.command, meta, result), curve, exit_code
+        if getattr(args, "html", None) is not None:
+            _, _, rows = split_rows(rows, args.seed)
+            graders = (*graders, *(args.check_column or ()))
+    if getattr(args, "html", None) is not None and args.command in {"audit", "policy"}:
+        threshold = (
+            result["threshold"]
+            if args.command == "audit"
+            else result["selection"]["selected_threshold"]
+        )
+        accepted = [
+            row for row in rows if threshold is not None and row.score >= threshold
+        ]
+        curves = {}
+        for index, name in enumerate(graders):
+            view = {
+                "threshold": threshold,
+                "overall": Counts(
+                    len(rows),
+                    len(accepted),
+                    sum(not row.outcomes[index] for row in accepted),
+                ).metrics(),
+            }
+            curves[name] = (
+                view,
+                threshold_points((row.score, not row.outcomes[index]) for row in rows),
+            )
+    else:
+        curves = None
+    return make_report(args.command, meta, result), curve, curves, exit_code
 
 
 def output_paths(args):
@@ -273,13 +380,20 @@ def output_paths(args):
         if artifacts and args.output.resolve() == artifacts[1].resolve():
             raise ValueError("--output cannot replace risk_coverage.csv")
         outputs.add(args.output)
-    plot = getattr(args, "plot", None)
-    if plot is not None:
-        if plot.suffix.lower() != ".svg":
-            raise ValueError("--plot needs an .svg file")
-        if plot.resolve() in {path.resolve() for path in outputs}:
-            raise ValueError("--plot must use a different path from report outputs")
-        outputs.add(plot)
+    for option, suffix in (
+        ("plot", ".svg"),
+        ("reliability_plot", ".svg"),
+        ("html", ".html"),
+    ):
+        path = getattr(args, option, None)
+        if path is None:
+            continue
+        flag = "--" + option.replace("_", "-")
+        if path.suffix.lower() != suffix:
+            raise ValueError(f"{flag} needs a {suffix} file")
+        if path.resolve() in {output.resolve() for output in outputs}:
+            raise ValueError(f"{flag} must use a different path from report outputs")
+        outputs.add(path)
     if inputs.intersection(path.resolve() for path in outputs):
         raise ValueError("output would overwrite an input CSV")
     return artifacts
@@ -314,6 +428,12 @@ def main(argv=None):
                 metavar="FILE.svg",
                 help="Write an SVG view of the report.",
             )
+            command.add_argument(
+                "--html",
+                type=Path,
+                metavar="FILE.html",
+                help="Write a standalone HTML report.",
+            )
         commands[name] = command
     feature_command = subcommands.add_parser(
         "features", help="Compute scores from saved token log probabilities."
@@ -324,6 +444,10 @@ def main(argv=None):
         "--feature", action="append", choices=FEATURES, help="Repeat to choose scores."
     )
     commands["features"] = feature_command
+    commands["calibrate"] = subcommands.add_parser(
+        "calibrate", help="Fit and apply correctness probability maps."
+    )
+    calibrate_options(commands["calibrate"])
     args = parser.parse_args(argv)
     try:
         if args.command == "features":
@@ -332,11 +456,19 @@ def main(argv=None):
             )
             print(f"Wrote scores for {count} responses to {args.output}.")
             return 0
+        if args.command == "calibrate":
+            return run_calibrate(args)
         artifacts = output_paths(args)
-        report, curve, status = run(args)
+        report, curve, curves, status = run(args)
         plot = getattr(args, "plot", None)
         if plot is not None:
             write_plot(plot, report, curve)
+        reliability = getattr(args, "reliability_plot", None)
+        if reliability is not None:
+            write_svg(reliability, reliability_diagram(report["reliability_bins"]))
+        html = getattr(args, "html", None)
+        if html is not None:
+            write_html(html, report, curve, curves)
         if artifacts:
             artifact, curve_path = artifacts
             artifact.parent.mkdir(parents=True, exist_ok=True)

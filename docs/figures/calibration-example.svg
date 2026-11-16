@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 670 350" role="img" aria-labelledby="title">
+<title id="title">Reliability diagram</title>
+<rect width="670" height="350" fill="white"/>
+<g font-family="system-ui, sans-serif">
+<text x="66" y="27" fill="#172b38" font-size="18" font-weight="650" text-anchor="start">Reliability diagram</text>
+<text x="66" y="56" fill="#496170" font-size="13" font-weight="400" text-anchor="start">Observed correctness</text>
+<text x="354.0" y="329" fill="#496170" font-size="13" font-weight="400" text-anchor="middle">Mean predicted probability</text>
+<line x1="66" y1="283" x2="642" y2="283" stroke="#dbe4e9"/>
+<text x="56" y="287" fill="#496170" font-size="13" font-weight="400" text-anchor="end">0%</text>
+<text x="66" y="303" fill="#496170" font-size="13" font-weight="400" text-anchor="middle">0%</text>
+<line x1="66" y1="228.75" x2="642" y2="228.75" stroke="#dbe4e9"/>
+<text x="56" y="232.75" fill="#496170" font-size="13" font-weight="400" text-anchor="end">25%</text>
+<text x="210.0" y="303" fill="#496170" font-size="13" font-weight="400" text-anchor="middle">25%</text>
+<line x1="66" y1="174.5" x2="642" y2="174.5" stroke="#dbe4e9"/>
+<text x="56" y="178.5" fill="#496170" font-size="13" font-weight="400" text-anchor="end">50%</text>
+<text x="354.0" y="303" fill="#496170" font-size="13" font-weight="400" text-anchor="middle">50%</text>
+<line x1="66" y1="120.25" x2="642" y2="120.25" stroke="#dbe4e9"/>
+<text x="56" y="124.25" fill="#496170" font-size="13" font-weight="400" text-anchor="end">75%</text>
+<text x="498.0" y="303" fill="#496170" font-size="13" font-weight="400" text-anchor="middle">75%</text>
+<line x1="66" y1="66" x2="642" y2="66" stroke="#dbe4e9"/>
+<text x="56" y="70" fill="#496170" font-size="13" font-weight="400" text-anchor="end">100%</text>
+<text x="642" y="303" fill="#496170" font-size="13" font-weight="400" text-anchor="middle">100%</text>
+<line x1="66" y1="283" x2="642" y2="66" stroke="#b54e00" stroke-dasharray="5 4"/>
+<circle cx="123.6" cy="283.0" r="5" fill="#0072b2"><title>1 rows, mean probability 10.00%, observed correctness 0.00%</title></circle>
+<circle cx="296.4" cy="66.0" r="5" fill="#0072b2"><title>1 rows, mean probability 40.00%, observed correctness 100.00%</title></circle>
+<circle cx="498.0" cy="174.5" r="5" fill="#0072b2"><title>2 rows, mean probability 75.00%, observed correctness 50.00%</title></circle>
+<circle cx="584.4" cy="66.0" r="5" fill="#0072b2"><title>1 rows, mean probability 90.00%, observed correctness 100.00%</title></circle>
+</g>
+</svg>

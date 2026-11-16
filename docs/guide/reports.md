@@ -6,7 +6,9 @@ or not you use `--json`. A valid report can accompany exit code 1. Exit
 code 2 signals invalid input. `evaluate --output-dir DIR` also writes
 `metrics.json` and `risk_coverage.csv`. Use `--plot FILE.svg` with
 `evaluate` for a risk–coverage curve or with `audit` and `policy` for
-per-grader risk at the selected cutoff.
+per-grader risk at the selected cutoff. Add `--html FILE.html` to any of
+these three commands for an offline report with embedded SVGs. For a
+standalone reliability diagram, use `evaluate --probability --reliability-plot FILE.svg`.
 
 Each rate is a fraction between 0 and 1. Risk has value `null` when the
 policy accepts no rows. In the tables, `*` stands for a key in a map and
@@ -41,6 +43,9 @@ policy accepts no rows. In the tables, `*` stands for a key in a map and
 | `by_reference` | The same counts and rates by reference label. |
 | `by_group` | The same counts and rates by group. |
 | `brier_score` | Brier loss when scores are supplied as probabilities. |
+| `ece` | Expected calibration error from fixed-width bins. Present with `--probability`. |
+| `ace` | Mean absolute calibration gap over nonempty adaptive bins. Present with `--probability`. |
+| `reliability_bins` | Fixed-width probability intervals with row counts, mean probability, and observed correctness. Present with `--probability`. |
 | `auroc` | Area under the ROC curve for the correctness labels. |
 | `aurc` | Mean risk over prefixes of the score ranking, averaging over ties. |
 | `normalized_aurc_gain` | AURC improvement on random order as a fraction of the oracle improvement. |
@@ -109,3 +114,10 @@ policy accepts no rows. In the tables, `*` stands for a key in a map and
 | `confirmed` | True if a cutoff is selected and all graders meet the empirical target on held-out rows. |
 
 `heldout` is null when selection finds no cutoff.
+
+When `--calibrate METHOD` is used, `probability_calibration.graders` contains
+one fitted `map` per selection grader. Each entry reports
+`heldout_calibrated` and, for probability inputs, `heldout_uncalibrated`.
+These field values use the same Brier, ECE, ACE, and reliability-bin
+definitions as `evaluate`. The policy cutoff stays on the raw score scale.
+[Calibration workflow](calibration.md)
