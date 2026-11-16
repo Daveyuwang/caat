@@ -1,57 +1,16 @@
 import argparse
 import csv
 import json
-from contextlib import contextmanager
 from importlib.metadata import version
 from pathlib import Path
 
-from .audit import AuditRow, audit
-from .evaluation import Prediction, evaluate
+from .audit import audit
+from .evaluate import evaluate
+from .evaluation import read_predictions
 from .policy import build_policy, describe
-from .selection import RULES, design_thresholds, select_threshold
-
-
-@contextmanager
-def open_predictions_csv(path: Path, required: set[str], group_column: str | None):
-    with path.open(encoding="utf-8-sig", newline="") as source:
-        reader = csv.DictReader(source)
-        header = reader.fieldnames or []
-        if len(header) != len(set(header)):
-            raise ValueError("CSV column names must be unique")
-        if group_column is not None:
-            required = required | {group_column}
-        missing = sorted(required.difference(header))
-        if missing:
-            raise ValueError(f"missing CSV columns: {', '.join(missing)}. The file has: {', '.join(header)}")
-        if group_column is None and "group" in header:
-            group_column = "group"
-        yield reader, group_column
-
-
-def parse_score(value, line):
-    try:
-        return float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"invalid score at CSV line {line}") from exc
-
-
-def parse_correct(value, line):
-    if value not in ("0", "1"):
-        raise ValueError(f"correctness must be 0 or 1 at CSV line {line}")
-    return value == "1"
-
-
-def read_predictions(path: Path, columns: dict[str, str], group_column: str | None):
-    with open_predictions_csv(path, set(columns.values()), group_column) as (reader, group_column):
-        for row in reader:
-            values = {name: row[column] for name, column in columns.items()}
-            score = parse_score(values["score"], reader.line_num)
-            correct = parse_correct(values["correct"], reader.line_num) if "correct" in columns else None
-            group = (row[group_column] or None) if group_column is not None else None
-            yield Prediction(
-                values["id"], values.get("prediction"), values.get("reference"),
-                score, group=group, correct=correct,
-            )
+from .rules import RULES
+from .select import design_thresholds, select_threshold
+from .table import join_grader_files, load_predictions, read_design_scores, read_graded_rows
 
 
 def grader_source(value):
@@ -68,61 +27,6 @@ def prediction_filter(value):
     return column, expected
 
 
-@contextmanager
-def open_audit_predictions(args, required):
-    selection = args.prediction_filter
-    if selection is not None:
-        required = required | {selection[0]}
-    with open_predictions_csv(args.predictions, required, args.group_column) as (reader, group_column):
-        rows = reader
-        if selection is not None:
-            column, expected = selection
-            rows = (row for row in reader if row[column] == expected)
-        yield rows, reader, group_column
-
-
-def join_grader_files(args):
-    required = {args.id_column, args.score_column, args.output_key_column}
-    with open_audit_predictions(args, required) as (rows, reader, group_column):
-        predictions = {}
-        for row in rows:
-            item_id, key = row[args.id_column], row[args.output_key_column]
-            if not item_id or item_id in predictions:
-                raise ValueError(f"{args.predictions}: empty or duplicate id: {item_id!r}")
-            if not key:
-                raise ValueError(f"{args.predictions}: missing output key for {item_id!r}")
-            predictions[item_id] = (
-                parse_score(row[args.score_column], reader.line_num),
-                key,
-                (row[group_column] or None) if group_column is not None else None,
-            )
-    if not predictions:
-        raise ValueError("at least one prediction is required")
-
-    outcomes = []
-    for name, path in args.grader:
-        bits = {}
-        with open_predictions_csv(path, {args.id_column, args.output_key_column, "correct"}, None) as (reader, _):
-            for row in reader:
-                item_id = row[args.id_column]
-                if item_id not in predictions:
-                    raise ValueError(f"{name}: unexpected id {item_id!r}")
-                if item_id in bits:
-                    raise ValueError(f"{name}: duplicate id {item_id!r}")
-                if row[args.output_key_column] != predictions[item_id][1]:
-                    raise ValueError(f"{name}: output key mismatch for {item_id!r}")
-                bits[item_id] = parse_correct(row["correct"], reader.line_num)
-        missing = predictions.keys() - bits.keys()
-        if missing:
-            raise ValueError(f"{name}: missing {len(missing)} ids, including {min(missing)!r}")
-        outcomes.append(bits)
-    rows = (
-        AuditRow(item_id, score, tuple(bits[item_id] for bits in outcomes), group)
-        for item_id, (score, _, group) in predictions.items()
-    )
-    return rows, group_column
-
-
 def run_audit(args, command):
     if args.fail_on_target and args.risk_target is None:
         command.error("--fail-on-target requires --risk-target")
@@ -133,21 +37,18 @@ def run_audit(args, command):
         }
         if args.grader:
             graders = tuple(name for name, _ in args.grader)
-            rows, group_column = join_grader_files(args)
-            report = audit(rows, graders=graders, **options)
+            rows, group_column = join_grader_files(
+                args.predictions, args.grader, id_column=args.id_column, score_column=args.score_column,
+                output_key_column=args.output_key_column, group_column=args.group_column,
+                selection=args.prediction_filter,
+            )
         else:
             graders = tuple(args.correct_column)
-            required = {args.id_column, args.score_column, *graders}
-            with open_audit_predictions(args, required) as (source_rows, reader, group_column):
-                rows = (
-                    AuditRow(
-                        row[args.id_column], parse_score(row[args.score_column], reader.line_num),
-                        tuple(parse_correct(row[name], reader.line_num) for name in graders),
-                        (row[group_column] or None) if group_column is not None else None,
-                    )
-                    for row in source_rows
-                )
-                report = audit(rows, graders=graders, **options)
+            rows, group_column = read_graded_rows(
+                args.predictions, args.id_column, args.score_column, graders,
+                group_column=args.group_column, selection=args.prediction_filter,
+            )
+        report = audit(rows, graders=graders, **options)
     except (OSError, ValueError, csv.Error) as exc:
         command.error(str(exc))
     report["input"] = {
@@ -168,20 +69,12 @@ def run_audit(args, command):
     return 0
 
 
-def read_graded_rows(path, id_column, score_column, graders):
-    with open_predictions_csv(path, {id_column, score_column, *graders}, None) as (reader, _):
-        return [
-            AuditRow(row[id_column], parse_score(row[score_column], reader.line_num),
-                     tuple(parse_correct(row[name], reader.line_num) for name in graders))
-            for row in reader
-        ]
-
-
 def run_policy(args, command):
     graders, check_graders = tuple(args.correct_column), tuple(args.check_column or ())
     try:
+        rows, _ = read_graded_rows(args.predictions, args.id_column, args.score_column, (*graders, *check_graders))
         report = build_policy(
-            read_graded_rows(args.predictions, args.id_column, args.score_column, (*graders, *check_graders)),
+            rows,
             graders=graders, check_graders=check_graders, risk_target=args.risk_target,
             failure_rate=args.failure_rate, rule=args.rule, seed=args.seed,
         )
@@ -198,13 +91,10 @@ def run_select(args, command):
         if args.design is not None:
             if args.design.resolve() == args.calibration.resolve():
                 raise ValueError("design and calibration must be separate CSVs")
-            with open_predictions_csv(args.design, {args.score_column}, None) as (reader, _):
-                thresholds = design_thresholds(
-                    parse_score(row[args.score_column], reader.line_num) for row in reader
-                )
+            thresholds = design_thresholds(read_design_scores(args.design, args.score_column))
+        rows, _ = read_graded_rows(args.calibration, args.id_column, args.score_column, graders)
         report = select_threshold(
-            read_graded_rows(args.calibration, args.id_column, args.score_column, graders),
-            graders=graders, thresholds=thresholds, risk_target=args.risk_target,
+            rows, graders=graders, thresholds=thresholds, risk_target=args.risk_target,
             failure_rate=args.failure_rate, rule=args.rule,
         )
     except (OSError, ValueError, csv.Error) as exc:
@@ -304,7 +194,7 @@ def main(argv=None):
             columns["reference"] = args.reference_column
     try:
         metrics, curve = evaluate(
-            read_predictions(args.predictions, columns, args.group_column),
+            load_predictions(args.predictions, columns, args.group_column),
             threshold=args.threshold,
             probability=args.probability,
         )
