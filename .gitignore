@@ -3,3 +3,4 @@ __pycache__/
 *.egg-info/
 build/
 replay/
+results/trust_scorer/models/*_rf_pipeline.joblib

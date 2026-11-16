@@ -1,6 +1,6 @@
-# Datasets
+# Course datasets
 
-This directory contains three benchmark datasets for annotation reliability analysis.
+The course project used three benchmark datasets for annotation reliability analysis.
 
 **Download processed datasets**: [Hugging Face - limbo23/cs1684models/data](https://huggingface.co/limbo23/cs1684models/tree/main/data)
 
@@ -34,7 +34,7 @@ This directory contains three benchmark datasets for annotation reliability anal
   - Development: 97,320 samples
   - Test: 97,320 samples
   - Total: 1,999,514 samples
-- Stratified 20k sample (used for LLM annotations): 20,000 samples sampled from test set
+- LLM annotations use a stratified 20,000-row sample with rows from the original train, development, and test splits. [Sampling record](../../results/llm_annotations_7b/jigsaw/jigsaw_sample/jigsaw_20k_sampling_report.json)
 ---
 
 ## FEVER
@@ -68,7 +68,7 @@ This directory contains three benchmark datasets for annotation reliability anal
 
 **Notes on Usage**:
 - **IMDb**: Full dataset used for both DeBERTa training and LLM annotations
-- **Jigsaw**: Full 2M dataset for DeBERTa training; 20k stratified sample from test set for LLM annotations
+- **Jigsaw** uses the labeled dataset for supervised training and the 20,000-row sample for LLM annotation.
 - **FEVER**: Full 145k training set for DeBERTa; paper dev/test datasets (9,999 each) for LLM annotations
 
 ---
