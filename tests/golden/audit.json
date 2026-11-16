@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "threshold": 0.75,
   "risk_target": 0.4,
   "primary_grader": "reference",
@@ -74,15 +74,18 @@
       }
     }
   ],
+  "command": "audit",
+  "caat_version": "0.1.0",
   "input": {
     "path": "examples/audit/predictions.csv",
     "id_column": "id",
     "score_column": "score",
-    "group_column": "group",
+    "correct_columns": [],
     "output_key_column": "output_key",
     "grader_files": {
       "reference": "examples/audit/reference.csv",
       "rubric": "examples/audit/rubric.csv"
-    }
+    },
+    "group_column": "group"
   }
 }

@@ -1,22 +1,21 @@
 import argparse
 import csv
-import json
 from importlib.metadata import version
 from pathlib import Path
 
 from .audit import audit
 from .evaluate import evaluate
-from .evaluation import read_predictions
-from .policy import build_policy, describe
+from .policy import policy
+from .report import emit, make_report, write_curve, write_report
 from .rules import RULES
-from .select import design_thresholds, select_threshold
-from .table import join_grader_files, load_predictions, read_design_scores, read_graded_rows
+from .select import design_thresholds, select
+from .table import join_grader_files, read_csv_rows, read_design_scores
 
 
 def grader_source(value):
     name, _, path = value.partition("=")
     if not name or not path:
-        raise argparse.ArgumentTypeError("use NAME=CSV for --grader")
+        raise argparse.ArgumentTypeError("use NAME=CSV for --grader-file")
     return name, Path(path)
 
 
@@ -27,189 +26,170 @@ def prediction_filter(value):
     return column, expected
 
 
-def run_audit(args, command):
-    if args.fail_on_target and args.risk_target is None:
-        command.error("--fail-on-target requires --risk-target")
-    try:
-        options = {
-            "threshold": args.threshold, "risk_target": args.risk_target,
-            "bootstrap": args.bootstrap, "seed": args.seed,
-        }
-        if args.grader:
-            graders = tuple(name for name, _ in args.grader)
-            rows, group_column = join_grader_files(
-                args.predictions, args.grader, id_column=args.id_column, score_column=args.score_column,
-                output_key_column=args.output_key_column, group_column=args.group_column,
-                selection=args.prediction_filter,
-            )
-        else:
-            graders = tuple(args.correct_column)
-            rows, group_column = read_graded_rows(
-                args.predictions, args.id_column, args.score_column, graders,
-                group_column=args.group_column, selection=args.prediction_filter,
-            )
-        report = audit(rows, graders=graders, **options)
-    except (OSError, ValueError, csv.Error) as exc:
-        command.error(str(exc))
-    report["input"] = {
-        "path": str(args.predictions),
-        "id_column": args.id_column,
-        "score_column": args.score_column,
-        "group_column": group_column,
-    }
-    if args.prediction_filter is not None:
-        column, value = args.prediction_filter
-        report["input"]["prediction_filter"] = {"column": column, "value": value}
-    if args.grader:
-        report["input"]["output_key_column"] = args.output_key_column
-        report["input"]["grader_files"] = {name: str(path) for name, path in args.grader}
-    print(json.dumps(report, indent=2))
-    if args.fail_on_target and any(result["meets_target"] is not True for result in report["graders"].values()):
-        return 1
-    return 0
+def column_options(parser):
+    parser.add_argument("predictions", type=Path, metavar="CSV")
+    parser.add_argument("--id-column", default="id")
+    parser.add_argument("--score-column", default="score")
+    parser.add_argument("--group-column", help="Defaults to 'group' when present.")
+    parser.add_argument("--output-key-column", help="Column identifying the saved output.")
+    parser.add_argument("--json", action="store_true", help="Print the JSON report.")
+    parser.add_argument("--output", type=Path, metavar="FILE", help="Write the JSON report to a file.")
 
 
-def run_policy(args, command):
-    graders, check_graders = tuple(args.correct_column), tuple(args.check_column or ())
-    try:
-        rows, _ = read_graded_rows(args.predictions, args.id_column, args.score_column, (*graders, *check_graders))
-        report = build_policy(
-            rows,
-            graders=graders, check_graders=check_graders, risk_target=args.risk_target,
-            failure_rate=args.failure_rate, rule=args.rule, seed=args.seed,
-        )
-    except (OSError, ValueError, csv.Error) as exc:
-        command.error(str(exc))
-    print(json.dumps(report, indent=2) if args.json else describe(report))
-    return int(not report["confirmed"])
+def selection_options(parser):
+    parser.add_argument("--correct-column", action="append", required=True, help="Repeat for each selection grader.")
+    parser.add_argument("--risk-target", type=float, required=True)
+    parser.add_argument("--failure-rate", type=float, default=0.05)
+    parser.add_argument("--rule", choices=RULES, default="ltt-bonferroni")
 
 
-def run_select(args, command):
-    graders = tuple(args.correct_column)
-    try:
-        thresholds = args.thresholds
-        if args.design is not None:
-            if args.design.resolve() == args.calibration.resolve():
-                raise ValueError("design and calibration must be separate CSVs")
-            thresholds = design_thresholds(read_design_scores(args.design, args.score_column))
-        rows, _ = read_graded_rows(args.calibration, args.id_column, args.score_column, graders)
-        report = select_threshold(
-            rows, graders=graders, thresholds=thresholds, risk_target=args.risk_target,
-            failure_rate=args.failure_rate, rule=args.rule,
-        )
-    except (OSError, ValueError, csv.Error) as exc:
-        command.error(str(exc))
-    print(json.dumps(report, indent=2))
-    return int(report["selected_threshold"] is None)
+def evaluate_options(parser):
+    parser.add_argument("--threshold", type=float, required=True)
+    parser.add_argument("--output-dir", type=Path, help="Also write metrics.json and risk_coverage.csv.")
+    parser.add_argument("--probability", action="store_true", help="Report Brier score for correctness probabilities.")
+    parser.add_argument("--prediction-column", help="Defaults to 'prediction' for exact matching.")
+    parser.add_argument("--reference-column", help="Defaults to 'reference' for exact matching.")
+    parser.add_argument("--correct-column", action="append", help="A column of 0/1 grades for one grader.")
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(prog="caat", description="Evaluate confidence-based annotation policies.")
-    parser.add_argument("--version", action="version", version=f"caat {version('caat-annotation')}")
-    commands = parser.add_subparsers(dest="command", required=True)
-    command = commands.add_parser(
-        "evaluate", help="Evaluate a fixed confidence threshold on a labeled CSV."
-    )
-    command.add_argument("predictions", type=Path)
-    command.add_argument(
-        "--threshold", type=float, required=True,
-        help="Accept rows with a score at or above this value.",
-    )
-    command.add_argument("--output-dir", type=Path, required=True)
-    command.add_argument(
-        "--probability", action="store_true",
-        help="Treat scores as correctness probabilities and report Brier score.",
-    )
-    command.add_argument("--id-column", default="id")
-    command.add_argument("--score-column", default="score")
-    command.add_argument("--prediction-column", help="Defaults to 'prediction' for exact matching.")
-    command.add_argument("--reference-column", help="Defaults to 'reference' for exact matching.")
-    command.add_argument("--correct-column", help="Read the evaluation outcome from a column of 0s and 1s.")
-    command.add_argument("--group-column", help="Group column to summarize. Defaults to 'group' if present.")
-    audit_command = commands.add_parser("audit", help="Compare graders at the same fixed threshold.")
-    audit_command.add_argument("predictions", type=Path)
-    audit_command.add_argument("--id-column", default="id")
-    audit_command.add_argument("--score-column", default="score")
-    audit_command.add_argument("--group-column", help="Group column to summarize. Defaults to 'group' if present.")
-    audit_command.add_argument("--prediction-filter", type=prediction_filter, metavar="COLUMN=VALUE",
-                               help="Read only matching prediction rows. Grader exports must cover those IDs.")
-    graders = audit_command.add_mutually_exclusive_group(required=True)
-    graders.add_argument("--correct-column", action="append",
-                         help="Repeat for grader columns in an aligned CSV. The first is the baseline.")
-    graders.add_argument("--grader", action="append", type=grader_source, metavar="NAME=CSV",
-                         help="Repeat for separate grader exports keyed by ID and output.")
-    audit_command.add_argument("--output-key-column", default="output_sha256",
-                               help="Output identity column shared by predictions and grader files.")
-    audit_command.add_argument("--threshold", type=float, required=True)
-    audit_command.add_argument("--risk-target", type=float)
-    audit_command.add_argument("--bootstrap", type=int, metavar="N", help="Paired bootstrap replicates for 95%% intervals.")
-    audit_command.add_argument("--seed", type=int, default=42, help="Bootstrap seed. Defaults to 42.")
-    audit_command.add_argument("--fail-on-target", action="store_true",
-                               help="Return 1 if any grader exceeds the target or coverage is zero.")
-    select_command = commands.add_parser("select", help="Choose a cutoff on labeled calibration data.")
-    select_command.add_argument("calibration", type=Path)
-    select_command.add_argument("--id-column", default="id")
-    select_command.add_argument("--score-column", default="score")
-    select_command.add_argument("--correct-column", action="append", required=True,
-                                help="Repeat for each grader's outcome column.")
-    select_command.add_argument("--risk-target", type=float, required=True)
-    select_command.add_argument("--failure-rate", type=float, default=0.05)
-    select_command.add_argument("--rule", choices=RULES, default="ltt-bonferroni")
-    grid = select_command.add_mutually_exclusive_group(required=True)
+def audit_options(parser):
+    grades = parser.add_mutually_exclusive_group(required=True)
+    grades.add_argument("--correct-column", action="append", help="Repeat for each grader in the same CSV.")
+    grades.add_argument("--grader-file", action="append", type=grader_source, metavar="NAME=CSV",
+                        help="Repeat for separate grader exports. Default output key is 'output_sha256'.")
+    parser.add_argument("--threshold", type=float, required=True)
+    parser.add_argument("--risk-target", type=float)
+    parser.add_argument("--prediction-filter", type=prediction_filter, metavar="COLUMN=VALUE",
+                        help="Read only matching prediction rows.")
+    parser.add_argument("--bootstrap", type=int, metavar="N", help="Paired bootstrap replicates for 95%% intervals.")
+    parser.add_argument("--seed", type=int, default=42, help="Bootstrap seed. Defaults to 42.")
+
+
+def select_options(parser):
+    selection_options(parser)
+    grid = parser.add_mutually_exclusive_group(required=True)
     grid.add_argument("--thresholds", action="extend", nargs="+", type=float,
                       help="Fixed candidate cutoffs. Use --thresholds=-1e-5 for negative scientific notation.")
     grid.add_argument("--design", type=Path, help="Separate CSV with scores for a decile grid.")
-    policy_command = commands.add_parser(
-        "policy", help="Split one labeled CSV, choose a cutoff, and check it on held-out rows."
-    )
-    policy_command.add_argument("predictions", type=Path)
-    policy_command.add_argument("--id-column", default="id")
-    policy_command.add_argument("--score-column", default="score")
-    policy_command.add_argument("--correct-column", action="append", required=True,
-                                help="Grader outcome column the cutoff must satisfy. Repeat for each grader.")
-    policy_command.add_argument("--check-column", action="append",
-                                help="Grader outcome column reported on held-out rows only. Repeatable.")
-    policy_command.add_argument("--risk-target", type=float, required=True)
-    policy_command.add_argument("--failure-rate", type=float, default=0.05)
-    policy_command.add_argument("--rule", choices=RULES, default="ltt-bonferroni")
-    policy_command.add_argument("--seed", type=int, default=42, help="Split seed. Defaults to 42.")
-    policy_command.add_argument("--json", action="store_true", help="Print the full report as JSON.")
-    args = parser.parse_args(argv)
-    if args.command == "audit":
-        return run_audit(args, audit_command)
-    if args.command == "policy":
-        return run_policy(args, policy_command)
-    if args.command == "select":
-        return run_select(args, select_command)
 
-    columns = {"id": args.id_column, "score": args.score_column}
-    if args.correct_column is None:
-        columns["prediction"] = args.prediction_column or "prediction"
-        columns["reference"] = args.reference_column or "reference"
+
+def policy_options(parser):
+    selection_options(parser)
+    parser.add_argument("--seed", type=int, default=42, help="Split seed. Defaults to 42.")
+    parser.add_argument("--check-column", action="append", help="Repeat for each held-out-only grader.")
+
+
+def load_inputs(args):
+    columns = tuple(args.correct_column or ())
+    common = {"id_column": args.id_column, "score_column": args.score_column, "group_column": args.group_column}
+    meta = {"path": str(args.predictions), "id_column": args.id_column, "score_column": args.score_column,
+            "correct_columns": list(columns), "output_key_column": args.output_key_column}
+    key = args.output_key_column
+    selected = getattr(args, "prediction_filter", None)
+    if selected is not None:
+        meta["prediction_filter"] = dict(zip(("column", "value"), selected, strict=True))
+    files = getattr(args, "grader_file", None)
+    if files:
+        key = key or "output_sha256"
+        rows, group = join_grader_files(args.predictions, files, **common, output_key_column=key, selection=selected)
+        meta.update(output_key_column=key, grader_files={name: str(path) for name, path in files})
     else:
-        columns["correct"] = args.correct_column
-        if args.prediction_column is not None:
-            columns["prediction"] = args.prediction_column
-        if args.reference_column is not None:
-            columns["reference"] = args.reference_column
-    try:
-        metrics, curve = evaluate(
-            load_predictions(args.predictions, columns, args.group_column),
-            threshold=args.threshold,
-            probability=args.probability,
+        checks = tuple(getattr(args, "check_column", None) or ())
+        if args.command == "policy":
+            meta["check_columns"] = list(checks)
+        prediction = getattr(args, "prediction_column", None)
+        reference = getattr(args, "reference_column", None)
+        if args.command == "evaluate":
+            if len(columns) > 1:
+                raise ValueError("evaluate needs one correctness column; use audit to compare graders")
+            if not columns:
+                prediction, reference = prediction or "prediction", reference or "reference"
+            meta.update(prediction_column=prediction, reference_column=reference)
+        rows, group = read_csv_rows(
+            args.predictions, **common, correct_columns=(*columns, *checks),
+            output_key_column=key, prediction_column=prediction, reference_column=reference, selection=selected,
         )
-        metrics_path = args.output_dir / "metrics.json"
-        curve_path = args.output_dir / "risk_coverage.csv"
-        if args.predictions.resolve() in {metrics_path.resolve(), curve_path.resolve()}:
-            raise ValueError("output would overwrite the input CSV")
-        args.output_dir.mkdir(parents=True, exist_ok=True)
-        metrics_path.write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
-        with curve_path.open("w", encoding="utf-8", newline="") as output:
-            fields = ["threshold", "total", "accepted", "errors", "coverage", "error_rate"]
-            writer = csv.DictWriter(output, fieldnames=fields)
-            writer.writeheader()
-            for threshold, counts in curve:
-                writer.writerow({"threshold": threshold, **counts.metrics()})
+    meta["group_column"] = group
+    return rows, meta
+
+
+def run(args):
+    rows, meta = load_inputs(args)
+    graders = tuple(args.correct_column or ())
+    curve = None
+    exit_code = 0
+    if args.command == "evaluate":
+        result, curve = evaluate(rows, threshold=args.threshold, probability=args.probability)
+    elif args.command == "audit":
+        if args.grader_file:
+            graders = tuple(name for name, _ in args.grader_file)
+        result = audit(rows, graders=graders, threshold=args.threshold, risk_target=args.risk_target,
+                       bootstrap=args.bootstrap, seed=args.seed)
+        if args.risk_target is not None:
+            exit_code = int(any(counts["meets_target"] is not True for counts in result["graders"].values()))
+    elif args.command == "select":
+        thresholds = args.thresholds
+        if args.design is not None:
+            if args.design.resolve() == args.predictions.resolve():
+                raise ValueError("design and calibration must be separate CSVs")
+            thresholds = design_thresholds(read_design_scores(args.design, args.score_column))
+        meta["design_path"] = str(args.design) if args.design is not None else None
+        result = select(rows, graders=graders, thresholds=thresholds, risk_target=args.risk_target,
+                        failure_rate=args.failure_rate, rule=args.rule)
+        exit_code = int(result["selected_threshold"] is None)
+    else:
+        result = policy(rows, graders=graders, check_graders=tuple(args.check_column or ()),
+                        risk_target=args.risk_target, failure_rate=args.failure_rate, rule=args.rule, seed=args.seed)
+        exit_code = int(not result["confirmed"])
+    return make_report(args.command, meta, result), curve, exit_code
+
+
+def output_paths(args):
+    inputs = {args.predictions.resolve(), *(path.resolve() for _, path in (getattr(args, "grader_file", None) or ()))}
+    design = getattr(args, "design", None)
+    if design is not None:
+        inputs.add(design.resolve())
+    directory = getattr(args, "output_dir", None)
+    artifacts = (directory / "metrics.json", directory / "risk_coverage.csv") if directory is not None else ()
+    outputs = {*artifacts}
+    if args.output is not None:
+        if artifacts and args.output.resolve() == artifacts[1].resolve():
+            raise ValueError("--output cannot replace risk_coverage.csv")
+        outputs.add(args.output)
+    if inputs.intersection(path.resolve() for path in outputs):
+        raise ValueError("output would overwrite an input CSV")
+    return artifacts
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="caat", description="Evaluate saved predictions and review policies.")
+    parser.add_argument("--version", action="version", version=f"caat {version('caat-annotation')}")
+    subcommands = parser.add_subparsers(dest="command", required=True)
+    definitions = {
+        "evaluate": ("Evaluate a fixed threshold.", evaluate_options),
+        "audit": ("Compare graders at a fixed threshold.", audit_options),
+        "select": ("Choose a cutoff on calibration data.", select_options),
+        "policy": ("Split a CSV, choose a cutoff, and check it on held-out rows.", policy_options),
+    }
+    commands = {}
+    for name, (help_text, configure) in definitions.items():
+        command = subcommands.add_parser(name, help=help_text)
+        column_options(command)
+        configure(command)
+        commands[name] = command
+    args = parser.parse_args(argv)
+    try:
+        artifacts = output_paths(args)
+        report, curve, status = run(args)
+        if artifacts:
+            artifact, curve_path = artifacts
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            write_curve(curve_path, curve)
+            if args.output is None:
+                args.output = artifact
+        serialized = emit(report, json_output=args.json, output=args.output)
+        if artifacts and args.output.resolve() != artifacts[0].resolve():
+            write_report(artifacts[0], serialized)
+        return status
     except (OSError, ValueError, csv.Error) as exc:
-        command.error(str(exc))
-    print(f"Wrote {metrics_path} and {curve_path}")
+        commands[args.command].error(str(exc))

@@ -147,5 +147,20 @@
   "brier_score": null,
   "auroc": 0.5481481481481482,
   "aurc": 0.342414785662531,
-  "normalized_aurc_gain": 0.1139021602787014
+  "normalized_aurc_gain": 0.1139021602787014,
+  "schema_version": 2,
+  "command": "evaluate",
+  "caat_version": "0.1.0",
+  "input": {
+    "path": "examples/mmlu_pro.csv",
+    "id_column": "id",
+    "score_column": "mean_token_logprob",
+    "correct_columns": [
+      "correct"
+    ],
+    "output_key_column": null,
+    "prediction_column": null,
+    "reference_column": "reference",
+    "group_column": "group"
+  }
 }

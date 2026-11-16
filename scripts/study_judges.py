@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 import numpy as np
 
-from caat.evaluation import ranking_metrics, threshold_points
+from caat.metrics import ranking_metrics, threshold_points
 from compare_baselines import ROOT, write_report
 from prepare_helm_judges import JUDGES, MATCHED_TOKEN_TEXT, SCENARIOS
 

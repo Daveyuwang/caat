@@ -29,8 +29,9 @@ per-group metrics.
 
 CAAT accepts every row with a score at or above `--threshold`. Use
 `--probability` to report Brier score for probabilities of correctness.
-The CLI and the `caat.evaluate` Python API share the same evaluator and use
-the standard library.
+All commands print a short summary. Add `--json` for machine-readable
+stdout or `--output FILE` to save the JSON report. The CLI and Python API
+use the standard library. [Report fields](docs/guide/reports.md)
 
 ## Choose and check a cutoff in one command
 
@@ -65,18 +66,18 @@ Run a frozen threshold against separate grader exports. CAAT matches rows
 by ID and checks that each grader scored the same saved output.
 
 ```bash
-caat audit examples/audit/predictions.csv --output-key-column output_key --grader reference=examples/audit/reference.csv --grader rubric=examples/audit/rubric.csv --threshold 0.75 --risk-target 0.4
+caat audit examples/audit/predictions.csv --output-key-column output_key --grader-file reference=examples/audit/reference.csv --grader-file rubric=examples/audit/rubric.csv --threshold 0.75 --risk-target 0.4
 ```
 
 The sample accepts three tickets. The reference grader counts one error,
-and the rubric grader counts two. The JSON report gives the changed
+and the rubric grader counts two. Use `--json` for the changed
 decision, discordant IDs, and per-group counts. For each alternate grader,
 `overall_risk_change` measures the shift on all outputs and
 `excess_risk_change` subtracts that shift from the accepted-set shift.
 Add `--bootstrap 2000 --seed 42` for paired 95% intervals at the frozen
-cutoff. Add `--fail-on-target` to
-return exit code 1 if any grader exceeds the empirical risk target or the
-policy accepts zero rows. Invalid input returns 2.
+cutoff. The sample exits 1 because the rubric grader exceeds the 40%
+risk target. A policy with zero accepted rows also exits 1 if you supply
+a target. Invalid input returns 2.
 
 For separate grader files, include `id`, `output_sha256`, and a 0/1
 `correct` column in each export. The prediction file supplies the same

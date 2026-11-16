@@ -12,5 +12,20 @@
   "brier_score": null,
   "auroc": 0.6285714285714286,
   "aurc": 0.2664953833650832,
-  "normalized_aurc_gain": 0.49092014186436245
+  "normalized_aurc_gain": 0.49092014186436245,
+  "schema_version": 2,
+  "command": "evaluate",
+  "caat_version": "0.1.0",
+  "input": {
+    "path": "examples/ifeval_strict.csv",
+    "id_column": "id",
+    "score_column": "mean_token_logprob",
+    "correct_columns": [
+      "strict_pass"
+    ],
+    "output_key_column": null,
+    "prediction_column": null,
+    "reference_column": null,
+    "group_column": null
+  }
 }

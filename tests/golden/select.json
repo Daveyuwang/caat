@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "rule": "empirical",
   "graders": [
     "strict_pass"
@@ -47,5 +47,18 @@
       "tested": true,
       "passes": false
     }
-  ]
+  ],
+  "command": "select",
+  "caat_version": "0.1.0",
+  "input": {
+    "path": "examples/ifeval_strict.csv",
+    "id_column": "id",
+    "score_column": "mean_token_logprob",
+    "correct_columns": [
+      "strict_pass"
+    ],
+    "output_key_column": null,
+    "group_column": null,
+    "design_path": null
+  }
 }

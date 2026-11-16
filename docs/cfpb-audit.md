@@ -16,7 +16,7 @@ Run from the CAAT checkout in a Python virtual environment.
 ```bash
 python -m pip install .
 python scripts/prepare_cfpb_audit.py
-caat audit replay/cfpb/sources/encoder_eval.csv --prediction-filter tier=encoder --id-column complaint_id --score-column confidence --group-column product --output-key-column output_text --grader archived=replay/cfpb/archived.csv --grader regraded=replay/cfpb/regraded.csv --threshold 0.7980151891708375 --risk-target 0.10 --fail-on-target
+caat audit replay/cfpb/sources/encoder_eval.csv --prediction-filter tier=encoder --id-column complaint_id --score-column confidence --group-column product --output-key-column output_text --grader-file archived=replay/cfpb/archived.csv --grader-file regraded=replay/cfpb/regraded.csv --threshold 0.7980151891708375 --risk-target 0.10
 ```
 
 Preparation downloads the pinned prediction export and policy report and
@@ -75,9 +75,8 @@ Add these GitHub Actions steps after checkout and installation.
     caat audit replay/cfpb/sources/encoder_eval.csv \
       --prediction-filter tier=encoder --id-column complaint_id \
       --score-column confidence --group-column product --output-key-column output_text \
-      --grader archived=replay/cfpb/archived.csv --grader regraded=replay/cfpb/regraded.csv \
-      --threshold 0.7980151891708375 --risk-target 0.10 --fail-on-target \
-      > replay/cfpb/audit.json || status=$?
+      --grader-file archived=replay/cfpb/archived.csv --grader-file regraded=replay/cfpb/regraded.csv \
+      --threshold 0.7980151891708375 --risk-target 0.10 --output replay/cfpb/audit.json || status=$?
     printf 'status=%s\n' "$status" >> "$GITHUB_OUTPUT"
     exit "$status"
 - name: Keep the audit report

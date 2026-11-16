@@ -12,8 +12,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from caat.audit import AuditRow, audit
-from caat.evaluation import Prediction, threshold_points
+from caat import GradedRow, audit
+from caat.metrics import threshold_points
 
 from compare_baselines import FAILURE_RATE, ROOT, SEED, ranking_rows, risk_at_count, write_report
 
@@ -121,7 +121,7 @@ def budget_deltas(name, graders, heldout, scores):
 
 def audit_rows(rows, scores, graders):
     return [
-        AuditRow(row["id"], score, tuple(row[grader] for grader in graders), row.get("group"))
+        GradedRow(row["id"], score, tuple(row[grader] for grader in graders), row.get("group"))
         for row, score in zip(rows, scores, strict=True)
     ]
 
@@ -193,7 +193,7 @@ def study(replay_dir, output):
         for method, values in heldout_scores.items():
             for grader in graders:
                 predictions = [
-                    Prediction(row["id"], None, None, score, correct=row[grader])
+                    GradedRow(row["id"], score, (row[grader],))
                     for row, score in zip(heldout, values, strict=True)
                 ]
                 rankings.extend(ranking_rows(name, method, grader, predictions, method in probabilities))

@@ -20,7 +20,7 @@ class AuditTests(unittest.TestCase):
             output = io.StringIO()
             with redirect_stdout(output):
                 exit_code = main([
-                    "audit", str(source), "--id-column", "key", "--score-column", "conf",
+                    "audit", str(source), "--json", "--id-column", "key", "--score-column", "conf",
                     "--correct-column", "primary", "--correct-column", "alternate",
                     "--threshold", str(threshold), "--risk-target", "0.4", *flags,
                 ])
@@ -32,7 +32,7 @@ class AuditTests(unittest.TestCase):
             ("b", 0.8, 1, 0, "case"),
             ("a", 0.8, 1, 0, "case"),
             ("c", 0.9, 0, 1, "other"),
-        ], 0.8, "--fail-on-target")
+        ], 0.8)
         self.assertEqual(exit_code, 1)
         primary = report["graders"]["primary"]
         self.assertEqual((primary["accepted"], primary["errors"]), (3, 1))
@@ -48,7 +48,7 @@ class AuditTests(unittest.TestCase):
                          [("a", True), ("b", True), ("c", True), ("d", False)])
 
     def test_zero_coverage_has_no_risk(self):
-        exit_code, report = self.run_audit([("a", 0.1, 0, 0, "x")], 0.8, "--fail-on-target")
+        exit_code, report = self.run_audit([("a", 0.1, 0, 0, "x")], 0.8)
         self.assertEqual(exit_code, 1)
         self.assertIsNone(report["graders"]["primary"]["error_rate"])
         self.assertIsNone(report["accepted_comparisons"]["alternate"]["target_decision_changed"])
@@ -82,11 +82,11 @@ class AuditTests(unittest.TestCase):
             primary.write_text("id,output_sha256,correct\nb,b-out,0\na,a-out,1\n", encoding="utf-8")
             header = "id,output_sha256,correct\n"
             alternate.write_text(header + "a,a-out,0\nb,b-out,0\n", encoding="utf-8")
-            args = ["audit", str(predictions), "--threshold", "0.75", "--risk-target", "0.3",
-                    "--grader", f"primary={primary}", "--grader", f"alternate={alternate}"]
+            args = ["audit", str(predictions), "--json", "--threshold", "0.75", "--risk-target", "0.3",
+                    "--grader-file", f"primary={primary}", "--grader-file", f"alternate={alternate}"]
             output = io.StringIO()
             with redirect_stdout(output):
-                self.assertEqual(main(args), 0)
+                self.assertEqual(main(args), 1)
             report = json.loads(output.getvalue())
             self.assertEqual(report["accepted_comparisons"]["alternate"]["newly_failed"], 1)
             self.assertEqual(report["input"]["grader_files"]["alternate"], str(alternate))
@@ -118,10 +118,10 @@ class AuditTests(unittest.TestCase):
             for path, bit in ((old, 1), (new, 0)):
                 path.write_text(f"id,output_sha256,correct\nsame-id,selected-output,{bit}\n", encoding="utf-8")
 
-            args = ["audit", str(source), "--threshold", "0.8"]
+            args = ["audit", str(source), "--json", "--threshold", "0.8"]
             for grader_args in (
                 ["--correct-column", "old", "--correct-column", "new"],
-                ["--grader", f"old={old}", "--grader", f"new={new}"],
+                ["--grader-file", f"old={old}", "--grader-file", f"new={new}"],
             ):
                 output = io.StringIO()
                 with redirect_stdout(output):

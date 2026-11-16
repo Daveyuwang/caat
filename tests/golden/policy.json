@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "split": {
     "seed": 42,
     "design": 108,
@@ -189,5 +189,20 @@
       }
     }
   },
-  "confirmed": true
+  "confirmed": true,
+  "command": "policy",
+  "caat_version": "0.1.0",
+  "input": {
+    "path": "examples/ifeval_graders.csv",
+    "id_column": "id",
+    "score_column": "mean_token_logprob",
+    "correct_columns": [
+      "strict_pass"
+    ],
+    "output_key_column": null,
+    "check_columns": [
+      "helm_strict_pass"
+    ],
+    "group_column": null
+  }
 }

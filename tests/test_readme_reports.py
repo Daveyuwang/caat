@@ -1,5 +1,6 @@
 import json
 import math
+import re
 import shlex
 import subprocess
 import sys
@@ -25,16 +26,27 @@ def readme_commands():
 
 
 def run_readme(command, arguments):
-    return subprocess.run(
-        [*CLI, command, *arguments], cwd=ROOT, check=True, capture_output=True, encoding="utf-8",
-    ).stdout
+    result = subprocess.run([*CLI, command, *arguments], cwd=ROOT, capture_output=True, encoding="utf-8")
+    expected = int(command == "audit")  # The alternate grader misses the example's target.
+    if result.returncode != expected:
+        raise ValueError(f"{command} returned {result.returncode}, expected {expected}: {result.stderr}")
+    return result.stdout
 
 
-def normalize_audit_paths(report):
-    # The CLI reports the native file names passed to it.
+def normalize_paths(report):
+    # Normalize workspace paths for fixtures shared by Windows and Linux.
+    def relative(value):
+        path = Path(value)
+        if path.is_absolute() and path.is_relative_to(ROOT):
+            path = path.relative_to(ROOT)
+        return path.as_posix()
+
     inputs = report["input"]
-    inputs["path"] = Path(inputs["path"]).as_posix()
-    inputs["grader_files"] = {name: Path(path).as_posix() for name, path in inputs["grader_files"].items()}
+    for name in ("path", "design_path"):
+        if inputs.get(name):
+            inputs[name] = relative(inputs[name])
+    if "grader_files" in inputs:
+        inputs["grader_files"] = {name: relative(path) for name, path in inputs["grader_files"].items()}
     return report
 
 
@@ -44,6 +56,7 @@ class ReadmeReportTests(unittest.TestCase):
         cls.examples = readme_commands()
 
     def assert_golden_report(self, actual, filename):
+        actual = normalize_paths(actual)
         frozen = json.loads((GOLDEN / filename).read_text(encoding="utf-8"))
         if "selection" in actual:
             selection, reference = actual["selection"], frozen["selection"]
@@ -74,13 +87,59 @@ class ReadmeReportTests(unittest.TestCase):
             )
 
     def test_audit_example(self):
-        report = json.loads(run_readme("audit", self.examples["audit"]))
-        self.assert_golden_report(normalize_audit_paths(report), "audit.json")
+        report = json.loads(run_readme("audit", [*self.examples["audit"], "--json"]))
+        self.assert_golden_report(report, "audit.json")
 
     def test_select_example(self):
-        self.assert_golden_report(json.loads(run_readme("select", self.examples["select"])), "select.json")
+        self.assert_golden_report(json.loads(run_readme("select", [*self.examples["select"], "--json"])), "select.json")
 
     def test_policy_example(self):
         arguments = self.examples["policy"]
         self.assertEqual(run_readme("policy", arguments), (GOLDEN / "policy.txt").read_text(encoding="utf-8"))
         self.assert_golden_report(json.loads(run_readme("policy", [*arguments, "--json"])), "policy.json")
+
+    def test_output_file_for_each_command(self):
+        with TemporaryDirectory() as directory:
+            for command, args in self.examples.items():
+                with self.subTest(command=command):
+                    args = args.copy()
+                    path = Path(directory) / f"{command}.json"
+                    if command == "evaluate":
+                        args[args.index("--output-dir") + 1] = directory
+                    output = run_readme(command, [*args, "--output", str(path)])
+                    self.assertFalse(output.lstrip().startswith("{"))
+                    payload = json.loads(path.read_text(encoding="utf-8"))
+                    self.assertEqual(payload["command"], command)
+                    self.assertEqual(payload["schema_version"], 2)
+
+    def test_documented_fields_exist_in_real_reports(self):
+        text = (ROOT / "docs" / "guide" / "reports.md").read_text(encoding="utf-8")
+        fields = {
+            name.lower(): re.findall(r"^\| `([^\x60]+)` \|", section, flags=re.MULTILINE)
+            for name, section in re.findall(r"^## (\w+)\n(.*?)(?=^## |\Z)", text, flags=re.MULTILINE | re.DOTALL)
+        }
+        self.assertEqual(set(fields), {"common", *self.examples})
+        with TemporaryDirectory() as directory:
+            for command, args in self.examples.items():
+                args = args.copy()
+                if command == "evaluate":
+                    del args[args.index("--output-dir"):args.index("--output-dir") + 2]
+                if command == "audit":
+                    predictions = Path(directory) / "predictions.csv"
+                    header, *rows = (ROOT / args[0]).read_text(encoding="utf-8").splitlines()
+                    predictions.write_text(header + ",batch\n" + "\n".join(row + ",current" for row in rows),
+                                           encoding="utf-8")
+                    args[0] = str(predictions)
+                    args.extend(("--prediction-filter", "batch=current", "--bootstrap", "5"))
+                report = json.loads(run_readme(command, [*args, "--json"]))
+                for field in fields["common"] + fields[command]:
+                    with self.subTest(command=command, field=field):
+                        values = [report]
+                        for key in field.replace("[]", ".[]").split("."):
+                            if key == "[]":
+                                values = [entry for value in values for entry in value]
+                            elif key == "*":
+                                values = [entry for value in values for entry in value.values()]
+                            else:
+                                values = [value[key] for value in values]
+                            self.assertTrue(values)

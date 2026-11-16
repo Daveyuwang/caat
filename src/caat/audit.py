@@ -6,9 +6,6 @@ from .metrics import grouped_counts
 from .table import GradedRow, validated_rows
 
 
-AuditRow = GradedRow
-
-
 def percentile_interval(values):
     if not values:
         return None

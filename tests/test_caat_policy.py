@@ -5,7 +5,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from caat.audit import AuditRow
+from caat import GradedRow
 from caat.cli import main
 from caat.policy import split_rows
 
@@ -21,7 +21,7 @@ class PolicyTests(unittest.TestCase):
         return exit_code, output.getvalue()
 
     def test_split_is_reproducible_and_complete(self):
-        rows = [AuditRow(str(i), i / 10, (True,)) for i in range(10)]
+        rows = [GradedRow(str(i), i / 10, (True,)) for i in range(10)]
         design, calibration, heldout = split_rows(rows, 42)
         self.assertEqual((len(design), len(calibration), len(heldout)), (2, 4, 4))
         self.assertEqual(sorted(design + calibration + heldout, key=lambda row: row.id), rows)
