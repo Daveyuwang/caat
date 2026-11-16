@@ -10,7 +10,7 @@ git worktree add --detach ../caat-course 2b63aa800960879549828d0ce27517f2372398a
 ```
 
 The saved predictions can also be used from the current checkout. Run
-`python scripts/compare_baselines.py --course` after installing CAAT for the
+`python scripts/study_modules.py --course` after installing CAAT for the
 [matched-coverage replay](../../results/baselines/course.csv). This replay
 includes DeBERTa maximum softmax probability on its own labels and the
 probability it assigns to the frozen Qwen label. Both use the saved class

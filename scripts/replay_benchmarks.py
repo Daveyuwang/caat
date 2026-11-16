@@ -10,7 +10,8 @@ from tempfile import TemporaryDirectory
 
 from caat.cli import main as caat_main
 
-ROOT = Path(__file__).resolve().parents[1]
+from common import ROOT
+
 BENCHMARKS = {
     "ifeval": (
         "ifeval_strict.csv",

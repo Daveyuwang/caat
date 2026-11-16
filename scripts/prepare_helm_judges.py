@@ -2,66 +2,28 @@
 
 import argparse
 import csv
-import gzip
-import json
 import re
 from math import isclose
 from pathlib import Path
-from shutil import copyfileobj
 from statistics import mean
-from tempfile import NamedTemporaryFile
 from urllib.error import HTTPError
 from urllib.parse import quote
-from urllib.request import Request, urlopen
 
-from archived_scores import FULL_SCORE_FIELDS, full_scores, token_logprobs
+from common import JUDGES, MATCHED_TOKEN_TEXT, SCENARIOS, FULL_SCORE_FIELDS, fetch, full_scores, read_json, token_logprobs
 
 
 BASE = "https://storage.googleapis.com/crfm-helm-public/capabilities/benchmark_output"
-SCENARIOS = {
-    "wildbench": ("score", "wildbench_score_rescaled"),
-    "omni_math": ("equivalence_judgement", "omni_math_accuracy"),
-}
-JUDGES = ("gpt", "llama", "claude")
 INVENTORY = ("release", "scenario", "model", "suite", "run", "kept", "excluded", "status",
              "token_text_verified")
 EXCLUSION = ("release", "scenario", "model", "id", "reason")
 LITERAL_TERMINATORS = {"<|im_end|>", "<|eot_id|>", "<|end_of_text|>", "<|endoftext|>", "</s>", "<|return|>"}
 TERMINATORS = LITERAL_TERMINATORS | {"<|eot|>", "<|user|>"}
-MATCHED_TOKEN_TEXT = {"literal", "terminal_marker", "byte_level", "final_channel", "byte_level_final_channel"}
 
 # Reverse the standard GPT-2 byte-to-Unicode table used by ByteLevel tokenizers.
 VISIBLE_BYTES = set(range(33, 127)) | set(range(161, 173)) | set(range(174, 256))
 BYTE_LEVEL_DECODER = str.maketrans({
     chr(256 + index): chr(byte) for index, byte in enumerate(sorted(set(range(256)) - VISIBLE_BYTES))
 })
-
-
-def read_json(path):
-    with path.open(encoding="utf-8") as source:
-        return json.load(source)
-
-
-def fetch(url, path):
-    if path.is_file():
-        return path
-    path.parent.mkdir(parents=True, exist_ok=True)
-    request = Request(url, headers={"Accept-Encoding": "gzip"})
-    with urlopen(request, timeout=90) as source:
-        with NamedTemporaryFile(dir=path.parent, delete=False) as output:
-            temporary = Path(output.name)
-            try:
-                if source.headers.get("Content-Encoding") == "gzip":
-                    with gzip.GzipFile(fileobj=source) as uncompressed:
-                        copyfileobj(uncompressed, output, length=1 << 20)
-                else:
-                    copyfileobj(source, output, length=1 << 20)
-            except BaseException:
-                output.close()
-                temporary.unlink(missing_ok=True)
-                raise
-        temporary.replace(path)
-    return path
 
 
 def indexed(rows, key):
