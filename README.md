@@ -29,7 +29,7 @@ per-group metrics.
 
 CAAT accepts every row with a score at or above `--threshold`. Use
 `--probability` to report Brier score for probabilities of correctness.
-All commands print a short summary. Add `--json` for machine-readable
+The review commands print a short summary. Add `--json` for machine-readable
 stdout or `--output FILE` to save the JSON report. The CLI and Python API
 use the standard library. [CSV input](https://github.com/Daveyuwang/caat/blob/main/docs/guide/csv-format.md) · [Report fields](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md)
 
@@ -106,9 +106,11 @@ grader. The JSON includes per-candidate counts and `selected_threshold`.
 The command returns 0 if it selects a cutoff, 1 if none qualifies, and 2
 for invalid input.
 
-For statistical risk control, use `--rule ltt-bonferroni` (default) or
-`--rule ltt-fixed-sequence`. Both assume independent calibration rows
-from the target population and a candidate grid fixed before calibration.
+For statistical risk control, use `--rule ltt-bonferroni` (default),
+`--rule ltt-holm`, or `--rule ltt-fixed-sequence`. These rules assume
+independent calibration rows from the target population and a candidate
+grid fixed before calibration. Holm's rule tests candidates in order of
+increasing p-value. [Holm's step-down procedure](https://www.jstor.org/stable/4615733)
 `--failure-rate` defaults to 0.05. Fixed-sequence testing proceeds from
 the strictest threshold and stops at the first failure. The empirical rule
 has no statistical guarantee. Apply the selected cutoff unchanged to

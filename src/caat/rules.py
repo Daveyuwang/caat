@@ -88,8 +88,25 @@ def fixed_sequence(candidates, risk_target, failure_rate):
     )
 
 
+def holm(candidates, risk_target, failure_rate):
+    """Test the smallest p-values first at Holm's step-down levels."""
+    order = sorted(
+        range(len(candidates)), key=lambda index: candidates[index]["pvalue"]
+    )
+    decisions = [None] * len(candidates)
+    for rank, index in enumerate(order):
+        candidate = candidates[index]
+        level = failure_rate / (len(candidates) - rank)
+        passed = candidate["accepted"] > 0 and candidate["pvalue"] <= level
+        decisions[index] = passed
+        if not passed:
+            break
+    return RuleResult(tuple(decisions), controls_risk=True)
+
+
 RULES = {
     "empirical": empirical,
     "ltt-bonferroni": bonferroni,
     "ltt-fixed-sequence": fixed_sequence,
+    "ltt-holm": holm,
 }
