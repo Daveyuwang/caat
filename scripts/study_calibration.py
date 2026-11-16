@@ -14,7 +14,7 @@ from common import ROOT, SEED, read_csv, write_report
 HELM_MODEL = "qwen_qwen2.5-7b-instruct-turbo"
 
 
-def archives(replay):
+def course_archives():
     for archive in ("imdb", "jigsaw", "fever"):
         saved = read_csv(ROOT / "results/course" / f"{archive}_lr_predictions.csv")
         for method in ("qwen_self_report", "deberta_probability_of_qwen_label"):
@@ -32,6 +32,10 @@ def archives(replay):
                     for row in saved
                 ],
             )
+
+
+def archives(replay):
+    yield from course_archives()
     for archive, label, cutoff in (
         ("wildbench", "gpt_score", 7),
         ("omni_math", "gpt_equivalence_judgement", 1),

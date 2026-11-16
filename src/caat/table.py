@@ -104,8 +104,9 @@ def read_csv_rows(
     prediction_column=None,
     reference_column=None,
     selection=None,
+    require_labels=True,
 ):
-    if not correct_columns:
+    if not correct_columns and require_labels:
         prediction_column = prediction_column or "prediction"
         reference_column = reference_column or "reference"
     required = {id_column, score_column, *correct_columns}
@@ -134,8 +135,10 @@ def read_csv_rows(
                     parse_correct(row[column], reader.line_num)
                     for column in correct_columns
                 )
-            else:
+            elif require_labels:
                 outcomes = (exact_match(item_id, row[prediction_column], reference),)
+            else:
+                outcomes = ()
             rows.append(GradedRow(item_id, score, outcomes, group, key, reference))
     return rows, group_column
 

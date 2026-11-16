@@ -5,6 +5,8 @@
 - Fit and apply temperature, Platt, isotonic, and histogram probability maps.
 - Report Brier score, ECE, ACE, and reliability bins on saved predictions.
 - Export reliability SVGs and self-contained HTML evaluation, audit, and policy reports.
+- Queue saved predictions for review under a budget, with group limits and a random baseline.
+- Score saved confidence checks, answer samples, and semantic clusters. Collect model responses with the optional local Transformers backend.
 
 ## 0.1.0
 
