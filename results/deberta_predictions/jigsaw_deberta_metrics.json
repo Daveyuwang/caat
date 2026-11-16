@@ -1,8 +1,0 @@
-{
-  "n_examples": 20000,
-  "accuracy": 0.95165,
-  "id_range": {
-    "min": 209,
-    "max": 1999347
-  }
-}

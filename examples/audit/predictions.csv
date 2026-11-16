@@ -1,0 +1,6 @@
+id,output_key,score,group
+1,run-a-ticket-1,0.96,billing
+2,run-a-ticket-2,0.88,billing
+3,run-a-ticket-3,0.80,support
+4,run-a-ticket-4,0.68,support
+5,run-a-ticket-5,0.50,support

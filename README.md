@@ -1,298 +1,142 @@
-# Confidence-Aware Annotation with LLMs  
-**CAAT** (Confidence-Aware Annotation Toolkit) is a framework for reliable, auditable, semi-automated dataset labeling.
+# Confidence-Aware Annotation Toolkit
 
-Use agreement, disagreement, and calibrated trust scoring to decide when LLM annotations are safe to keep and when humans should intervene.  
+[![CI](https://github.com/Daveyuwang/caat/actions/workflows/ci.yml/badge.svg)](https://github.com/Daveyuwang/caat/actions/workflows/ci.yml)
 
-**Interactive Dashboard**: [https://one684proj.onrender.com/](https://one684proj.onrender.com/)  
-*Available for research purposes. Text content is not displayed. Not intended for public distribution.*
-
-[CPU policy comparison](#cpu-policy-comparison) · [GPU answer-token pilot](#gpu-answer-token-pilot)
-
----
-
-# Contents
-
-- [Overview](#overview)
-- [System Architecture](#system-architecture)
-- [Key Features](#key-features)
-- [Trust Scorer](#trust-scorer)
-- [Dashboard](#dashboard)
-- [Results](#results)
-- [Offline Evaluation](#offline-evaluation)
-- [Datasets](#datasets)
-- [Installation](#installation)
-- [Usage](#usage)
----
-
-# Overview
-
-Modern LLMs are powerful annotators, yet they remain:
-
-- overconfident  
-- inconsistent  
-- mismatched with supervised baselines  
-- unreliable for sensitive tasks such as fact verification or toxicity detection
-
-This project develops a **trust-aware annotation pipeline** that quantifies when an LLM prediction is likely correct and when it should be reviewed by a human.  
-The system turns raw LLM outputs into **calibrated, actionable trust scores** and visualizes them through an interactive dashboard.
-
----
-
-# System Architecture
-
-![System Architecture](pics/systemarch.png)
-
-A high-level view of the flow from LLM outputs → feature extraction → trust scoring → dashboard visualization.
-
----
-
-# Key Features
-
-### Deterministic LLM annotation  
-- JSON schema enforcement  
-- Low-temperature decoding  
-- Automatic validation and re-querying  
-
-### Supervised baseline for cross-model validation  
-- DeBERTa-v3 fine-tuned for each dataset  
-- Provides entropy, margins, and confidence features  
-
-### Trust Scorer  
-- Logistic regression + isotonic calibration  
-- Uses confidence, disagreement, and text features  
-- Outputs actionable trust scores for deferral policies  
-
-### Selective annotation policies  
-- High Precision  
-- High Coverage  
-- Balanced F1  
-
-### Interactive dashboard  
-- Confidence regions  
-- Hard-case explorer  
-- Threshold tuning  
-- Dataset-level summaries  
-
----
-
-## Trust Scorer
-
-![Trust Scorer Diagram](pics/trustscore.png)
-
-Feature groups include:
-
-- LLM confidence  
-- baseline probabilities  
-- cross-model disagreement  
-- text-level complexity indicators  
-
-The scorer outputs a calibrated trust score  
-`P(correct annotation | features)`  
-used to determine whether to **automate** or **defer**.
-
----
-
-# Dashboard
-
-![Annotation Explorer](pics/annotation.png)  
-![Confidence Regions](pics/confidence.png)  
-![Policy Thresholds](pics/policythresh.png)
-
-The dashboard provides:
-
-### **1. Overview Metrics**  
-Summaries of accuracy, κ, F1, ECE, and class-level behavior.
-
-### **2. Annotation Explorer**  
-Interactive filtering of examples by confidence, agreement, difficulty, and correctness.
-
-### **3. Confidence Regions + Policy Analysis**  
-Scatterplots, threshold sliders, and coverage/accuracy tradeoff curves.
-
----
-
-# Results
-
-![Selective Annotation Performance](pics/coverage_accuracy_combined.png)
-
-Selective annotation highlights:
-
-- IMDb: nearly full automation with minimal accuracy loss  
-- Jigsaw: 97.3 percent accepted accuracy at 77 percent coverage  
-- FEVER: trust scoring substantially improves acceptance precision  
-
-<table>
-  <thead>
-    <tr>
-      <th>Dataset</th>
-      <th>ROC-AUC</th>
-      <th>ECE</th>
-      <th>Accepted Accuracy</th>
-      <th>Coverage</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>IMDb</td>
-      <td>0.894</td>
-      <td>0.006</td>
-      <td>95.7%</td>
-      <td>99.4%</td>
-    </tr>
-    <tr>
-      <td>Jigsaw</td>
-      <td>0.974</td>
-      <td>0.003</td>
-      <td>97.3%</td>
-      <td>77.0%</td>
-    </tr>
-    <tr>
-      <td>FEVER</td>
-      <td>0.736</td>
-      <td>0.040</td>
-      <td>71.5%</td>
-      <td>55.9%</td>
-    </tr>
-  </tbody>
-</table>
-
-For detailed metrics, predictions, plots, and ablation studies, explore the `results/` directory.
-
----
-
-# Offline Evaluation
-
-## CPU policy comparison
-
-Run the CPU evaluation from the repository root with Python 3.10 or later.
-
-```bash
-python -m pip install matplotlib
-python scripts/eval_saved_predictions.py
-```
-
-The script compares the policies on the same saved predictions for IMDb,
-Jigsaw, and FEVER. Python and Matplotlib are enough to run it.
-
-- **Trust scorer** keeps Qwen's label and ranks examples by the saved calibrated
-  trust score. The marked point uses the saved balanced policy.
-- **Two-model agreement** accepts an example only when Qwen and DeBERTa predict
-  the same label. This rule gives a single operating point.
-- **DeBERTa-only** uses DeBERTa's own label and its saved probability. The marked
-  point gives the highest attainable coverage at or below the trust scorer's
-  balanced coverage. The curve also includes accepting every example.
-
-The script writes two files to [`results/offline_eval/`](results/offline_eval/).
-Use `--output-dir PATH` to write them elsewhere.
-
-- [`risk_coverage.png`](results/offline_eval/risk_coverage.png) plots the share
-  of accepted examples against the error rate among accepted labels. Each panel
-  has its own error scale. The curves connect distinct thresholds and keep tied
-  scores together.
-- [`class_errors.csv`](results/offline_eval/class_errors.csv) reports totals,
-  accepted counts, errors, coverage, and accepted error rates overall and by
-  gold class. An empty error rate means the policy accepted no examples in that
-  group. DeBERTa-only has rows at matched and full coverage.
-
-On Jigsaw, the original trust scorer and DeBERTa-only each accepted 2,311 of
-3,000 examples. DeBERTa-only made 14 errors overall, compared with 62 for the
-trust scorer. Among the 230 gold-toxic examples, DeBERTa-only accepted 14 and
-misclassified all 14. The trust scorer accepted 128 and misclassified 29.
-The [Jigsaw sampling record](results/llm_annotations_7b/jigsaw/jigsaw_sample/jigsaw_20k_sampling_report.json)
-shows that the course sample included rows from the original train,
-development, and test splits.
-
-## GPU answer-token pilot
-
-The pilot scores the original Qwen2.5-7B-Instruct labels for 400 saved Jigsaw
-examples. The error rate at 75% coverage uses uniform tie-breaking in
-expectation.
-
-| Confidence score | Brier score | Error rate at 75% coverage |
-| --- | ---: | ---: |
-| A/B answer-token probability | 0.2217 | 19.33% |
-| Saved self-reported confidence | 0.1569 | 14.88% |
-| Original trust scorer | 0.0380 | 0.56% |
-
-Run the pilot from the repository root with the [GPU setup and pinned dependencies](results/answer_token_pilot/README.md#reproduce).
-
-```bash
-python scripts/run_answer_token_pilot.py --batch-size 16 --gpu-memory 10GiB --output-dir replay/answer_token_pilot
-```
-
-[Pilot record](results/answer_token_pilot/README.md) · [Risk–coverage plot](results/answer_token_pilot/risk_coverage.png) · [Per-example scores](results/answer_token_pilot/scores.csv)
-
----
-
-# Datasets
-
-<table>
-  <thead>
-    <tr>
-      <th>Dataset</th>
-      <th>Train</th>
-      <th>Dev</th>
-      <th>Test</th>
-      <th>Classes</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>IMDb</td>
-      <td>25000</td>
-      <td>12500</td>
-      <td>12500</td>
-      <td>2</td>
-    </tr>
-    <tr>
-      <td>Jigsaw</td>
-      <td>1.8M</td>
-      <td>97320</td>
-      <td>97320</td>
-      <td>2</td>
-    </tr>
-    <tr>
-      <td>FEVER</td>
-      <td>145449</td>
-      <td>9999</td>
-      <td>9999</td>
-      <td>3</td>
-    </tr>
-  </tbody>
-</table>
-
-For dataset structure, statistics, label mappings, and download information, see `data/README.md`.
-
----
-
-# Installation
+CAAT evaluates which saved model predictions to accept automatically and
+which to send for review. It reports coverage, errors among accepted
+predictions, and the risk–coverage curve. Use Python 3.10 or later.
 
 ```bash
 git clone https://github.com/Daveyuwang/caat.git
 cd caat
-python -m pip install -r requirements.txt
+python -m pip install .
+caat evaluate examples/ticket_triage.csv --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --group-column inbox --threshold 0.75 --probability --output-dir replay/tickets
 ```
 
----
+The example accepts 3 of 5 tickets and makes 1 error. CAAT writes `metrics.json`
+with overall and per-group counts, AUROC, area under the risk–coverage curve
+(AURC), and normalized AURC gain. It writes `risk_coverage.csv` with the
+results at each distinct score threshold. A normalized gain of 0 matches
+random ordering and 1 matches ordering all correct predictions first.
 
-# Usage
+## CSV input
 
-### Launch dashboard
-```
-python dashboard/app.py
+Each row needs a unique `id` and a finite `score`. Larger scores indicate
+greater confidence. Supply `prediction` and `reference` for exact label
+matching, or use `--correct-column NAME` for a grader's 0/1 outcome. Map
+different headers with the flags above. An optional `group` column gives
+per-group metrics.
+
+CAAT accepts every row with a score at or above `--threshold`. Use
+`--probability` to report Brier score for probabilities of correctness.
+The CLI and the `caat.evaluate` Python API share the same evaluator and use
+the standard library.
+
+## Choose and check a cutoff in one command
+
+```bash
+caat policy examples/ifeval_graders.csv --score-column mean_token_logprob --correct-column strict_pass --check-column helm_strict_pass --risk-target 0.4
 ```
 
-### Generate LLM annotations
-```
-python scripts/run_llm_annotations.py
+`caat policy` splits one labeled CSV into design, calibration, and held-out
+rows. It selects a cutoff on the calibration rows and applies it unchanged
+to the held-out rows. The example holds 541 saved IFEval responses graded by
+Google's strict grader and by HELM. The command selects
+`-0.43964836263206303` under the Google grader. On the 217 held-out rows the
+policy accepts 144 responses, with 33 errors (22.9%) under Google and 45
+(31.2%) under HELM. Both meet the 40% target.
+
+A `--check-column` grader is reported on held-out rows and takes no part in
+selection. Pass it as a second `--correct-column` to require the target
+under both graders. The cutoff then rises to `-0.3327795407672605` and the
+policy accepts 92 held-out responses, with 19 and 23 errors.
+
+The summary reports AUROC for each grader on the calibration rows and says
+when the score ranks no better than random. The split sorts IDs, shuffles
+with `--seed` (default 42), and assigns about 20%, 40%, and 40% of the rows.
+`--rule` and `--failure-rate` work as in `caat select`. Add `--json` for the
+full report. The command returns 0 if the held-out rows meet the target
+under every listed grader, 1 if no cutoff qualifies or a grader exceeds the
+target, and 2 for invalid input.
+
+## Compare graders on the same outputs
+
+Run a frozen threshold against separate grader exports. CAAT matches rows
+by ID and checks that each grader scored the same saved output.
+
+```bash
+caat audit examples/audit/predictions.csv --output-key-column output_key --grader reference=examples/audit/reference.csv --grader rubric=examples/audit/rubric.csv --threshold 0.75 --risk-target 0.4
 ```
 
-### Train the baseline model
-```
-python scripts/train_baseline_models.py
+The sample accepts three tickets. The reference grader counts one error,
+and the rubric grader counts two. The JSON report gives the changed
+decision, discordant IDs, and per-group counts. For each alternate grader,
+`overall_risk_change` measures the shift on all outputs and
+`excess_risk_change` subtracts that shift from the accepted-set shift.
+Add `--bootstrap 2000 --seed 42` for paired 95% intervals at the frozen
+cutoff. Add `--fail-on-target` to
+return exit code 1 if any grader exceeds the empirical risk target or the
+policy accepts zero rows. Invalid input returns 2.
+
+For separate grader files, include `id`, `output_sha256`, and a 0/1
+`correct` column in each export. The prediction file supplies the same
+IDs and output hashes plus the score. Use `--output-key-column` if your
+pipeline already records another output identity. If the results are
+already aligned in one CSV, repeat `--correct-column NAME` for each grader.
+The first grader is the reference for directional differences.
+
+If a prediction CSV contains multiple runs for the same IDs, select one
+with `--prediction-filter COLUMN=VALUE`.
+[Real routing example and CI setup](https://github.com/Daveyuwang/caat/blob/main/docs/cfpb-audit.md)
+
+## Select a threshold on calibration data
+
+```bash
+caat select examples/ifeval_strict.csv --score-column mean_token_logprob --correct-column strict_pass --thresholds -0.20 -0.35 -0.60 --risk-target 0.4 --rule empirical
 ```
 
-### Train trust scorer
+The example selects `-0.35`, accepting 12 of 24 responses with four
+errors on the calibration sample. Supply a fixed list with `--thresholds`
+or use `--design DESIGN.csv` to derive candidates from score deciles on a
+separate file. Repeat `--correct-column` to require the target under every
+grader. The JSON includes per-candidate counts and `selected_threshold`.
+The command returns 0 if it selects a cutoff, 1 if none qualifies, and 2
+for invalid input.
+
+For statistical risk control, use `--rule ltt-bonferroni` (default) or
+`--rule ltt-fixed-sequence`. Both assume independent calibration rows
+from the target population and a candidate grid fixed before calibration.
+`--failure-rate` defaults to 0.05. Fixed-sequence testing proceeds from
+the strictest threshold and stops at the first failure. The empirical rule
+has no statistical guarantee. Apply the selected cutoff unchanged to
+held-out data with `caat evaluate` or `caat audit`.
+
+## CPU benchmarks
+
+```bash
+python scripts/replay_benchmarks.py
 ```
-python scripts/train_trust_scorer.py
+
+The command replays the bundled 24-response samples for IFEval, MMLU-Pro, and
+TriviaQA and writes `replay/benchmarks/summary.csv`. The larger HELM comparison
+evaluates sequence probability and perplexity rankings and tests empirical
+threshold selection against Learn then Test.
+[Sources, results, and reproduction](https://github.com/Daveyuwang/caat/blob/main/docs/benchmarks.md) ·
+[WildBench and Omni-MATH grader replay](https://github.com/Daveyuwang/caat/blob/main/docs/judge-study.md)
+
+## Development
+
+```bash
+python -m pip install -e .
+python -m unittest discover -s tests
 ```
+
+The tests include the bundled benchmark replay. CI runs them on Python 3.10
+through 3.14 on Linux and on 3.10 and 3.14 on Windows, runs the README
+examples, and builds and installs the wheel.
+
+[Evaluation method and related work](https://github.com/Daveyuwang/caat/blob/main/docs/method.md)
+
+## License
+
+MIT. See [LICENSE](https://github.com/Daveyuwang/caat/blob/main/LICENSE).

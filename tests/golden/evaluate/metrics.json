@@ -1,0 +1,46 @@
+{
+  "threshold": 0.75,
+  "overall": {
+    "total": 5,
+    "accepted": 3,
+    "errors": 1,
+    "coverage": 0.6,
+    "error_rate": 0.3333333333333333
+  },
+  "by_reference": {
+    "billing": {
+      "total": 3,
+      "accepted": 2,
+      "errors": 1,
+      "coverage": 0.6666666666666666,
+      "error_rate": 0.5
+    },
+    "security": {
+      "total": 2,
+      "accepted": 1,
+      "errors": 0,
+      "coverage": 0.5,
+      "error_rate": 0.0
+    }
+  },
+  "by_group": {
+    "email": {
+      "total": 2,
+      "accepted": 2,
+      "errors": 1,
+      "coverage": 1.0,
+      "error_rate": 0.5
+    },
+    "chat": {
+      "total": 3,
+      "accepted": 1,
+      "errors": 0,
+      "coverage": 0.3333333333333333,
+      "error_rate": 0.0
+    }
+  },
+  "brier_score": 0.20099999999999998,
+  "auroc": 0.75,
+  "aurc": 0.24666666666666667,
+  "normalized_aurc_gain": 0.5679012345679012
+}

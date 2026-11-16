@@ -1,0 +1,7 @@
+Split with seed 42: 108 design, 216 calibration, and 217 held-out rows.
+Score ranking under strict_pass: AUROC 0.596.
+Score ranking under helm_strict_pass: AUROC 0.614.
+Selected threshold -0.43964836263206303 for a 40% risk target under strict_pass (ltt-bonferroni).
+Held-out rows under strict_pass: accepted 144 of 217 with 33 errors (22.9%), which meets the target.
+Held-out rows under helm_strict_pass (check only): accepted 144 of 217 with 45 errors (31.2%), which meets the target.
+The held-out rows confirm the policy.
