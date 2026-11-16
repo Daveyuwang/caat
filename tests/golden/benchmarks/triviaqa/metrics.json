@@ -15,7 +15,7 @@
   "normalized_aurc_gain": 0.9495821944614115,
   "schema_version": 2,
   "command": "evaluate",
-  "caat_version": "0.1.0",
+  "caat_version": "0.2.0",
   "input": {
     "path": "examples/triviaqa.csv",
     "id_column": "id",

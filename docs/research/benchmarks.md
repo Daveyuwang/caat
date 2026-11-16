@@ -343,3 +343,11 @@ archive and checks those rows against the gold labels.
 `python scripts/study_queue.py` regenerates the table from the saved
 course predictions. [Replay table](../../results/course/queue.csv) ·
 [Queue guide](../guide/queue.md)
+
+## Local Qwen confidence benchmark
+
+Compare token-probability baselines, verbalized confidence, P(True),
+sample agreement, and discrete semantic entropy on the same Qwen2.5-7B
+answers. The replay covers TriviaQA short answers and MMLU-Pro multiple
+choice, with recorded call counts and wall times on an RTX 5080.
+[Benchmark and reproduction](black-box-benchmark.md)

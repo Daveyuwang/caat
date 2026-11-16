@@ -158,6 +158,11 @@ threshold selection against Learn then Test.
 [Sources, results, and reproduction](https://github.com/Daveyuwang/caat/blob/main/docs/research/benchmarks.md) ·
 [WildBench and Omni-MATH grader replay](https://github.com/Daveyuwang/caat/blob/main/docs/research/judge-study.md)
 
+The local Qwen2.5-7B study compares token scores, self-reports, and sample
+agreement on TriviaQA and MMLU-Pro. It includes a CPU replay and measured
+collection costs from an RTX 5080.
+[Qwen confidence benchmark](https://github.com/Daveyuwang/caat/blob/main/docs/research/black-box-benchmark.md)
+
 ## Development
 
 ```bash

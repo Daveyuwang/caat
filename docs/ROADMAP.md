@@ -6,7 +6,7 @@ The local collection extra can produce those inputs.
 
 | Stage | Open work |
 | --- | --- |
-| Features | Replay black-box confidence signals and collection cost on short-answer and multiple-choice datasets with Qwen2.5-7B. |
+| Features | Recheck confidence quality and collection cost with additional model families and sampling budgets. [Qwen2.5-7B replay](research/black-box-benchmark.md) |
 | Calibrators and metrics | Add calibration references and fixtures for score types proposed by users. |
 | Rules | Recheck proportional grader shifts on held-out WildBench archives. |
 | Adapters | Read a pinned HELM run directory directly. |

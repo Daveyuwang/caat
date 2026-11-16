@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "caat-annotation"
-version = "0.1.0"
+version = "0.2.0"
 description = "Score, calibrate, evaluate, and triage saved model predictions"
 readme = "README.md"
 license = "MIT"

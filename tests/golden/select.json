@@ -49,7 +49,7 @@
     }
   ],
   "command": "select",
-  "caat_version": "0.1.0",
+  "caat_version": "0.2.0",
   "input": {
     "path": "examples/ifeval_strict.csv",
     "id_column": "id",
