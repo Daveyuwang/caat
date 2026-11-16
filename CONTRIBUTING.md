@@ -69,5 +69,14 @@ python -m twine check --strict dist/*
 ```
 
 Install the wheel in an empty environment and run the README examples.
-Update the [changelog](CHANGELOG.md) and tag the tested commit. The project
-maintainer approves publishing to the package index.
+Update the [changelog](CHANGELOG.md) and tag the tested commit. A version
+tag runs the [release workflow](.github/workflows/release.yml) and produces
+the wheel and source archive.
+
+After the maintainer approves PyPI publication, set up a Trusted Publisher
+for project `caat-annotation` with owner `Daveyuwang`, repository `caat`,
+workflow `release.yml`, and environment `pypi`. Run the Release workflow
+from the version tag with `publish` enabled. Then install the exact version
+in a fresh environment with `python -m pip install caat-annotation==0.1.0`
+and run the README examples.
+[Create a PyPI project with a Trusted Publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)
