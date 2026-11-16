@@ -8,8 +8,6 @@ from shutil import copyfileobj
 from tempfile import NamedTemporaryFile
 from urllib.request import Request, urlopen
 
-from archived_scores import FULL_SCORE_FIELDS, full_scores, token_logprobs
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SEED = 42
@@ -65,3 +63,14 @@ def write_report(path, rows, fields=None):
         writer.writeheader()
         writer.writerows(rows)
     print(f"Wrote {path}")
+
+
+def risk_at_count(points, target):
+    previous_accepted = previous_errors = 0
+    for _, counts in points:
+        if counts.accepted >= target:
+            # Include the expected errors from a uniform draw inside the boundary tie.
+            share = (target - previous_accepted) / (counts.accepted - previous_accepted)
+            return (previous_errors + share * (counts.errors - previous_errors)) / target
+        previous_accepted, previous_errors = counts.accepted, counts.errors
+    raise ValueError("Target exceeds the sample size")
