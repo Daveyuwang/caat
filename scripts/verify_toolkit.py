@@ -14,16 +14,21 @@ from urllib.parse import quote
 import numpy as np
 from mapie.risk_control import BinaryClassificationController
 from mapie.risk_control.risks import BinaryRisk
-from scipy.stats import binom
-from sklearn.metrics import roc_auc_score
+from scipy.optimize import minimize_scalar
+from scipy.stats import binom, rankdata
+from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import brier_score_loss, roc_auc_score
 
 from caat import load_csv, select
-from caat.metrics import Counts
+from caat.calibrate import CALIBRATORS, calibration_transform, fit_calibration
+from caat.metrics import Counts, calibration_metrics
 from caat.policy import split_rows
 from caat.rules import binomial_pvalue
 from caat.select import design_thresholds
 
 from common import ARCHIVES, ROOT, SEED, read_csv, write_report
+from study_calibration import archives
 
 
 SOURCES = {
@@ -267,6 +272,86 @@ def verify_mapie(replay):
     return report["selected_threshold"]
 
 
+def verify_calibration(replay):
+    scenarios = 0
+    for _, _, rows in archives(replay):
+        _, calibration, heldout = split_rows(rows, SEED)
+        x = np.array([row.score for row in calibration])
+        y = np.array([row.outcomes[0] for row in calibration], dtype=int)
+        z = np.array([row.score for row in heldout])
+        labels = np.array([row.outcomes[0] for row in heldout], dtype=int)
+        logits = np.log(
+            np.clip(x, 1e-12, 1 - 1e-12) / (1 - np.clip(x, 1e-12, 1 - 1e-12))
+        )
+        z_clipped = np.clip(z, 1e-12, 1 - 1e-12)
+        z_logits = np.log(z_clipped / (1 - z_clipped))
+        scale = np.abs(logits).max() or 1
+        for method in ("raw", *CALIBRATORS):
+            if method == "raw":
+                values = z
+            else:
+                mapping = fit_calibration(
+                    x, y.tolist(), method=method, input_scale="probability"
+                )
+                transform = calibration_transform(mapping)
+                values = np.array([transform(p) for p in z])
+            if method == "platt":
+                model = LogisticRegression(C=1, tol=1e-12, max_iter=1000)
+                model.fit((logits / scale).reshape(-1, 1), y)
+                reference = model.predict_proba((z_logits / scale).reshape(-1, 1))[:, 1]
+                np.testing.assert_allclose(values, reference, rtol=0, atol=1e-6)
+            elif method == "isotonic":
+                model = IsotonicRegression(out_of_bounds="clip")
+                np.testing.assert_allclose(
+                    values, model.fit(x, y).predict(z), atol=1e-12
+                )
+            elif method == "temperature":
+
+                def loss(slope):
+                    return np.logaddexp(0, (1 - 2 * y) * logits * slope).mean()
+
+                optimum = minimize_scalar(loss, bounds=(1e-6, 100), method="bounded")
+                assert (
+                    loss(mapping["parameters"]["inverse_temperature"])
+                    <= optimum.fun + 1e-8
+                )
+            elif method == "histogram":
+                fit_bin = np.minimum((x * 10).astype(int), 9)
+                frequencies = [
+                    y[fit_bin == i].mean() if (fit_bin == i).any() else y.mean()
+                    for i in range(10)
+                ]
+                np.testing.assert_allclose(
+                    values, np.array(frequencies)[np.minimum((z * 10).astype(int), 9)]
+                )
+
+            actual = calibration_metrics(values, labels)
+            assert math.isclose(
+                actual["brier_score"], brier_score_loss(labels, values), abs_tol=1e-12
+            )
+            fixed = np.minimum((values * 10).astype(int), 9)
+            adaptive = (
+                (rankdata(values) - 0.5) * min(len(values), 10) / len(values)
+            ).astype(int)
+            counts = np.bincount(fixed, minlength=10)
+            fixed_gaps = np.abs(np.bincount(fixed, values - labels, minlength=10))
+            _, counts_adaptive = np.unique(adaptive, return_counts=True)
+            adaptive_gaps = np.abs(np.bincount(adaptive, values - labels))[
+                np.unique(adaptive)
+            ]
+            np.testing.assert_array_equal(
+                [entry["count"] for entry in actual["reliability_bins"]], counts
+            )
+            assert math.isclose(
+                actual["ece"], fixed_gaps.sum() / len(values), abs_tol=1e-12
+            )
+            assert math.isclose(
+                actual["ace"], (adaptive_gaps / counts_adaptive).mean(), abs_tol=1e-12
+            )
+            scenarios += 1
+    return scenarios
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--replay-dir", type=Path, default=ROOT / "replay")
@@ -276,10 +361,14 @@ def main():
         count, pvalues = verify_policies(args.replay_dir, Path(directory))
     checks = verify_auroc(args.replay_dir)
     cutoff = verify_mapie(args.replay_dir)
+    calibration = verify_calibration(args.replay_dir)
     print(
         f"{count} policy replays, {pvalues} calibration tails, and {checks} AUROC checks matched."
     )
     print(f"MAPIE selected the same IFEval cutoff: {cutoff!r}.")
+    print(
+        f"{calibration} held-out calibration scenarios matched independent references."
+    )
 
 
 if __name__ == "__main__":

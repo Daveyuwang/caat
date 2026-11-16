@@ -203,13 +203,72 @@ def wildbench_auroc(rows, output):
     export(fig, output / "wildbench-auroc")
 
 
+def calibration_replay(rows, output):
+    examples = (
+        ("fever", "qwen_self_report", "FEVER · Qwen self-report"),
+        ("jigsaw", "deberta_probability_of_qwen_label", "Jigsaw · DeBERTa"),
+        (
+            "omni_math",
+            "geometric_mean_token_probability",
+            "Omni-MATH · Token probability",
+        ),
+    )
+    figure, axes = plt.subplots(1, 3, figsize=(10, 3.7), sharex=True, sharey=True)
+    figure.subplots_adjust(left=0.09, right=0.98, bottom=0.24, top=0.86, wspace=0.21)
+    for axis, (archive, score, title) in zip(axes, examples, strict=True):
+        axis.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="#67818f")
+        for index, method in enumerate(("raw", "platt")):
+            bins = [
+                row
+                for row in rows
+                if row["archive"] == archive
+                and row["score"] == score
+                and row["method"] == method
+                and int(row["count"]) > 0
+            ]
+            axis.scatter(
+                [float(row["mean_probability"]) for row in bins],
+                [float(row["accuracy"]) for row in bins],
+                s=[18 + 0.09 * int(row["count"]) for row in bins],
+                label={"raw": "Raw score", "platt": "Platt"}[method],
+                color=COLORS[index],
+                marker=MARKERS[index],
+                alpha=0.72,
+            )
+        axis.set(
+            title=title,
+            xlim=(-0.04, 1.04),
+            ylim=(-0.04, 1.04),
+            xticks=(0, 0.5, 1),
+            yticks=(0, 0.5, 1),
+        )
+        axis.set_aspect("equal")
+        axis.xaxis.set_major_formatter(PercentFormatter(1))
+        axis.yaxis.set_major_formatter(PercentFormatter(1))
+    axes[0].set_ylabel("Observed correctness")
+    figure.supxlabel("Mean predicted probability", y=0.12)
+    handles, labels = axes[0].get_legend_handles_labels()
+    figure.legend(handles, labels, loc="lower center", ncols=2, frameon=False)
+    export(figure, output / "calibration-replay")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--replay-dir", type=Path, default=ROOT / "replay")
     parser.add_argument("--output-dir", type=Path, default=ROOT / "docs" / "figures")
+    parser.add_argument(
+        "--calibration-only",
+        action="store_true",
+        help="Plot the bundled calibration table only.",
+    )
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     setup_style()
+    calibration_replay(
+        read_csv(ROOT / "results/calibration/reliability.csv"), args.output_dir
+    )
+    if args.calibration_only:
+        return
     risk_coverage(read_csv(ROOT / "results/module_study/ranking.csv"), args.output_dir)
     records = args.replay_dir / "judge_study"
     wildbench_shifts(read_csv(records / "gate_cells.csv"), args.output_dir)

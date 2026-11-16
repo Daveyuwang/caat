@@ -46,7 +46,12 @@ def describe(report):
     if command == "policy":
         return describe_policy(report)
     if command == "evaluate":
-        return f"Threshold {report['threshold']!r}. {counts_summary(report['overall'])}"
+        summary = (
+            f"Threshold {report['threshold']!r}. {counts_summary(report['overall'])}"
+        )
+        if "ece" in report:
+            summary += "\n" + calibration_summary(report)
+        return summary
     if command == "audit":
         lines = [f"Threshold {report['threshold']!r}."]
         for grader, counts in report["graders"].items():
@@ -80,6 +85,13 @@ def percent(value):
     return f"{100 * value:.3g}%"
 
 
+def calibration_summary(metrics):
+    return (
+        f"Brier {metrics['brier_score']:.4f}. "
+        f"ECE {percent(metrics['ece'])}. ACE {percent(metrics['ace'])}."
+    )
+
+
 def describe_policy(report) -> str:
     """Summarize a policy report in plain text."""
     split, selection = report["split"], report["selection"]
@@ -103,6 +115,22 @@ def describe_policy(report) -> str:
     target, rule = percent(selection["risk_target"]), selection["rule"]
     graders = " and ".join(selection["graders"])
     threshold = selection["selected_threshold"]
+    if "probability_calibration" in report:
+        calibration = report["probability_calibration"]
+        lines.append(
+            f"Probability calibration uses {calibration['method']}. "
+            "The policy threshold uses the raw score."
+        )
+        for name, estimates in calibration["graders"].items():
+            before = estimates["heldout_uncalibrated"]
+            if before is not None:
+                lines.append(
+                    f"Held-out raw probabilities under {name}. {calibration_summary(before)}"
+                )
+            lines.append(
+                f"Held-out calibrated probabilities under {name}. "
+                + calibration_summary(estimates["heldout_calibrated"])
+            )
     if threshold is None:
         lines.append(
             f"No candidate threshold met the {target} risk target under {graders} ({rule})."

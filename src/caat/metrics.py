@@ -4,7 +4,53 @@ from dataclasses import asdict, dataclass
 from itertools import groupby
 from math import fsum
 from operator import itemgetter
+from statistics import mean
 from typing import Iterable
+
+
+def probability_bin(probability, bins):
+    return min(int(probability * bins), bins - 1)
+
+
+def calibration_metrics(probabilities, outcomes, *, bins=10):
+    """Measure binary correctness calibration. Keep tied scores together in ACE."""
+    if type(bins) is not int or bins < 1:
+        raise ValueError("bins must be a positive integer")
+    pairs = list(zip(probabilities, outcomes, strict=True))
+    if not pairs or any(not 0 <= p <= 1 for p, _ in pairs):
+        raise ValueError("calibration metrics need probabilities between 0 and 1")
+    fixed = [[] for _ in range(bins)]
+    adaptive = [[] for _ in range(min(bins, len(pairs)))]
+    for pair in pairs:
+        fixed[probability_bin(pair[0], bins)].append(pair)
+    seen = 0
+    for _, tied in groupby(sorted(pairs, key=itemgetter(0)), key=itemgetter(0)):
+        block = list(tied)
+        index = (2 * seen + len(block)) * len(adaptive) // (2 * len(pairs))
+        adaptive[index].extend(block)
+        seen += len(block)
+
+    def summarize(group):
+        count = len(group)
+        return {
+            "count": count,
+            "mean_probability": fsum(p for p, _ in group) / count if count else None,
+            "accuracy": sum(y for _, y in group) / count if count else None,
+        }
+
+    reliability = [
+        {"lower": i / bins, "upper": (i + 1) / bins, **summarize(group)}
+        for i, group in enumerate(fixed)
+    ]
+    adaptive_gaps = [
+        abs(fsum(p - y for p, y in group)) / len(group) for group in adaptive if group
+    ]
+    return {
+        "brier_score": mean((p - y) ** 2 for p, y in pairs),
+        "ece": fsum(abs(fsum(p - y for p, y in group)) for group in fixed) / len(pairs),
+        "ace": fsum(adaptive_gaps) / len(adaptive_gaps),
+        "reliability_bins": reliability,
+    }
 
 
 @dataclass(frozen=True)

@@ -28,10 +28,19 @@ different headers with the flags above. An optional `group` column gives
 per-group metrics.
 
 CAAT accepts every row with a score at or above `--threshold`. Use
-`--probability` to report Brier score for probabilities of correctness.
+`--probability` to report Brier score, ECE, ACE, and reliability bins for
+probabilities of correctness.
 The review commands print a short summary. Add `--json` for machine-readable
 stdout or `--output FILE` to save the JSON report. The CLI and Python API
 use the standard library. [CSV input](https://github.com/Daveyuwang/caat/blob/main/docs/guide/csv-format.md) · [Report fields](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md)
+
+Use `caat calibrate fit` to save a temperature, Platt, isotonic, or histogram
+map from labeled calibration rows. Use `caat calibrate apply` to add its
+probabilities to a held-out CSV. Add `--html report.html` to `evaluate`,
+`audit`, or `policy` for a self-contained report.
+[Calibration examples](https://github.com/Daveyuwang/caat/blob/main/docs/guide/calibration.md)
+
+![Reliability diagram for the ticket-triage example](https://github.com/Daveyuwang/caat/raw/main/docs/figures/calibration-example.svg)
 
 ## Choose and check a cutoff in one command
 
