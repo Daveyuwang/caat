@@ -4,7 +4,7 @@ The training and dashboard commands below refer to the archived checkout.
 [Course project archive and checkout instructions](course-project.md)
 
 The course pipeline combines Qwen2.5-7B annotations with DeBERTa predictions
-and fits a scorer to estimate whether each Qwen label is correct. [System diagram](../../pics/systemarch.png)
+and fits a scorer to estimate whether each Qwen label is correct. [System diagram](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/pics/systemarch.png)
 
 ## DeBERTa Predictions
 
@@ -98,7 +98,7 @@ Each annotation includes:
 ### Jigsaw Stratified Sample
 
 The stratified Jigsaw sample includes 18,115 original training rows, 944
-development rows, and 941 test rows. [Sampling record](../../results/llm_annotations_7b/jigsaw/jigsaw_sample/jigsaw_20k_sampling_report.json)
+development rows, and 941 test rows. [Sampling record](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/results/llm_annotations_7b/jigsaw/jigsaw_sample/jigsaw_20k_sampling_report.json)
 - Location: `jigsaw/jigsaw_sample/`
 - Files:
   - `jigsaw_sample20k.csv` - Full sample data
@@ -133,7 +133,7 @@ Complete trust score classifier implementation for predicting LLM annotation rel
 - **Comparison Model**: Random Forest (RF)
 - **Features**: 10 features combining LLM confidence, DeBERTa predictions, and text characteristics
 
-[Scorer diagram](../../pics/trustscore.png) · [Original coverage and accuracy plots](../../pics/coverage_accuracy_combined.png)
+[Scorer diagram](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/pics/trustscore.png) · [Original coverage and accuracy plots](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/pics/coverage_accuracy_combined.png)
 
 ### Features
 
@@ -277,7 +277,7 @@ python scripts/run_llm_annotations_7b.py --datasets imdb
 ### Trust Scorer
 
 The archived Jigsaw run used scikit-learn 1.7.1. Use the recorded version to
-retrain the course scorer, which uses `cv='prefit'` for calibration. [Run config](../../results/trust_scorer/models/jigsaw_lr_config.json)
+retrain the course scorer, which uses `cv='prefit'` for calibration. [Run config](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/results/trust_scorer/models/jigsaw_lr_config.json)
 
 ```bash
 # Train all models
@@ -297,7 +297,7 @@ python -m dashboard.app
 ```
 
 Open [localhost:8050](http://127.0.0.1:8050/) to browse the saved results.
-[Annotation explorer](../../pics/annotation.png) · [Confidence regions](../../pics/confidence.png) · [Policy thresholds](../../pics/policythresh.png)
+[Annotation explorer](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/pics/annotation.png) · [Confidence regions](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/pics/confidence.png) · [Policy thresholds](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/pics/policythresh.png)
 
 ---
 

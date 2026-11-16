@@ -1,12 +1,34 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "caat-annotation"
 version = "0.1.0"
 description = "Evaluate confidence-based review policies for model annotations"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
+keywords = ["selective prediction", "risk control", "LLM evaluation", "human review", "calibration"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Homepage = "https://github.com/Daveyuwang/caat"
+Documentation = "https://github.com/Daveyuwang/caat/blob/main/docs/method.md"
+Issues = "https://github.com/Daveyuwang/caat/issues"
 
 [project.scripts]
 caat = "caat.cli:main"

@@ -1,5 +1,7 @@
 # Confidence-Aware Annotation Toolkit
 
+[![CI](https://github.com/Daveyuwang/caat/actions/workflows/ci.yml/badge.svg)](https://github.com/Daveyuwang/caat/actions/workflows/ci.yml)
+
 CAAT evaluates which saved model predictions to accept automatically and
 which to send for review. It reports coverage, errors among accepted
 predictions, and the risk–coverage curve. Use Python 3.10 or later.
@@ -85,7 +87,7 @@ The first grader is the reference for directional differences.
 
 If a prediction CSV contains multiple runs for the same IDs, select one
 with `--prediction-filter COLUMN=VALUE`.
-[Real routing example and CI setup](docs/cfpb-audit.md)
+[Real routing example and CI setup](https://github.com/Daveyuwang/caat/blob/main/docs/cfpb-audit.md)
 
 ## Select a threshold on calibration data
 
@@ -119,8 +121,8 @@ The command replays the bundled 24-response samples for IFEval, MMLU-Pro, and
 TriviaQA and writes `replay/benchmarks/summary.csv`. The larger HELM comparison
 evaluates sequence probability and perplexity rankings and tests empirical
 threshold selection against Learn then Test.
-[Sources, results, and reproduction](docs/benchmarks.md) ·
-[WildBench and Omni-MATH grader replay](docs/judge-study.md)
+[Sources, results, and reproduction](https://github.com/Daveyuwang/caat/blob/main/docs/benchmarks.md) ·
+[WildBench and Omni-MATH grader replay](https://github.com/Daveyuwang/caat/blob/main/docs/judge-study.md)
 
 ## Development
 
@@ -129,4 +131,12 @@ python -m pip install -e .
 python -m unittest discover -s tests
 ```
 
-[Evaluation method and related work](docs/method.md)
+The tests include the bundled benchmark replay. CI runs them on Python 3.10
+through 3.14 on Linux and on 3.10 and 3.14 on Windows, runs the README
+examples, and builds and installs the wheel.
+
+[Evaluation method and related work](https://github.com/Daveyuwang/caat/blob/main/docs/method.md)
+
+## License
+
+MIT. See [LICENSE](https://github.com/Daveyuwang/caat/blob/main/LICENSE).

@@ -35,9 +35,12 @@ Run from this folder in a Python virtual environment. On Windows, use
 
 ```bash
 python -m pip install -e .
-python -m unittest discover -s tests -p test_caat_evaluate.py
+python -m unittest discover -s tests
 python scripts/replay_benchmarks.py
 ```
+
+The full test suite includes a replay check. [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+runs the same tests, the README examples, and a wheel build on every pull request.
 
 The replay writes `replay/benchmarks/summary.csv`, plus a metrics JSON and a
 risk–coverage CSV per benchmark. With the included scores and cutoffs, IFEval

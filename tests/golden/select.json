@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "rule": "empirical",
+  "graders": [
+    "strict_pass"
+  ],
+  "risk_target": 0.4,
+  "failure_rate": 0.05,
+  "per_candidate_level": null,
+  "guarantee": null,
+  "calibration_total": 24,
+  "selected_threshold": -0.35,
+  "candidates": [
+    {
+      "threshold": -0.2,
+      "accepted": 4,
+      "coverage": 0.16666666666666666,
+      "errors": {
+        "strict_pass": 0
+      },
+      "worst_error_rate": 0.0,
+      "pvalue": 0.1296,
+      "tested": true,
+      "passes": true
+    },
+    {
+      "threshold": -0.35,
+      "accepted": 12,
+      "coverage": 0.5,
+      "errors": {
+        "strict_pass": 4
+      },
+      "worst_error_rate": 0.3333333333333333,
+      "pvalue": 0.4381782220800002,
+      "tested": true,
+      "passes": true
+    },
+    {
+      "threshold": -0.6,
+      "accepted": 20,
+      "coverage": 0.8333333333333334,
+      "errors": {
+        "strict_pass": 9
+      },
+      "worst_error_rate": 0.45,
+      "pvalue": 0.7553372033163923,
+      "tested": true,
+      "passes": false
+    }
+  ]
+}

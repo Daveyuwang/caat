@@ -32,15 +32,15 @@ python scripts/eval_saved_predictions.py --output-dir replay/course
 
 The script writes the risk–coverage plot and per-class error table. The
 marked DeBERTa point has the highest coverage at or below the balanced trust
-scorer's coverage. [Class error table](../../results/offline_eval/class_errors.csv)
+scorer's coverage. [Class error table](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/results/offline_eval/class_errors.csv)
 
-![Risk–coverage comparison for IMDb, Jigsaw, and FEVER](../../results/offline_eval/risk_coverage.png)
+![Risk–coverage comparison for IMDb, Jigsaw, and FEVER](https://github.com/Daveyuwang/caat/raw/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/results/offline_eval/risk_coverage.png)
 
 On Jigsaw, the balanced trust scorer and DeBERTa-only each accepted 2,311 of
 3,000 examples. DeBERTa made 14 errors and the trust scorer made 62. DeBERTa
 accepted 14 gold-toxic examples and misclassified all 14. The trust scorer
 accepted 128 and misclassified 29. The course sample spans the original train,
-development, and test splits. [Sampling record](../../results/llm_annotations_7b/jigsaw/jigsaw_sample/jigsaw_20k_sampling_report.json)
+development, and test splits. [Sampling record](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/results/llm_annotations_7b/jigsaw/jigsaw_sample/jigsaw_20k_sampling_report.json)
 
 #### Jigsaw CLI replay
 
@@ -64,13 +64,13 @@ tie breaks.
 | Saved self-reported confidence | 0.1569 | 14.88% |
 | Course trust scorer | 0.0380 | 0.56% |
 
-Set up the GPU environment before rerunning inference. [Pinned dependencies](../../results/answer_token_pilot/README.md#reproduce)
+Set up the GPU environment before rerunning inference. [Pinned dependencies](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/results/answer_token_pilot/README.md#reproduce)
 
 ```bash
 python scripts/run_answer_token_pilot.py --batch-size 16 --gpu-memory 10GiB --output-dir replay/answer_token_pilot
 ```
 
-[Pilot record](../../results/answer_token_pilot/README.md) · [Risk–coverage plot](../../results/answer_token_pilot/risk_coverage.png) · [Per-example scores](../../results/answer_token_pilot/scores.csv)
+[Pilot record](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/results/answer_token_pilot/README.md) · [Risk–coverage plot](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/results/answer_token_pilot/risk_coverage.png) · [Per-example scores](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/results/answer_token_pilot/scores.csv)
 
 ## Course project
 

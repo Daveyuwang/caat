@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "threshold": 0.75,
+  "risk_target": 0.4,
+  "primary_grader": "reference",
+  "graders": {
+    "reference": {
+      "total": 5,
+      "accepted": 3,
+      "errors": 1,
+      "coverage": 0.6,
+      "error_rate": 0.3333333333333333,
+      "meets_target": true,
+      "by_group": {
+        "billing": {
+          "total": 2,
+          "accepted": 2,
+          "errors": 0,
+          "coverage": 1.0,
+          "error_rate": 0.0
+        },
+        "support": {
+          "total": 3,
+          "accepted": 1,
+          "errors": 1,
+          "coverage": 0.3333333333333333,
+          "error_rate": 1.0
+        }
+      }
+    },
+    "rubric": {
+      "total": 5,
+      "accepted": 3,
+      "errors": 2,
+      "coverage": 0.6,
+      "error_rate": 0.6666666666666666,
+      "meets_target": false,
+      "by_group": {
+        "billing": {
+          "total": 2,
+          "accepted": 2,
+          "errors": 1,
+          "coverage": 1.0,
+          "error_rate": 0.5
+        },
+        "support": {
+          "total": 3,
+          "accepted": 1,
+          "errors": 1,
+          "coverage": 0.3333333333333333,
+          "error_rate": 1.0
+        }
+      }
+    }
+  },
+  "accepted_comparisons": {
+    "rubric": {
+      "newly_failed": 1,
+      "newly_passed": 0,
+      "risk_change": 0.3333333333333333,
+      "overall_risk_change": 0.2,
+      "excess_risk_change": 0.1333333333333333,
+      "target_decision_changed": true
+    }
+  },
+  "discordant": [
+    {
+      "id": "2",
+      "group": "billing",
+      "accepted": true,
+      "outcomes": {
+        "reference": true,
+        "rubric": false
+      }
+    }
+  ],
+  "input": {
+    "path": "examples/audit/predictions.csv",
+    "id_column": "id",
+    "score_column": "score",
+    "group_column": "group",
+    "output_key_column": "output_key",
+    "grader_files": {
+      "reference": "examples/audit/reference.csv",
+      "rubric": "examples/audit/rubric.csv"
+    }
+  }
+}

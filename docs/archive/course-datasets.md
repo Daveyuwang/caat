@@ -34,7 +34,7 @@ The course project used three benchmark datasets for annotation reliability anal
   - Development: 97,320 samples
   - Test: 97,320 samples
   - Total: 1,999,514 samples
-- LLM annotations use a stratified 20,000-row sample with rows from the original train, development, and test splits. [Sampling record](../../results/llm_annotations_7b/jigsaw/jigsaw_sample/jigsaw_20k_sampling_report.json)
+- LLM annotations use a stratified 20,000-row sample with rows from the original train, development, and test splits. [Sampling record](https://github.com/Daveyuwang/caat/blob/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/results/llm_annotations_7b/jigsaw/jigsaw_sample/jigsaw_20k_sampling_report.json)
 ---
 
 ## FEVER

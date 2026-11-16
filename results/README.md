@@ -13,11 +13,12 @@ and its controls. Its per-model tables regenerate under `replay/judge_study/`.
 
 ## Course archive
 
-The other directories hold saved predictions, annotations, metrics, and
-plots from the original course project: `deberta_predictions/`,
-`llm_annotations_7b/`, `trust_scorer/`, `offline_eval/`, and
-`answer_token_pilot/`. `python scripts/compare_baselines.py --course` reads
-`trust_scorer/*_lr_predictions.csv` as a historical baseline.
+[`trust_scorer/`](trust_scorer/) keeps the course trust scorer's saved
+predictions for IMDb, Jigsaw, and FEVER. `python scripts/compare_baselines.py --course`
+reads them as a historical baseline and writes `baselines/course.csv`. The
+other course outputs (DeBERTa predictions, Qwen annotations, trained models,
+plots, and the answer-token pilot) are available in the
+[original results tree](https://github.com/Daveyuwang/caat/tree/24ca74c32f910b38e18fd6593fc3d6bb5b4f57ab/results).
 [Course results](../docs/archive/course-results.md) ·
 [Course datasets](../docs/archive/course-datasets.md) ·
 [Course project](../docs/archive/course-project.md)
