@@ -1,0 +1,9 @@
+archive,split,primary_grader,alternate_grader,total,primary_pass,alternate_pass,newly_failed,newly_passed
+ifeval_qwen,all,strict_pass,helm_strict_pass,541,383,343,40,0
+ifeval_qwen,heldout,strict_pass,helm_strict_pass,217,162,142,20,0
+ifeval_llama,all,strict_pass,helm_strict_pass,541,399,342,57,0
+ifeval_llama,heldout,strict_pass,helm_strict_pass,217,168,142,26,0
+mmlu_pro_qwen,all,correct,tiger_correct,1000,539,545,1,7
+mmlu_pro_qwen,heldout,correct,tiger_correct,400,211,215,1,5
+mmlu_pro_llama,all,correct,tiger_correct,1000,406,436,0,30
+mmlu_pro_llama,heldout,correct,tiger_correct,400,169,179,0,10

@@ -1,0 +1,4 @@
+score,policy_selected_using_google,risk_target,threshold,total,accepted,google_errors,helm_errors,google_pass_helm_fail,google_fail_helm_pass
+mean_token_logprob,empirical,0.3,-0.43964836263206303,217,144,33,45,12,0
+sequence_logprob,empirical,0.2,-17.21496997802972,217,46,10,13,3,0
+sequence_logprob,empirical,0.3,-89.27494837597722,217,105,24,33,9,0

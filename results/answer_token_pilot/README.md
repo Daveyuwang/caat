@@ -31,6 +31,9 @@ Use the existing logistic-regression trust score as the supervised reference.
 
 ## Reproduce
 
+Run the GPU command from the archived course checkout.
+[Course project checkout instructions](../../docs/archive/course-project.md)
+
 Use an environment with CUDA-enabled PyTorch. The recorded run used Python
 3.12, PyTorch 2.13.0 with CUDA 13.2, and Transformers 5.16.1. The runner
 downloads the pinned checkpoint on first use. Set `HF_HUB_OFFLINE=1` to use
