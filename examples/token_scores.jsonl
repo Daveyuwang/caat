@@ -1,0 +1,2 @@
+{"id":"response-1","text":"Answer: A","tokens":[{"text":"Answer","logprob":-0.4},{"text":":","logprob":-0.2},{"text":" A","logprob":-0.7}],"answer_span":[8,9]}
+{"id":"response-2","text":"Answer: B","tokens":[{"text":"Answer","logprob":-0.1},{"text":":","logprob":-0.3},{"text":" B","logprob":-1.2}],"answer_span":[8,9]}

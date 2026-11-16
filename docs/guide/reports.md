@@ -1,10 +1,12 @@
 # CLI reports
 
-All commands print a plain-text summary by default. `--json` prints the
+The four review commands print a plain-text summary by default. `--json` prints the
 full report to stdout. `--output FILE` writes that report as JSON whether
 or not you use `--json`. A valid report can accompany exit code 1. Exit
 code 2 signals invalid input. `evaluate --output-dir DIR` also writes
-`metrics.json` and `risk_coverage.csv`.
+`metrics.json` and `risk_coverage.csv`. Use `--plot FILE.svg` with
+`evaluate` for a risk–coverage curve or with `audit` and `policy` for
+per-grader risk at the selected cutoff.
 
 Each rate is a fraction between 0 and 1. Risk has value `null` when the
 policy accepts no rows. In the tables, `*` stands for a key in a map and

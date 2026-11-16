@@ -71,7 +71,7 @@ class ReadmeReportTests(unittest.TestCase):
         self.assertEqual(json.dumps(actual, sort_keys=True, indent=2), json.dumps(frozen, sort_keys=True, indent=2))
 
     def test_readme_examples_have_golden_reports(self):
-        self.assertEqual(set(self.examples), {"evaluate", "policy", "audit", "select"})
+        self.assertEqual(set(self.examples), {"evaluate", "policy", "audit", "select", "features"})
 
     def test_evaluate_example(self):
         with TemporaryDirectory() as directory:
@@ -94,18 +94,35 @@ class ReadmeReportTests(unittest.TestCase):
         self.assert_golden_report(json.loads(run_readme("select", [*self.examples["select"], "--json"])), "select.json")
 
     def test_policy_example(self):
-        arguments = self.examples["policy"]
-        self.assertEqual(run_readme("policy", arguments), (GOLDEN / "policy.txt").read_text(encoding="utf-8"))
-        self.assert_golden_report(json.loads(run_readme("policy", [*arguments, "--json"])), "policy.json")
+        with TemporaryDirectory() as directory:
+            arguments = self.examples["policy"].copy()
+            plot = Path(directory) / "policy.svg"
+            arguments[arguments.index("--plot") + 1] = str(plot)
+            self.assertEqual(run_readme("policy", arguments), (GOLDEN / "policy.txt").read_text(encoding="utf-8"))
+            self.assert_golden_report(json.loads(run_readme("policy", [*arguments, "--json"])), "policy.json")
+            expected = ROOT / "docs" / "figures" / "policy-example.svg"
+            self.assertEqual(plot.read_text(encoding="utf-8"), expected.read_text(encoding="utf-8"))
+
+    def test_features_example(self):
+        with TemporaryDirectory() as directory:
+            args = self.examples["features"].copy()
+            output = Path(directory) / "features.csv"
+            args[args.index("--output") + 1] = str(output)
+            run_readme("features", args)
+            self.assertEqual(output.read_text(encoding="utf-8"), (GOLDEN / "features.csv").read_text(encoding="utf-8"))
 
     def test_output_file_for_each_command(self):
         with TemporaryDirectory() as directory:
             for command, args in self.examples.items():
+                if command == "features":
+                    continue
                 with self.subTest(command=command):
                     args = args.copy()
                     path = Path(directory) / f"{command}.json"
                     if command == "evaluate":
                         args[args.index("--output-dir") + 1] = directory
+                    if command == "policy":
+                        args[args.index("--plot") + 1] = str(Path(directory) / "policy.svg")
                     output = run_readme(command, [*args, "--output", str(path)])
                     self.assertFalse(output.lstrip().startswith("{"))
                     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -118,12 +135,16 @@ class ReadmeReportTests(unittest.TestCase):
             name.lower(): re.findall(r"^\| `([^\x60]+)` \|", section, flags=re.MULTILINE)
             for name, section in re.findall(r"^## (\w+)\n(.*?)(?=^## |\Z)", text, flags=re.MULTILINE | re.DOTALL)
         }
-        self.assertEqual(set(fields), {"common", *self.examples})
+        self.assertEqual(set(fields), {"common", "evaluate", "audit", "select", "policy"})
         with TemporaryDirectory() as directory:
             for command, args in self.examples.items():
+                if command not in fields:
+                    continue
                 args = args.copy()
                 if command == "evaluate":
                     del args[args.index("--output-dir"):args.index("--output-dir") + 2]
+                if command == "policy":
+                    args[args.index("--plot") + 1] = str(Path(directory) / "policy.svg")
                 if command == "audit":
                     predictions = Path(directory) / "predictions.csv"
                     header, *rows = (ROOT / args[0]).read_text(encoding="utf-8").splitlines()

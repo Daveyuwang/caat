@@ -36,7 +36,7 @@ use the standard library. [Report fields](docs/guide/reports.md)
 ## Choose and check a cutoff in one command
 
 ```bash
-caat policy examples/ifeval_graders.csv --score-column mean_token_logprob --correct-column strict_pass --check-column helm_strict_pass --risk-target 0.4
+caat policy examples/ifeval_graders.csv --score-column mean_token_logprob --correct-column strict_pass --check-column helm_strict_pass --risk-target 0.4 --plot replay/policy.svg
 ```
 
 `caat policy` splits one labeled CSV into design, calibration, and held-out
@@ -46,6 +46,8 @@ Google's strict grader and by HELM. The command selects
 `-0.43964836263206303` under the Google grader. On the 217 held-out rows the
 policy accepts 144 responses, with 33 errors (22.9%) under Google and 45
 (31.2%) under HELM. Both meet the 40% target.
+
+![Held-out IFEval risk for the Google and HELM graders](docs/figures/policy-example.svg)
 
 A `--check-column` grader is reported on held-out rows and takes no part in
 selection. Pass it as a second `--correct-column` to require the target
@@ -111,6 +113,16 @@ from the target population and a candidate grid fixed before calibration.
 the strictest threshold and stops at the first failure. The empirical rule
 has no statistical guarantee. Apply the selected cutoff unchanged to
 held-out data with `caat evaluate` or `caat audit`.
+
+## Score saved responses
+
+```bash
+caat features examples/token_scores.jsonl --output replay/token_scores.csv
+```
+
+The input supplies response text and token log probabilities. The CSV
+contains one row per response, with scores you can use as `--score-column`
+values. [JSONL format and available scores](docs/guide/features.md)
 
 ## CPU benchmarks
 

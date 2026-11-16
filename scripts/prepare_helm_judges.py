@@ -9,7 +9,9 @@ from statistics import mean
 from urllib.error import HTTPError
 from urllib.parse import quote
 
-from common import JUDGES, MATCHED_TOKEN_TEXT, SCENARIOS, FULL_SCORE_FIELDS, fetch, full_scores, read_json, token_logprobs
+from caat.features import FULL_SCORE_FIELDS, SavedResponse, full_scores, mean_token_logprob, token_logprobs
+
+from common import JUDGES, MATCHED_TOKEN_TEXT, SCENARIOS, fetch, read_json
 
 
 BASE = "https://storage.googleapis.com/crfm-helm-public/capabilities/benchmark_output"
@@ -176,7 +178,8 @@ def prepare_run(cache, output, release, scenario, model, suite, run):
             continue
         literal_match, alignment = token_alignment(completion)
         verified += alignment in MATCHED_TOKEN_TEXT
-        rows.append((item, mean(scores), *full_scores(completion, scores), literal_match, alignment, *judgment))
+        response = SavedResponse(completion["text"], completion["tokens"], scores)
+        rows.append((item, mean_token_logprob(response), *full_scores(response), literal_match, alignment, *judgment))
     if rows:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8", newline="") as target:

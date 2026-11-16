@@ -36,6 +36,25 @@ with the cutoff recorded in `policies.csv`.
 caat audit replay/module_study/ifeval_qwen_heldout.csv --score-column mean_token_logprob --correct-column strict_pass --correct-column helm_strict_pass --threshold -0.43964836263206303 --risk-target 0.30
 ```
 
+## Design score screen
+
+Run `python scripts/study_features.py` after preparing the four complete
+archives. For each archive, the script uses the original seed-42 design
+split and its primary grader. It compares each score with mean token log
+probability at 75% coverage. The matched-budget calculation averages over
+ties at the boundary. A candidate enters the default registry if it lowers
+risk in at least three of the four archives.
+
+| Candidate | Direction for higher confidence | Design archives with lower risk |
+| --- | --- | ---: |
+| Token log probability population standard deviation | Less variation | 0 / 4 |
+| Share of tokens with probability below 0.1 | Lower share | 1 / 4 |
+| Mean log probability of the final tenth of tokens | Higher mean | 1 / 4 |
+| Distinct adjacent word-pair ratio | Higher ratio | 0 / 4 |
+
+The four candidate scores remain in the research script. The output at
+`replay/feature_screen.csv` records each observed risk difference.
+
 ## Grader changes
 
 IFEval compares Google's pinned strict grader with the published HELM

@@ -5,6 +5,8 @@ from pathlib import Path
 
 from .audit import audit
 from .evaluate import evaluate
+from .features import FEATURES, write_feature_csv
+from .plots import write_plot
 from .policy import policy
 from .report import emit, make_report, write_curve, write_report
 from .rules import RULES
@@ -156,6 +158,13 @@ def output_paths(args):
         if artifacts and args.output.resolve() == artifacts[1].resolve():
             raise ValueError("--output cannot replace risk_coverage.csv")
         outputs.add(args.output)
+    plot = getattr(args, "plot", None)
+    if plot is not None:
+        if plot.suffix.lower() != ".svg":
+            raise ValueError("--plot needs an .svg file")
+        if plot.resolve() in {path.resolve() for path in outputs}:
+            raise ValueError("--plot must use a different path from report outputs")
+        outputs.add(plot)
     if inputs.intersection(path.resolve() for path in outputs):
         raise ValueError("output would overwrite an input CSV")
     return artifacts
@@ -176,11 +185,25 @@ def main(argv=None):
         command = subcommands.add_parser(name, help=help_text)
         column_options(command)
         configure(command)
+        if name in {"evaluate", "audit", "policy"}:
+            command.add_argument("--plot", type=Path, metavar="FILE.svg", help="Write an SVG view of the report.")
         commands[name] = command
+    feature_command = subcommands.add_parser("features", help="Compute scores from saved token log probabilities.")
+    feature_command.add_argument("predictions", type=Path, metavar="JSONL")
+    feature_command.add_argument("--output", type=Path, metavar="CSV", required=True)
+    feature_command.add_argument("--feature", action="append", choices=FEATURES, help="Repeat to choose scores.")
+    commands["features"] = feature_command
     args = parser.parse_args(argv)
     try:
+        if args.command == "features":
+            count = write_feature_csv(args.predictions, args.output, args.feature or tuple(FEATURES))
+            print(f"Wrote scores for {count} responses to {args.output}.")
+            return 0
         artifacts = output_paths(args)
         report, curve, status = run(args)
+        plot = getattr(args, "plot", None)
+        if plot is not None:
+            write_plot(plot, report, curve)
         if artifacts:
             artifact, curve_path = artifacts
             artifact.parent.mkdir(parents=True, exist_ok=True)

@@ -4,11 +4,13 @@ import argparse
 import csv
 import json
 import re
+from dataclasses import replace
 from pathlib import Path
-from statistics import mean
 from string import ascii_uppercase
 
-from common import FULL_SCORE_FIELDS, fetch, full_scores, token_logprobs
+from caat.features import FULL_SCORE_FIELDS, SavedResponse, answer_span_logprob, full_scores, mean_token_logprob, token_logprobs
+
+from common import fetch
 
 DATASET_REVISION = "3373e0b32277875b8db2aa555a333b78a08477ea"
 DATASET_URL = (
@@ -51,19 +53,11 @@ def tiger_answer(text):
     return final[-1] if final else ""
 
 
-def answer_token_score(completion):
-    text = completion["text"]
-    match = re.search(r"(?i:\banswer\s*(?:is\b|:))\s*\(?([A-J])\b", text)
-    tokens = completion["tokens"]
-    if match is None or not "".join(token["text"] for token in tokens).startswith(text):
+def answer_token_score(response):
+    match = re.search(r"(?i:\banswer\s*(?:is\b|:))\s*\(?([A-J])\b", response.text)
+    if match is None:
         return None
-    position = match.start(1)
-    end = 0
-    for token in tokens:
-        end += len(token["text"])
-        if end > position:
-            return token["logprob"]
-    return None
+    return answer_span_logprob(replace(response, answer_span=match.span(1)))
 
 
 def main():
@@ -114,12 +108,13 @@ def main():
         scores = token_logprobs(completion, question_id)
         text = completion["text"]
         prediction = extract_answer(text)
+        response = SavedResponse(completion["text"], completion["tokens"], scores)
         row = (question_id, prediction, reference, int(prediction == reference),
-               mean(scores), gold["category"])
+               mean_token_logprob(response), gold["category"])
         if args.full:
             tiger = tiger_answer(text)
-            row = (*row, *full_scores(completion, scores), tiger,
-                   int(tiger == reference), answer_token_score(completion))
+            row = (*row, *full_scores(response), tiger,
+                   int(tiger == reference), answer_token_score(response))
         rows.append(row)
 
     expected = 1000 if args.full else SAMPLE_SIZE

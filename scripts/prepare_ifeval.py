@@ -6,9 +6,10 @@ import json
 import random
 import sys
 from pathlib import Path
-from statistics import mean
 
-from common import FULL_SCORE_FIELDS, fetch, full_scores, token_logprobs
+from caat.features import FULL_SCORE_FIELDS, SavedResponse, full_scores, mean_token_logprob, token_logprobs
+
+from common import fetch
 
 GRADER_REVISION = "e6890f85757dd84e27ca6df2dd30651dafad28e0"
 GRADER_URL = (
@@ -109,14 +110,15 @@ def main():
         completion, = state["result"]["completions"]
         graded = test_instruction_following_strict(example, {example.prompt: completion["text"]})
         scores = token_logprobs(completion, example.key)
-        row = (example.key, mean(scores), int(graded.follow_all_instructions))
+        response = SavedResponse(completion["text"], completion["tokens"], scores)
+        row = (example.key, mean_token_logprob(response), int(graded.follow_all_instructions))
         if args.full:
             needs_language = any(
                 name.startswith(("change_case:english_", "language:"))
                 for name in example.instruction_id_list
             )
             group = "language_or_case" if needs_language else "other"
-            row = (*row, *full_scores(completion, scores), group)
+            row = (*row, *full_scores(response), group)
         rows.append(row)
 
     expected = len(examples) if args.full else SAMPLE_SIZE
