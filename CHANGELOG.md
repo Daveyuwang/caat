@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - Fit and apply temperature, Platt, isotonic, and histogram probability maps.
 - Report Brier score, ECE, ACE, and reliability bins on saved predictions.
@@ -10,6 +10,7 @@
 - Compare candidate scores against random and length controls with paired intervals and a design-only recommendation.
 - Keep only the IDs, outcomes, and scores needed to replay the course comparisons.
 - Discover installed feature, calibrator, metric, rule, adapter, and renderer plugins through Python entry points. List them with `caat plugins`.
+- Benchmark Qwen2.5-7B confidence scores on TriviaQA and MMLU-Pro, with held-out comparisons and measured calls and latency.
 
 ## 0.1.0
 

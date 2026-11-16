@@ -430,6 +430,44 @@ def verify_scores(replay, directory):
     return module_count, course_count
 
 
+def verify_black_box():
+    root = ROOT / "results/black_box"
+    report = read_csv(root / "comparison.csv")
+    for dataset in ("triviaqa", "mmlu_pro"):
+        archived = read_csv(root / f"{dataset}_scores.csv")
+        rows = [row for row in report if row["dataset"] == dataset]
+        names = [row["method"] for row in rows]
+        matched = [row for row in archived if all(row[name] for name in names)]
+        labels = np.array([int(row["correct"]) for row in matched])
+        for row in rows:
+            name = row["method"]
+            assert int(row["total_rows"]) == len(archived)
+            assert int(row["scored_rows"]) == sum(bool(item[name]) for item in archived)
+            assert int(row["matched_rows"]) == len(matched)
+            assert int(row["matched_correct"]) == labels.sum()
+            scores = np.array([float(item[name]) for item in matched])
+            assert math.isclose(
+                float(row["auroc"]), roc_auc_score(labels, scores), abs_tol=5.1e-11
+            ), (dataset, name)
+            for coverage in (25, 50, 75):
+                accepted = math.ceil(len(scores) * coverage / 100)
+                cut_index = len(scores) - accepted
+                cutoff = np.partition(scores, cut_index)[cut_index]
+                above, tied = scores > cutoff, scores == cutoff
+                errors = (1 - labels[above]).sum()
+                errors += (accepted - above.sum()) * (1 - labels[tied]).mean()
+                assert math.isclose(
+                    float(row[f"risk_{coverage}"]), errors / accepted, abs_tol=5.1e-11
+                ), (dataset, name, coverage)
+            if row["brier_score"]:
+                assert math.isclose(
+                    float(row["brier_score"]),
+                    brier_score_loss(labels, scores),
+                    abs_tol=5.1e-11,
+                ), (dataset, name)
+    return len(report)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--replay-dir", type=Path, default=ROOT / "replay")
@@ -441,6 +479,7 @@ def main():
     checks = verify_auroc(args.replay_dir)
     cutoff = verify_mapie(args.replay_dir)
     calibration = verify_calibration(args.replay_dir)
+    black_box = verify_black_box()
     print(
         f"{count} policy replays, {pvalues} calibration tails, and {checks} AUROC checks matched."
     )
@@ -450,6 +489,9 @@ def main():
     )
     print(
         f"{module_scores} module and {course_scores} course score budgets matched the frozen tables."
+    )
+    print(
+        f"{black_box} Qwen score comparisons matched NumPy and scikit-learn references."
     )
 
 

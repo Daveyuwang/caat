@@ -119,7 +119,7 @@
   "normalized_aurc_gain": 0.5679012345679012,
   "schema_version": 2,
   "command": "evaluate",
-  "caat_version": "0.1.0",
+  "caat_version": "0.2.0",
   "input": {
     "path": "examples/ticket_triage.csv",
     "id_column": "ticket_id",
