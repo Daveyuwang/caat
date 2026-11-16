@@ -7,9 +7,8 @@ import re
 from pathlib import Path
 from statistics import mean
 from string import ascii_uppercase
-from urllib.request import urlopen
 
-from archived_scores import FULL_SCORE_FIELDS, full_scores, token_logprobs
+from common import FULL_SCORE_FIELDS, fetch, full_scores, token_logprobs
 
 DATASET_REVISION = "3373e0b32277875b8db2aa555a333b78a08477ea"
 DATASET_URL = (
@@ -83,9 +82,7 @@ def main():
     run_file = cache / f"{args.model}_scenario_state.json"
     run_url = HELM_BASE + HELM_MODELS[args.model] + "/scenario_state.json"
     for path, url in ((gold_file, DATASET_URL), (run_file, run_url)):
-        if not path.is_file():
-            with urlopen(url, timeout=60) as source:
-                path.write_bytes(source.read())
+        fetch(url, path)
 
     columns = ["question_id", "question", "options", "answer", "answer_index", "category"]
     official = {row["question_id"]: row for row in read_table(gold_file, columns=columns).to_pylist()}

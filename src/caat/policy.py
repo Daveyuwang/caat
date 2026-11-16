@@ -1,3 +1,4 @@
+from operator import attrgetter
 from random import Random
 
 from .audit import audit
@@ -6,9 +7,9 @@ from .select import design_thresholds, select
 from .table import GradedRow, validated_rows
 
 
-def split_rows(rows, seed):
+def split_rows(rows, seed, *, id_key=attrgetter("id")):
     """Sort by ID, shuffle, and split about 20/40/40 into design, calibration, and held-out rows."""
-    rows = sorted(rows, key=lambda row: row.id)
+    rows = sorted(rows, key=id_key)
     Random(seed).shuffle(rows)
     first, second = len(rows) // 5, 3 * len(rows) // 5
     return rows[:first], rows[first:second], rows[second:]

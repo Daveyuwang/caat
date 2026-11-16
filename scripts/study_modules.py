@@ -1,10 +1,10 @@
-"""Compare archived confidence features and single- or multi-grader thresholds."""
+"""Replay archived score rankings, review policies, and course baselines."""
 
 import argparse
-import csv
+from dataclasses import replace
 from math import ceil, isfinite, log
 from pathlib import Path
-from random import Random
+from operator import itemgetter
 
 from numpy.random import default_rng
 from scipy.stats import binom
@@ -12,17 +12,22 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from caat import GradedRow, audit
-from caat.metrics import threshold_points
+from caat import GradedRow, audit, evaluate, load_csv, select
+from caat.metrics import Counts, threshold_points
+from caat.policy import split_rows
+from caat.select import design_thresholds
 
-from compare_baselines import FAILURE_RATE, ROOT, SEED, ranking_rows, risk_at_count, write_report
+from common import ARCHIVES, ROOT, SEED, read_csv, write_report
 
-ARCHIVES = {
-    "ifeval_qwen": ("ifeval", 541, ("strict_pass", "helm_strict_pass")),
-    "ifeval_llama": ("ifeval_llama", 541, ("strict_pass", "helm_strict_pass")),
-    "mmlu_pro_qwen": ("mmlu_pro", 1000, ("correct", "tiger_correct")),
-    "mmlu_pro_llama": ("mmlu_pro_llama", 1000, ("correct", "tiger_correct")),
+HELM = {
+    "ifeval_google": ("ifeval", 541, "strict_pass"),
+    "ifeval_helm": ("ifeval", 541, "helm_strict_pass"),
+    "mmlu_pro": ("mmlu_pro", 1000, "correct"),
 }
+SCORES = ("mean_token_logprob", "sequence_logprob")
+BASELINE_TARGETS = (0.20, 0.30)
+
+
 ARCHIVED_FEATURES = ("mean_token_logprob", "low_token_logprob", "log_token_count")
 RAW_SCORES = ("mean_token_logprob", "sequence_logprob", "low_token_logprob", "shorter_response")
 BASELINE = "mean_token_logprob"
@@ -32,8 +37,7 @@ BOOTSTRAP_SEED = 20261115
 
 
 def load_archive(path, expected, graders):
-    with path.open(encoding="utf-8", newline="") as source:
-        rows = sorted(csv.DictReader(source), key=lambda row: row["id"])
+    rows = read_csv(path)
     if len(rows) != expected or len({row["id"] for row in rows}) != expected:
         raise ValueError(f"{path} must contain {expected} distinct outputs")
     for row in rows:
@@ -52,7 +56,6 @@ def load_archive(path, expected, graders):
             row["answer_present"] = float(value != "")
             row["answer_feature"] = float(value) if value else 0.0
             row["answer_token_logprob"] = float(value) if value else -1e6
-    Random(SEED).shuffle(rows)
     return rows
 
 
@@ -127,27 +130,26 @@ def audit_rows(rows, scores, graders):
 
 
 def compare_policies(name, rows, scores, graders, design_count, calibration_end):
-    design = sorted(scores[:design_count], reverse=True)
-    thresholds = sorted({design[ceil(len(design) * i / 10) - 1] for i in range(1, 11)})
+    thresholds = design_thresholds(scores[:design_count])
     calibration = audit_rows(rows[design_count:calibration_end], scores[design_count:calibration_end], graders)
     heldout = audit_rows(rows[calibration_end:], scores[calibration_end:], graders)
-    candidates = []
-    for threshold in thresholds:
-        report = audit(calibration, graders=graders, threshold=threshold)
-        first, second = (report["graders"][grader] for grader in graders)
-        if first["accepted"]:
-            candidates.append((threshold, first["accepted"], first["errors"], second["errors"]))
+    primary = [replace(row, outcomes=row.outcomes[:1]) for row in calibration]
     for target in TARGETS:
-        for scope in ("primary", "both"):
-            for rule in ("empirical", "learn_then_test"):
+        for scope, selected_rows, selected_graders in (
+            ("primary", primary, graders[:1]), ("both", calibration, graders),
+        ):
+            for rule, registered in (("empirical", "empirical"), ("learn_then_test", "ltt-bonferroni")):
+                report = select(selected_rows, graders=selected_graders, thresholds=thresholds,
+                                risk_target=target, rule=registered)
+                threshold = report["selected_threshold"]
                 selected = None
-                for threshold, n, first_errors, second_errors in candidates:
-                    # The larger count gives the larger binomial p-value for the same n and target.
-                    errors = first_errors if scope == "primary" else max(first_errors, second_errors)
-                    pvalue = float(binom.cdf(errors, n, target))
-                    if (errors / n <= target if rule == "empirical" else pvalue <= FAILURE_RATE / len(thresholds)):
-                        selected = (threshold, n, first_errors, second_errors, pvalue)
-                        break
+                if threshold is not None:
+                    accepted = [row for row in calibration if row.score >= threshold]
+                    n = len(accepted)
+                    first, second = (sum(not row.outcomes[index] for row in accepted) for index in (0, 1))
+                    errors = first if scope == "primary" else max(first, second)
+                    # Preserve the published reference representation of the tail.
+                    selected = (threshold, n, first, second, float(binom.cdf(errors, n, target)))
                 yield policy_result(name, graders, heldout, selected, target, scope, rule)
 
 
@@ -185,10 +187,11 @@ def policy_result(name, graders, heldout, selected, target, scope, rule):
 def study(replay_dir, output):
     rankings, paired_deltas, policies, disagreements = [], [], [], []
     for name, (directory, expected, graders) in ARCHIVES.items():
-        rows = load_archive(replay_dir / directory / "predictions_full.csv", expected, graders)
-        design_count, calibration_end = expected // 5, 3 * expected // 5
+        archived = load_archive(replay_dir / directory / "predictions_full.csv", expected, graders)
+        design, calibration, heldout = split_rows(archived, SEED, id_key=itemgetter("id"))
+        rows = design + calibration + heldout
+        design_count, calibration_end = len(design), len(design) + len(calibration)
         scores, probabilities = score_archive(rows, design_count, graders[0])
-        heldout = rows[calibration_end:]
         heldout_scores = {method: values[calibration_end:] for method, values in scores.items()}
         for method, values in heldout_scores.items():
             for grader in graders:
@@ -221,13 +224,143 @@ def study(replay_dir, output):
         write_report(output / f"{name}.csv", report)
 
 
+def risk_at_count(points, target):
+    previous_accepted = previous_errors = 0
+    for _, counts in points:
+        if counts.accepted >= target:
+            # Include the expected errors from a uniform draw inside the boundary tie.
+            share = (target - previous_accepted) / (counts.accepted - previous_accepted)
+            return (previous_errors + share * (counts.errors - previous_errors)) / target
+        previous_accepted, previous_errors = counts.accepted, counts.errors
+    raise ValueError("Target exceeds the sample size")
+
+
+def ranking_rows(benchmark, method, label_source, rows, probability=False):
+    metrics, curve = evaluate(rows, threshold=min(row.score for row in rows), probability=probability)
+    for coverage in (0.25, 0.50, 0.75, 1.00):
+        accepted = ceil(len(rows) * coverage)
+        yield {
+            "benchmark": benchmark,
+            "method": method,
+            "label_source": label_source,
+            "target_coverage": coverage,
+            "total": len(rows),
+            "accepted": accepted,
+            "coverage": accepted / len(rows),
+            "error_rate": risk_at_count(curve, accepted),
+            "brier_score": metrics["brier_score"],
+        }
+
+
+def policy_rows(benchmark, score, design, calibration, heldout):
+    thresholds = design_thresholds(row.score for row in design)
+    for target in BASELINE_TARGETS:
+        for method, rule in (("empirical", "empirical"), ("learn_then_test_bonferroni", "ltt-bonferroni")):
+            report = select(calibration, graders=("grade",), thresholds=thresholds, risk_target=target, rule=rule)
+            threshold = report["selected_threshold"]
+            counts = errors = 0
+            pvalue = None
+            test = Counts(len(heldout), 0, 0).metrics()
+            if threshold is not None:
+                candidate = next(item for item in report["candidates"] if item["threshold"] == threshold)
+                counts, errors, pvalue = candidate["accepted"], candidate["errors"]["grade"], candidate["pvalue"]
+                test = evaluate(heldout, threshold=threshold)[0]["overall"]
+            yield {
+                "benchmark": benchmark, "score": score, "policy": method, "risk_target": target,
+                "candidates": len(thresholds), "pvalue_cutoff": report["per_candidate_level"],
+                "threshold": threshold, "calibration_total": len(calibration),
+                "calibration_accepted": counts, "calibration_errors": errors, "calibration_pvalue": pvalue,
+                **test,
+            }
+
+
+def compare_helm(replay_dir):
+    ranking, policies = [], []
+    heldout_rows = {}
+    for benchmark, (source, count, grader) in HELM.items():
+        path = replay_dir / source / "predictions_full.csv"
+        for score in SCORES:
+            rows = sorted(
+                load_csv(path, score_column=score, correct_columns=(grader,)),
+                key=lambda row: row.id,
+            )
+            if len(rows) != count or len({row.id for row in rows}) != count:
+                raise ValueError(f"{path} must contain {count} distinct benchmark responses")
+            design, calibration, heldout = split_rows(rows, SEED)
+            heldout_rows[benchmark, score] = heldout
+            ranking.extend(ranking_rows(benchmark, score, "saved_qwen", heldout))
+            policies.extend(policy_rows(benchmark, score, design, calibration, heldout))
+        random = [replace(row, score=0.0) for row in heldout]
+        ranking.extend(ranking_rows(benchmark, "random", "saved_qwen", random))
+    paired = []
+    for policy in policies:
+        if policy["benchmark"] != "ifeval_google" or policy["threshold"] is None:
+            continue
+        score, threshold = policy["score"], policy["threshold"]
+        google = heldout_rows["ifeval_google", score]
+        helm = heldout_rows["ifeval_helm", score]
+        if [(row.id, row.score) for row in google] != [(row.id, row.score) for row in helm]:
+            raise ValueError("IFEval graders must share the same held-out IDs and scores")
+        accepted = [(g.outcomes[0], h.outcomes[0]) for g, h in zip(google, helm, strict=True)
+                    if g.score >= threshold]
+        paired.append({
+            "score": score,
+            "policy_selected_using_google": policy["policy"],
+            "risk_target": policy["risk_target"],
+            "threshold": threshold,
+            "total": len(google),
+            "accepted": len(accepted),
+            "google_errors": policy["errors"],
+            "helm_errors": sum(not h for _, h in accepted),
+            "google_pass_helm_fail": sum(g and not h for g, h in accepted),
+            "google_fail_helm_pass": sum(not g and h for g, h in accepted),
+        })
+    return ranking, policies, paired
+
+
+def compare_course():
+    for benchmark in ("imdb", "jigsaw", "fever"):
+        path = ROOT / "results" / "trust_scorer" / f"{benchmark}_lr_predictions.csv"
+        saved = read_csv(path)
+        methods = {
+            "random": (lambda row: 0.0, False),
+            "qwen_self_report": (lambda row: float(row["llm_confidence_numeric"]), True),
+            "model_agreement": (lambda row: float(row["llm_label"] == row["deberta_predicted_label"]), False),
+            "deberta_probability_of_qwen_label": (lambda row: float(row[f"prob_class{row['llm_label']}"]), True),
+            "course_trust_score": (lambda row: float(row["trust_score_calibrated"]), True),
+            "deberta_maximum_softmax_probability": (
+                lambda row: max(float(value) for key, value in row.items() if key.startswith("prob_class")),
+                True,
+            ),
+        }
+        for method, (score, probability) in methods.items():
+            label = "deberta_predicted_label" if method == "deberta_maximum_softmax_probability" else "llm_label"
+            rows = [
+                GradedRow(row["example_id"], score(row), (row[label] == row["gold_label"],), reference=row["gold_label"])
+                for row in saved
+            ]
+            yield from ranking_rows(benchmark, method, label, rows, probability)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--replay-dir", type=Path, default=ROOT / "replay")
-    parser.add_argument("--output-dir", type=Path, default=ROOT / "replay" / "module_study")
+    parser.add_argument("--output-dir", type=Path)
+    studies = parser.add_mutually_exclusive_group()
+    studies.add_argument("--course", action="store_true", help="Replay the saved course predictions.")
+    studies.add_argument("--baselines", action="store_true", help="Replay the original Qwen HELM baselines.")
     args = parser.parse_args()
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    study(args.replay_dir, args.output_dir)
+    output = args.output_dir or args.replay_dir / ("baselines" if args.course or args.baselines else "module_study")
+    output.mkdir(parents=True, exist_ok=True)
+    if args.course:
+        write_report(output / "course.csv", list(compare_course()))
+    elif args.baselines:
+        ranking, policies, paired = compare_helm(args.replay_dir)
+        write_report(output / "ranking.csv", ranking)
+        write_report(output / "policies.csv", policies)
+        write_report(output / "paired_ifeval.csv", paired)
+    else:
+        study(args.replay_dir, output)
 
 
 if __name__ == "__main__":

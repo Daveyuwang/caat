@@ -7,9 +7,8 @@ import random
 import sys
 from pathlib import Path
 from statistics import mean
-from urllib.request import urlopen
 
-from archived_scores import FULL_SCORE_FIELDS, full_scores, token_logprobs
+from common import FULL_SCORE_FIELDS, fetch, full_scores, token_logprobs
 
 GRADER_REVISION = "e6890f85757dd84e27ca6df2dd30651dafad28e0"
 GRADER_URL = (
@@ -29,15 +28,6 @@ HELM_MODELS = {
     "llama": "meta_llama-3.1-8b-instruct-turbo",
 }
 SAMPLE_SIZE = 24
-
-
-def fetch(url: str, path: Path) -> Path:
-    if not path.is_file():
-        with urlopen(url, timeout=60) as response:
-            content = response.read()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(content)
-    return path
 
 
 def helm_strict_passes(run_url, path):

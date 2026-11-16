@@ -5,7 +5,8 @@ import csv
 import json
 from math import isclose, isfinite
 from pathlib import Path
-from urllib.request import urlopen
+
+from common import fetch
 
 
 REVISION = "a8b059421bb7eb670f29ce93a77fcd3d14b5c29f"
@@ -13,14 +14,6 @@ BASE_URL = f"https://raw.githubusercontent.com/ryansloan/cfpb-routing/{REVISION}
 TIER = "encoder"
 GRADER_FIELDS = ("complaint_id", "output_text", "correct")
 RISK_TARGET = 0.10
-
-
-def fetch(cache, name):
-    path = cache / name
-    if not path.is_file():
-        with urlopen(f"{BASE_URL}/{name}", timeout=60) as response:
-            path.write_bytes(response.read())
-    return path
 
 
 def unique_top_label(output_text):
@@ -38,8 +31,8 @@ def unique_top_label(output_text):
 def prepare(output):
     cache = output / "sources"
     cache.mkdir(parents=True, exist_ok=True)
-    archive = fetch(cache, "encoder_eval.csv")
-    stats = json.loads(fetch(cache, "stats.json").read_text(encoding="utf-8"))
+    archive = fetch(f"{BASE_URL}/encoder_eval.csv", cache / "encoder_eval.csv")
+    stats = json.loads(fetch(f"{BASE_URL}/stats.json", cache / "stats.json").read_text(encoding="utf-8"))
     frozen = stats["encoder"]["hybrid"]["cheap"]["frozen"]
     threshold = frozen["threshold"]
     with archive.open(encoding="utf-8-sig", newline="") as stream:

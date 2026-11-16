@@ -20,12 +20,12 @@ Each prepared row carries a SHA-256 hash of the saved response text.
 
 ```bash
 python -m pip install .
-python -m pip install pyarrow==21.0.0 absl-py==2.3.1 nltk==3.9.2 langdetect==1.0.9 immutabledict==4.2.1 scikit-learn==1.7.2
+python -m pip install -r scripts/requirements.txt
 python scripts/prepare_ifeval.py --full
 python scripts/prepare_ifeval.py --model llama --full
 python scripts/prepare_mmlu_pro.py --full
 python scripts/prepare_mmlu_pro.py --model llama --full
-python scripts/study_review_modules.py
+python scripts/study_modules.py
 ```
 
 The run writes the aggregate tables and aligned held-out CSVs to

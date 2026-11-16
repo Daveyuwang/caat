@@ -1,7 +1,6 @@
 """Run the validation gate on the saved HELM judge archives."""
 
 import argparse
-import csv
 import json
 from math import ceil
 from pathlib import Path
@@ -10,8 +9,7 @@ from urllib.parse import quote
 import numpy as np
 
 from caat.metrics import ranking_metrics, threshold_points
-from compare_baselines import ROOT, write_report
-from prepare_helm_judges import JUDGES, MATCHED_TOKEN_TEXT, SCENARIOS
+from common import JUDGES, MATCHED_TOKEN_TEXT, ROOT, SCENARIOS, read_csv, write_report
 
 
 PAIRS = (("llama", "gpt"), ("claude", "gpt"), ("llama", "claude"))
@@ -26,11 +24,6 @@ CONTROLS = {
     "mmlu_pro_qwen": ("mmlu_pro", ("correct", "tiger_correct")),
     "mmlu_pro_llama": ("mmlu_pro_llama", ("correct", "tiger_correct")),
 }
-
-
-def read_csv(path):
-    with path.open(encoding="utf-8", newline="") as source:
-        return list(csv.DictReader(source))
 
 
 def scores_from(rows):

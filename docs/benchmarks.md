@@ -24,14 +24,14 @@ held-out replay. Both IFEval graders use the same split.
 
 ```bash
 python -m pip install .
-python -m pip install pyarrow==21.0.0 absl-py==2.3.1 nltk==3.9.2 langdetect==1.0.9 immutabledict==4.2.1
+python -m pip install -r scripts/requirements.txt
 python scripts/prepare_ifeval.py --full
 python scripts/prepare_mmlu_pro.py --full
-python scripts/compare_baselines.py
+python scripts/study_modules.py --baselines
 ```
 
 Preparation downloads and caches the pinned public artifacts. Comparison
-reuses the prepared CSVs and requires only CAAT. It writes `ranking.csv`,
+reuses the prepared CSVs. It writes `ranking.csv`,
 `policies.csv`, and `paired_ifeval.csv` under `replay/baselines/`. Omit
 `--full` to regenerate the 24-row samples.
 
@@ -65,7 +65,7 @@ rounding accepted counts up. Ties at the budget boundary use the expected
 error under uniform selection. Each deployed score threshold still accepts
 or defers the whole tie group. On MMLU-Pro at 50% coverage, sequence
 probability has 39% risk and perplexity has 41%.
-[Ranking results](../results/baselines/ranking.csv)
+The `--baselines` replay writes these values to `ranking.csv`.
 
 ### Threshold selection
 
@@ -83,7 +83,7 @@ risk target in this replay. The empirical MMLU-Pro sequence-probability rule
 at a 30% target accepted 139 of 400 held-out rows with 47 errors (33.81%).
 These are retrospective within-archive splits. Any risk guarantee for
 future data depends on the sampling assumptions and grader used.
-[Policy results](../results/baselines/policies.csv)
+The `--baselines` replay writes these values to `policies.csv`.
 
 For IFEval, the two full-pass outcomes differ on 40 of 541 instances. The
 Google-based empirical rule at the 30% target chose a mean token log
@@ -94,7 +94,7 @@ measures sensitivity to the two grading pipelines. All 40 disagreements
 occurred among the 95 prompts with an English capitalization, lowercase,
 or language check. The other 446 prompts agreed. This breakdown locates the
 disagreement without attributing it to one implementation detail.
-[Paired results](../results/baselines/paired_ifeval.csv)
+The `--baselines` replay writes these values to `paired_ifeval.csv`.
 
 The risk–coverage counts were cross-checked against CalibRoute 0.4.0 at all
 1,671 held-out threshold points, using a rank-preserving map for its

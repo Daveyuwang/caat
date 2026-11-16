@@ -6,7 +6,8 @@ import re
 from math import isfinite
 from pathlib import Path
 from string import punctuation
-from urllib.request import urlopen
+
+from common import fetch
 
 DATASET_URL = (
     "https://huggingface.co/datasets/mandarjoshi/trivia_qa/resolve/"
@@ -38,9 +39,7 @@ def main():
     gold_path = cache / "rc.web.nocontext-validation.parquet"
     run_path = cache / "triviaqa_llama8b-dpo_test.parquet"
     for path, url in ((gold_path, DATASET_URL), (run_path, RUN_URL)):
-        if not path.is_file():
-            with urlopen(url, timeout=60) as source:
-                path.write_bytes(source.read())
+        fetch(url, path)
 
     gold_rows = read_table(gold_path, columns=["question", "question_id", "answer"]).to_pylist()
     official = {row["question"]: row for row in gold_rows}

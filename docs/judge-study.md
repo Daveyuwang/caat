@@ -144,7 +144,7 @@ The installed `caat` commands only require the standard library.
 
 ```bash
 python -m pip install -e .
-python -m pip install numpy==2.5.5
+python -m pip install -r scripts/requirements.txt
 python scripts/prepare_helm_judges.py --scenario wildbench --release v1.15.0 --all-with-logprobs
 python scripts/prepare_helm_judges.py --scenario omni_math --release v1.15.0 --model qwen_qwen2.5-7b-instruct-turbo
 python scripts/study_judges.py --release v1.15.0 --deterministic-controls replay
@@ -159,6 +159,9 @@ rows. `cells.csv` includes the other scores, cutoffs, and controls,
 decision and sensitivity counts.
 
 ## Toolkit cross-checks
+
+After preparing the module CSVs and the judge replay, run
+`python scripts/verify_toolkit.py` in the research environment above.
 
 - All 48 policy rows in the [module study](../results/module_study/policies.csv)
   reproduced their thresholds and held-out risk counts through `caat select`
