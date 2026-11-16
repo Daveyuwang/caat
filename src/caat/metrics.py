@@ -127,6 +127,21 @@ def ranking_metrics(points: list[tuple[float, Counts]]) -> dict:
     }
 
 
+def risk_at_count(points, target):
+    """Expected prefix risk when the budget ends inside a tie."""
+    if target < 1:
+        raise ValueError("coverage budget must accept at least one row")
+    previous_accepted = previous_errors = 0
+    for _, counts in points:
+        if counts.accepted >= target:
+            share = (target - previous_accepted) / (counts.accepted - previous_accepted)
+            return (
+                previous_errors + share * (counts.errors - previous_errors)
+            ) / target
+        previous_accepted, previous_errors = counts.accepted, counts.errors
+    raise ValueError("coverage budget exceeds the row count")
+
+
 def grouped_counts(
     decisions: Iterable[tuple[str | None, bool, bool]],
 ) -> tuple[Counts, dict[str, Counts]]:

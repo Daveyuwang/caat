@@ -7,8 +7,8 @@ from pathlib import Path
 from statistics import mean, pstdev
 
 from caat.features import SavedResponse, token_logprobs
-from caat.metrics import threshold_points
 from caat.policy import split_rows
+from caat.scores import ScoredRow, compare_scores
 
 from common import (
     ARCHIVES,
@@ -16,7 +16,6 @@ from common import (
     SEED,
     read_csv,
     read_json,
-    risk_at_count,
     write_report,
 )
 
@@ -42,6 +41,7 @@ def distinct_bigram_ratio(response):
 
 
 CANDIDATES = {
+    "minimum_token_logprob": lambda response: min(response.logprobs),
     "negative_token_logprob_stddev": token_logprob_stddev,
     "negative_low_probability_token_share": low_probability_token_share,
     "last_tenth_logprob": last_tenth_logprob,
@@ -77,22 +77,28 @@ def screen(replay):
                 )
             )
         slots = ceil(len(design) * 0.75)
-        errors = [row[graders[0]] == "0" for row in design]
-        baseline = risk_at_count(
-            threshold_points(
-                zip(
-                    (float(row["mean_token_logprob"]) for row in design),
-                    errors,
-                    strict=True,
-                )
-            ),
-            slots,
-        )
-        for name, scorer in CANDIDATES.items():
-            values = (scorer(response) for response in responses)
-            risk = risk_at_count(
-                threshold_points(zip(values, errors, strict=True)), slots
+        scored = [
+            ScoredRow(
+                row["id"],
+                (
+                    float(row["mean_token_logprob"]),
+                    *(score(response) for score in CANDIDATES.values()),
+                ),
+                (row[graders[0]] == "1",),
             )
+            for row, response in zip(design, responses, strict=True)
+        ]
+        comparison = compare_scores(
+            scored,
+            names=("mean_token_logprob", *CANDIDATES),
+            graders=graders[:1],
+            split="all",
+            bootstrap=0,
+            coverages=(0.75,),
+        )["graders"][graders[0]]["scores"]
+        baseline = comparison["mean_token_logprob"]["budgets"][0]["error_rate"]
+        for name in CANDIDATES:
+            risk = comparison[name]["budgets"][0]["error_rate"]
             yield {
                 "archive": archive,
                 "score": name,

@@ -7,6 +7,8 @@
 - Export reliability SVGs and self-contained HTML evaluation, audit, and policy reports.
 - Queue saved predictions for review under a budget, with group limits and a random baseline.
 - Score saved confidence checks, answer samples, and semantic clusters. Collect model responses with the optional local Transformers backend.
+- Compare candidate scores against random and length controls with paired intervals and a design-only recommendation.
+- Keep only the IDs, outcomes, and scores needed to replay the course comparisons.
 
 ## 0.1.0
 

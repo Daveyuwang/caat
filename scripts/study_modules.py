@@ -13,11 +13,13 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from caat import GradedRow, audit, evaluate, load_csv, select
-from caat.metrics import Counts, threshold_points
+from caat.audit import percentile_interval
+from caat.metrics import Counts, risk_at_count, threshold_points
 from caat.policy import split_rows
+from caat.scores import coverage_budgets
 from caat.select import design_thresholds
 
-from common import ARCHIVES, ROOT, SEED, read_csv, risk_at_count, write_report
+from common import ARCHIVES, ROOT, SEED, read_csv, write_report
 
 HELM = {
     "ifeval_google": ("ifeval", 541, "strict_pass"),
@@ -104,12 +106,6 @@ def budget_risk(scores, errors, indices):
     return risk_at_count(points, ceil(len(indices) * 0.75))
 
 
-def bootstrap_interval(replicates):
-    ordered = sorted(replicates)
-    size = len(ordered)
-    return ordered[ceil(0.025 * size) - 1], ordered[ceil(0.975 * size) - 1]
-
-
 def budget_deltas(name, graders, heldout, scores):
     n = len(heldout)
     comparisons = [
@@ -138,7 +134,7 @@ def budget_deltas(name, graders, heldout, scores):
                     budget_risk(candidate, errors, indices)
                     - budget_risk(baseline, errors, indices)
                 )
-            lower, upper = bootstrap_interval(replicates)
+            lower, upper = percentile_interval(replicates)
             yield {
                 "archive": name,
                 "grader": grader,
@@ -240,7 +236,9 @@ def policy_result(name, graders, heldout, selected, target, scope, rule):
                 ],
                 size=RESAMPLES,
             )
-            lower, upper = bootstrap_interval((counts[:, 0] - counts[:, 1]) / accepted)
+            lower, upper = percentile_interval(
+                ((counts[:, 0] - counts[:, 1]) / accepted).tolist()
+            )
     return {
         "archive": name,
         "primary_grader": graders[0],
@@ -347,17 +345,16 @@ def ranking_rows(benchmark, method, label_source, rows, probability=False):
     metrics, curve = evaluate(
         rows, threshold=min(row.score for row in rows), probability=probability
     )
-    for coverage in (0.25, 0.50, 0.75, 1.00):
-        accepted = ceil(len(rows) * coverage)
+    for budget in coverage_budgets(curve, (0.25, 0.50, 0.75, 1.00)):
         yield {
             "benchmark": benchmark,
             "method": method,
             "label_source": label_source,
-            "target_coverage": coverage,
+            "target_coverage": budget["target_coverage"],
             "total": len(rows),
-            "accepted": accepted,
-            "coverage": accepted / len(rows),
-            "error_rate": risk_at_count(curve, accepted),
+            "accepted": budget["accepted"],
+            "coverage": budget["coverage"],
+            "error_rate": budget["error_rate"],
             "brier_score": metrics["brier_score"],
         }
 
@@ -463,7 +460,7 @@ def compare_helm(replay_dir):
     return ranking, policies, paired
 
 
-def compare_course():
+def course_predictions():
     for benchmark in ("imdb", "jigsaw", "fever"):
         path = ROOT / "results" / "course" / f"{benchmark}_lr_predictions.csv"
         saved = read_csv(path)
@@ -509,7 +506,12 @@ def compare_course():
                 )
                 for row in saved
             ]
-            yield from ranking_rows(benchmark, method, label, rows, probability)
+            yield benchmark, method, label, rows, probability
+
+
+def compare_course():
+    for benchmark, method, label, rows, probability in course_predictions():
+        yield from ranking_rows(benchmark, method, label, rows, probability)
 
 
 def main():

@@ -24,6 +24,7 @@ from .policy import policy, split_rows
 from .queue import review_queue, write_queue
 from .report import emit, make_report, write_curve, write_report
 from .rules import RULES
+from .scores import COSTS, DEFAULT_COVERAGES, compare_scores, read_score_rows
 from .select import design_thresholds, select
 from .table import join_grader_files, load_csv, read_csv_rows, read_design_scores
 
@@ -353,6 +354,74 @@ def run_collect(args):
     return 0
 
 
+def score_cost(value):
+    column, separator, cost = value.partition("=")
+    if not column or not separator or cost not in COSTS:
+        raise argparse.ArgumentTypeError(
+            f"use COLUMN=CLASS with one of {', '.join(COSTS)}"
+        )
+    return column, cost
+
+
+def scores_options(parser):
+    parser.add_argument("predictions", type=Path, metavar="CSV")
+    parser.add_argument("--id-column", default="id")
+    parser.add_argument("--score-column", action="append", required=True)
+    parser.add_argument("--correct-column", action="append", required=True)
+    parser.add_argument("--baseline", help="Default is the first score column.")
+    parser.add_argument("--length-column")
+    parser.add_argument(
+        "--score-cost", action="append", type=score_cost, metavar="COLUMN=CLASS"
+    )
+    parser.add_argument(
+        "--coverage",
+        action="append",
+        type=float,
+        help="Coverage fraction. Repeat for multiple budgets.",
+    )
+    parser.add_argument("--split", choices=("heldout", "all"), default="heldout")
+    parser.add_argument("--bootstrap", type=int, default=500, metavar="N")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--output", type=Path, metavar="JSON")
+
+
+def run_scores(args):
+    if args.output is not None and args.output.resolve() == args.predictions.resolve():
+        raise ValueError("output would overwrite the score CSV")
+    costs = dict(args.score_cost or ())
+    if len(costs) != len(args.score_cost or ()):
+        raise ValueError("give at most one cost for each score column")
+    rows = read_score_rows(
+        args.predictions,
+        args.score_column,
+        args.correct_column,
+        id_column=args.id_column,
+        length_column=args.length_column,
+    )
+    result = compare_scores(
+        rows,
+        names=args.score_column,
+        graders=args.correct_column,
+        baseline=args.baseline,
+        length_control=args.length_column is not None,
+        costs=costs,
+        coverages=args.coverage or DEFAULT_COVERAGES,
+        bootstrap=args.bootstrap,
+        seed=args.seed,
+        split=args.split,
+    )
+    meta = {
+        "path": str(args.predictions),
+        "id_column": args.id_column,
+        "score_columns": args.score_column,
+        "length_column": args.length_column,
+        "correct_columns": args.correct_column,
+    }
+    emit(make_report("scores", meta, result), json_output=args.json, output=args.output)
+    return 0
+
+
 def load_inputs(args):
     columns = tuple(args.correct_column or ())
     common = {
@@ -605,6 +674,10 @@ def main(argv=None):
         "collect", help="Save responses and confidence from a local Transformers model."
     )
     collect_options(commands["collect"])
+    commands["scores"] = subcommands.add_parser(
+        "scores", help="Compare saved scores on shared labels and coverage budgets."
+    )
+    scores_options(commands["scores"])
     args = parser.parse_args(argv)
     try:
         if args.command == "features":
@@ -619,6 +692,8 @@ def main(argv=None):
             return run_queue(args)
         if args.command == "collect":
             return run_collect(args)
+        if args.command == "scores":
+            return run_scores(args)
         artifacts = output_paths(args)
         report, curve, curves, status = run(args)
         plot = getattr(args, "plot", None)
