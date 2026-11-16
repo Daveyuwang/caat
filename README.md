@@ -135,6 +135,10 @@ The input supplies response text and token log probabilities. The CSV
 contains one row per response, with scores you can use as `--score-column`
 values. [JSONL format and available scores](https://github.com/Daveyuwang/caat/blob/main/docs/guide/features.md)
 
+Use `caat scores` to compare candidate columns at matched coverage budgets
+and pick a score on the design split before calibrating a threshold.
+[Score comparison guide](https://github.com/Daveyuwang/caat/blob/main/docs/guide/scores.md)
+
 Use `caat queue` to order saved predictions for review under a row budget.
 It can cap the number of rows per group and compare error yield with a
 random queue. [Queue guide](https://github.com/Daveyuwang/caat/blob/main/docs/guide/queue.md) ·

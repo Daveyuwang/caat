@@ -62,6 +62,41 @@ def describe(report):
                 f"The random queue found {counts['random_errors_found']}."
             )
         return "\n".join(lines)
+    if command == "scores":
+        recommended = report["recommended_score"]
+        lines = [
+            f"Compared scores on {report['split']['reported']} rows against {report['baseline']}."
+        ]
+        if report["split"]["comparison"] == "heldout":
+            lines.append(
+                f"Design-only recommendation: {recommended}."
+                if recommended
+                else "No score improved on random by design AURC."
+            )
+        for grader, comparison in report["graders"].items():
+            lines.append(f"{grader}:")
+            controls = [
+                (f"control {key}", value, "")
+                for key, value in comparison["controls"].items()
+            ]
+            candidates = [
+                (name, value, f" ({report['costs'][name]})")
+                for name, value in comparison["scores"].items()
+            ]
+            for name, score, cost in controls + candidates:
+                auc = score["auroc"]
+                roc = f"{auc:.3f}" if auc is not None else "undefined"
+                risks = ", ".join(
+                    f"{percent(entry['target_coverage'])} coverage: {percent(entry['error_rate'])} error"
+                    for entry in score["budgets"]
+                )
+                warning = (
+                    " AUROC no better than random."
+                    if score.get("direction_warning")
+                    else ""
+                )
+                lines.append(f"  {name}{cost}. AUROC {roc}. {risks}.{warning}")
+        return "\n".join(lines)
     if command == "audit":
         lines = [f"Threshold {report['threshold']!r}."]
         for grader, counts in report["graders"].items():

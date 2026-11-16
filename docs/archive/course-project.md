@@ -47,7 +47,7 @@ development, and test splits. [Sampling record](https://github.com/Daveyuwang/ca
 Run the installed CLI at the course scorer's balanced threshold.
 
 ```bash
-caat evaluate results/course/jigsaw_lr_predictions.csv --id-column example_id --prediction-column llm_label_str --reference-column gold_label_str --score-column trust_score_calibrated --threshold 0.5 --probability --output-dir replay/jigsaw
+caat evaluate results/course/jigsaw_lr_predictions.csv --id-column example_id --prediction-column llm_label --reference-column gold_label --score-column trust_score_calibrated --threshold 0.5 --probability --output-dir replay/jigsaw
 ```
 
 The CLI reports 77.03% coverage and a 2.68% error rate among accepted labels.

@@ -29,6 +29,7 @@ from caat.select import design_thresholds
 
 from common import ARCHIVES, ROOT, SEED, read_csv, write_report
 from study_calibration import archives
+from study_modules import course_predictions, load_archive, score_archive
 
 
 SOURCES = {
@@ -352,6 +353,83 @@ def verify_calibration(replay):
     return scenarios
 
 
+def verify_scores(replay, directory):
+    tables = [
+        {
+            (
+                item["benchmark"],
+                item["method"],
+                item["label_source"],
+                float(item["target_coverage"]),
+            ): item
+            for item in read_csv(ROOT / "results" / table)
+        }
+        for table in ("module_study/ranking.csv", "course/course.csv")
+    ]
+    expected_module, expected_course = tables
+    budgets = (
+        "--coverage",
+        "0.25",
+        "--coverage",
+        "0.5",
+        "--coverage",
+        "0.75",
+        "--coverage",
+        "1",
+    )
+
+    def compare(path, methods, grader_columns, split):
+        args = ["scores", path, "--split", split, "--bootstrap", "0", *budgets]
+        for method in methods:
+            args.extend(("--score-column", method))
+        for label in grader_columns:
+            args.extend(("--correct-column", label))
+        return invoke(*args)["graders"]
+
+    def check(result, expected, archive):
+        for label, grader in result.items():
+            for method, score in grader["scores"].items():
+                for entry in score["budgets"]:
+                    key = (archive, method, label, entry["target_coverage"])
+                    saved = expected.pop(key)
+                    assert entry["accepted"] == int(saved["accepted"]), key
+                    assert entry["coverage"] == float(saved["coverage"]), key
+                    assert entry["error_rate"] == float(saved["error_rate"]), key
+
+    module_count, course_count = len(expected_module), len(expected_course)
+    for name, (folder, count, graders) in ARCHIVES.items():
+        source = load_archive(replay / folder / "predictions_full.csv", count, graders)
+        design, calibration, heldout = split_rows(source, SEED, id_key=itemgetter("id"))
+        rows = design + calibration + heldout
+        scores, _ = score_archive(rows, len(design), graders[0])
+        path = directory / f"scores_{name}.csv"
+        write_report(
+            path,
+            [
+                {
+                    "id": row["id"],
+                    **{label: int(row[label]) for label in graders},
+                    **{key: values[i] for key, values in scores.items()},
+                }
+                for i, row in enumerate(rows)
+            ],
+        )
+        check(compare(path, scores, graders, "heldout"), expected_module, name)
+
+    for archive, method, label, rows, _ in course_predictions():
+        path = directory / f"scores_{archive}_{method}.csv"
+        write_report(
+            path,
+            [
+                {"id": row.id, method: row.score, label: int(row.outcomes[0])}
+                for row in rows
+            ],
+        )
+        check(compare(path, [method], [label], "all"), expected_course, archive)
+    assert not expected_module and not expected_course
+    return module_count, course_count
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--replay-dir", type=Path, default=ROOT / "replay")
@@ -359,6 +437,7 @@ def main():
     verify_binomial()
     with TemporaryDirectory() as directory:
         count, pvalues = verify_policies(args.replay_dir, Path(directory))
+        module_scores, course_scores = verify_scores(args.replay_dir, Path(directory))
     checks = verify_auroc(args.replay_dir)
     cutoff = verify_mapie(args.replay_dir)
     calibration = verify_calibration(args.replay_dir)
@@ -368,6 +447,9 @@ def main():
     print(f"MAPIE selected the same IFEval cutoff: {cutoff!r}.")
     print(
         f"{calibration} held-out calibration scenarios matched independent references."
+    )
+    print(
+        f"{module_scores} module and {course_scores} course score budgets matched the frozen tables."
     )
 
 

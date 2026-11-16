@@ -180,12 +180,13 @@ risk in at least three of the four archives.
 
 | Candidate | Direction for higher confidence | Design archives with lower risk |
 | --- | --- | ---: |
+| Minimum token log probability | Higher minimum | 1 / 4 |
 | Token log probability population standard deviation | Less variation | 0 / 4 |
 | Share of tokens with probability below 0.1 | Lower share | 1 / 4 |
 | Mean log probability of the final tenth of tokens | Higher mean | 1 / 4 |
 | Distinct adjacent word-pair ratio | Higher ratio | 0 / 4 |
 
-The four candidate scores remain in the research script. The output at
+The five candidate scores remain in the research script. The output at
 `replay/feature_screen.csv` records each observed risk difference.
 
 ## Grader changes
