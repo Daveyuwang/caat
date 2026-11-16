@@ -12,5 +12,20 @@
   "brier_score": null,
   "auroc": 0.957983193277311,
   "aurc": 0.06539325235040507,
-  "normalized_aurc_gain": 0.9495821944614115
+  "normalized_aurc_gain": 0.9495821944614115,
+  "schema_version": 2,
+  "command": "evaluate",
+  "caat_version": "0.1.0",
+  "input": {
+    "path": "examples/triviaqa.csv",
+    "id_column": "id",
+    "score_column": "response_prob",
+    "correct_columns": [
+      "correct"
+    ],
+    "output_key_column": null,
+    "prediction_column": null,
+    "reference_column": null,
+    "group_column": null
+  }
 }

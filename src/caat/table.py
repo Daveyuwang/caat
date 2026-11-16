@@ -71,24 +71,6 @@ def exact_match(item_id, prediction, reference):
     return prediction == reference
 
 
-def read_label_records(path, columns, group_column):
-    with open_predictions_csv(path, set(columns.values()), group_column) as (reader, group_column):
-        for row in reader:
-            values = {name: row[column] for name, column in columns.items()}
-            score = parse_score(values["score"], reader.line_num)
-            correct = parse_correct(values["correct"], reader.line_num) if "correct" in columns else None
-            group = (row[group_column] or None) if group_column is not None else None
-            yield values, score, correct, group
-
-
-def load_predictions(path, columns, group_column):
-    for values, score, correct, group in read_label_records(path, columns, group_column):
-        item_id, reference = values["id"], values.get("reference")
-        if correct is None:
-            correct = exact_match(item_id, values.get("prediction"), reference)
-        yield GradedRow(item_id, score, (correct,), group, reference=reference)
-
-
 @contextmanager
 def open_selected_predictions(path, required, group_column, selection):
     if selection is not None:
@@ -101,17 +83,48 @@ def open_selected_predictions(path, required, group_column, selection):
         yield rows, reader, group_column
 
 
-def read_graded_rows(path, id_column, score_column, graders, *, group_column=None, selection=None):
-    required = {id_column, score_column, *graders}
-    with open_selected_predictions(path, required, group_column, selection) as (rows, reader, group_column):
-        return [
-            GradedRow(
-                row[id_column], parse_score(row[score_column], reader.line_num),
-                tuple(parse_correct(row[name], reader.line_num) for name in graders),
-                (row[group_column] or None) if group_column is not None else None,
-            )
-            for row in rows
-        ], group_column
+def read_csv_rows(path, *, id_column="id", score_column="score", correct_columns=(),
+                  group_column=None, output_key_column=None, prediction_column=None,
+                  reference_column=None, selection=None):
+    if not correct_columns:
+        prediction_column = prediction_column or "prediction"
+        reference_column = reference_column or "reference"
+    required = {id_column, score_column, *correct_columns}
+    required.update(column for column in (prediction_column, reference_column, output_key_column) if column)
+    path = Path(path)
+    with open_selected_predictions(path, required, group_column, selection) as (source, reader, group_column):
+        rows = []
+        for row in source:
+            item_id = row[id_column]
+            score = parse_score(row[score_column], reader.line_num)
+            reference = row[reference_column] if reference_column is not None else None
+            group = (row[group_column] or None) if group_column is not None else None
+            key = row[output_key_column] if output_key_column is not None else None
+            if output_key_column is not None and not key:
+                raise ValueError(f"{path}: missing output key for {item_id!r}")
+            if correct_columns:
+                outcomes = tuple(parse_correct(row[column], reader.line_num) for column in correct_columns)
+            else:
+                outcomes = (exact_match(item_id, row[prediction_column], reference),)
+            rows.append(GradedRow(item_id, score, outcomes, group, key, reference))
+    return rows, group_column
+
+
+def load_csv(path, *, id_column="id", score_column="score", correct_columns=(),
+             group_column=None, output_key_column=None, prediction_column=None,
+             reference_column=None):
+    """Read rows from CSV, using correctness columns or exact label matching.
+
+    Outcome order follows correct_columns. The default exact match uses
+    prediction and reference columns and produces one outcome per row.
+    """
+    columns = tuple(correct_columns)
+    rows, _ = read_csv_rows(
+        path, id_column=id_column, score_column=score_column, correct_columns=columns,
+        group_column=group_column, output_key_column=output_key_column,
+        prediction_column=prediction_column, reference_column=reference_column,
+    )
+    return validated_rows(rows, columns or ("correct",))
 
 
 def read_design_scores(path, score_column):

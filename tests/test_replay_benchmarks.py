@@ -1,9 +1,12 @@
 import csv
+import json
 import subprocess
 import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+
+from test_readme_reports import normalize_paths
 
 ROOT = Path(__file__).resolve().parents[1]
 GOLDEN = ROOT / "tests" / "golden" / "benchmarks"
@@ -24,10 +27,12 @@ class ReplayTests(unittest.TestCase):
             self.assertEqual(generated, frozen)
             for path in sorted(frozen):
                 with self.subTest(output=path):
-                    self.assertEqual(
-                        (output / path).read_text(encoding="utf-8"),
-                        (GOLDEN / path).read_text(encoding="utf-8"),
-                    )
+                    actual = (output / path).read_text(encoding="utf-8")
+                    expected = (GOLDEN / path).read_text(encoding="utf-8")
+                    if path.suffix == ".json":
+                        self.assertEqual(normalize_paths(json.loads(actual)), json.loads(expected))
+                    else:
+                        self.assertEqual(actual, expected)
         self.assertEqual(counts, {"ifeval": (12, 4), "mmlu_pro": (12, 5), "triviaqa": (13, 0)})
 
 

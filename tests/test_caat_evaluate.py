@@ -6,7 +6,7 @@ from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from caat import Prediction, evaluate
+from caat import GradedRow, evaluate, load_csv
 from caat.cli import main
 
 
@@ -33,7 +33,7 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual([int(row["accepted"]) for row in curve], [1, 3, 4, 5])
 
     def test_rank_score_with_no_accepted_rows(self):
-        metrics, _ = evaluate([Prediction("1", "A", "A", -2.0)], threshold=0.0)
+        metrics, _ = evaluate([GradedRow("1", -2.0, (True,))], threshold=0.0)
         self.assertEqual(metrics["overall"]["coverage"], 0.0)
         self.assertIsNone(metrics["overall"]["error_rate"])
         self.assertIsNone(metrics["brier_score"])
@@ -56,15 +56,18 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(metrics["by_reference"], {})
 
     def test_external_result_takes_precedence_over_exact_match(self):
-        prediction = Prediction("1", "a", "A", 0.9, correct=True)
-        metrics, _ = evaluate([prediction], threshold=0.5)
+        with TemporaryDirectory() as directory:
+            source = Path(directory) / "graded.csv"
+            source.write_text("id,score,prediction,reference,g\n1,0.9,a,A,1\n", encoding="utf-8")
+            rows = load_csv(source, correct_columns=("g",), reference_column="reference")
+            metrics, _ = evaluate(rows, threshold=0.5)
         self.assertEqual(metrics["by_reference"]["A"]["errors"], 0)
 
     def test_invalid_inputs(self):
-        row = Prediction("1", "A", "A", 0.9)
+        row = GradedRow("1", 0.9, (True,))
         with self.assertRaisesRegex(ValueError, "duplicate id"):
             evaluate([row, row], threshold=0.5)
         with self.assertRaisesRegex(ValueError, "must be finite"):
-            evaluate([Prediction("1", "A", "A", float("nan"))], threshold=0.5)
+            evaluate([GradedRow("1", float("nan"), (True,))], threshold=0.5)
         with self.assertRaisesRegex(ValueError, "between 0 and 1"):
-            evaluate([Prediction("1", "A", "A", 2.0)], threshold=0.5, probability=True)
+            evaluate([GradedRow("1", 2.0, (True,))], threshold=0.5, probability=True)

@@ -42,5 +42,18 @@
   "brier_score": 0.20099999999999998,
   "auroc": 0.75,
   "aurc": 0.24666666666666667,
-  "normalized_aurc_gain": 0.5679012345679012
+  "normalized_aurc_gain": 0.5679012345679012,
+  "schema_version": 2,
+  "command": "evaluate",
+  "caat_version": "0.1.0",
+  "input": {
+    "path": "examples/ticket_triage.csv",
+    "id_column": "ticket_id",
+    "score_column": "confidence",
+    "correct_columns": [],
+    "output_key_column": null,
+    "prediction_column": "model_route",
+    "reference_column": "expected_route",
+    "group_column": "inbox"
+  }
 }

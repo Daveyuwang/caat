@@ -7,9 +7,9 @@ from math import ceil
 from pathlib import Path
 from random import Random
 
-from caat.cli import read_predictions
-from caat.evaluation import Counts, Prediction, evaluate, grouped_counts
-from caat.selection import binomial_pvalue
+from caat import GradedRow, evaluate, load_csv
+from caat.metrics import Counts, grouped_counts
+from caat.rules import binomial_pvalue
 
 ROOT = Path(__file__).resolve().parents[1]
 HELM = {
@@ -56,7 +56,7 @@ def policy_rows(benchmark, score, design, calibration, heldout):
     thresholds = sorted({ranked[ceil(len(ranked) * i / 10) - 1] for i in range(1, 11)})
     candidates = []
     for threshold in thresholds:
-        counts, _ = grouped_counts((None, row.score >= threshold, not row.correct) for row in calibration)
+        counts, _ = grouped_counts((None, row.score >= threshold, not row.outcomes[0]) for row in calibration)
         candidates.append((threshold, counts))
     cutoff = FAILURE_RATE / len(candidates)
     for target in RISK_TARGETS:
@@ -98,7 +98,7 @@ def compare_helm(replay_dir):
         path = replay_dir / source / "predictions_full.csv"
         for score in SCORES:
             rows = sorted(
-                read_predictions(path, {"id": "id", "score": score, "correct": grader}, None),
+                load_csv(path, score_column=score, correct_columns=(grader,)),
                 key=lambda row: row.id,
             )
             if len(rows) != count or len({row.id for row in rows}) != count:
@@ -122,7 +122,7 @@ def compare_helm(replay_dir):
         helm = heldout_rows["ifeval_helm", score]
         if [(row.id, row.score) for row in google] != [(row.id, row.score) for row in helm]:
             raise ValueError("IFEval graders must share the same held-out IDs and scores")
-        accepted = [(g.correct, h.correct) for g, h in zip(google, helm, strict=True)
+        accepted = [(g.outcomes[0], h.outcomes[0]) for g, h in zip(google, helm, strict=True)
                     if g.score >= threshold]
         paired.append({
             "score": score,
@@ -158,7 +158,7 @@ def compare_course():
         for method, (score, probability) in methods.items():
             label = "deberta_predicted_label" if method == "deberta_maximum_softmax_probability" else "llm_label"
             rows = [
-                Prediction(row["example_id"], row[label], row["gold_label"], score(row))
+                GradedRow(row["example_id"], score(row), (row[label] == row["gold_label"],), reference=row["gold_label"])
                 for row in saved
             ]
             yield from ranking_rows(benchmark, method, label, rows, probability)

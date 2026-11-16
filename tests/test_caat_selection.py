@@ -5,10 +5,10 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from caat.audit import AuditRow
+from caat import GradedRow, select
 from caat.cli import main
-from caat.evaluation import Counts, ranking_metrics, threshold_points
-from caat.selection import binomial_pvalue, select_threshold
+from caat.metrics import Counts, ranking_metrics, threshold_points
+from caat.rules import binomial_pvalue
 
 
 class RankingTests(unittest.TestCase):
@@ -35,18 +35,18 @@ class SelectionTests(unittest.TestCase):
 
     def test_fixed_sequence_stops_at_first_failure(self):
         rows = [
-            AuditRow(str(i), score, (True, correct))
+            GradedRow(str(i), score, (True, correct))
             for i, (score, correct) in enumerate([(0.9, True)] * 10 + [(0.8, False)] * 6 + [(0.7, True)] * 45)
         ]
         options = {"graders": ("first", "second"), "thresholds": [0.7, 0.9, 0.8], "risk_target": 0.3}
-        fixed = select_threshold(rows, rule="ltt-fixed-sequence", **options)
+        fixed = select(rows, rule="ltt-fixed-sequence", **options)
         self.assertEqual(fixed["selected_threshold"], 0.9)
         self.assertEqual([row["passes"] for row in fixed["candidates"]], [True, False, None])
         self.assertEqual(fixed["candidates"][1]["accepted"], 16)
-        bonferroni = select_threshold(rows, rule="ltt-bonferroni", **options)
+        bonferroni = select(rows, rule="ltt-bonferroni", **options)
         self.assertEqual(bonferroni["selected_threshold"], 0.7)
-        reversed_rows = [AuditRow(row.id, row.score, row.outcomes[::-1]) for row in rows]
-        reordered = select_threshold(reversed_rows, rule="ltt-fixed-sequence",
+        reversed_rows = [GradedRow(row.id, row.score, row.outcomes[::-1]) for row in rows]
+        reordered = select(reversed_rows, rule="ltt-fixed-sequence",
                                      **{**options, "graders": options["graders"][::-1]})
         self.assertEqual(fixed["selected_threshold"], reordered["selected_threshold"])
         self.assertEqual(fixed["candidates"], reordered["candidates"])
@@ -58,7 +58,7 @@ class SelectionTests(unittest.TestCase):
             calibration.write_text("id,conf,g\na,0.8,1\nb,0.2,0\n", encoding="utf-8")
             design = root / "design.csv"
             design.write_text("conf\n0.6\n0.9\n", encoding="utf-8")
-            args = ["select", str(calibration), "--score-column", "conf", "--correct-column", "g",
+            args = ["select", str(calibration), "--json", "--score-column", "conf", "--correct-column", "g",
                     "--risk-target", "0.2", "--design", str(design)]
             output = io.StringIO()
             with redirect_stdout(output):

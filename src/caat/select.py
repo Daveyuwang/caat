@@ -16,7 +16,7 @@ def design_thresholds(scores) -> list[float]:
     return sorted({scores[ceil(len(scores) * i / 10) - 1] for i in range(1, 11)}, reverse=True)
 
 
-def select_threshold(rows, *, graders, thresholds, risk_target, failure_rate=0.05, rule="ltt-bonferroni"):
+def select(rows, *, graders, thresholds, risk_target, failure_rate=0.05, rule="ltt-bonferroni"):
     """Select a cutoff using a fixed candidate list and paired calibration labels."""
     if not 0 <= risk_target <= 1:
         raise ValueError("risk target must be between 0 and 1")
