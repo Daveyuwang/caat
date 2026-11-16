@@ -12,27 +12,49 @@ from common import ARCHIVES, ROOT, read_csv
 COLORS = ("#0072b2", "#b54e00", "#00835f", "#aa4b86", "#7458ad", "#83672d", "#4d6979")
 STYLES = ("-", "--", ":", "-.")
 MARKERS = ("o", "s", "^", "D", "P")
-GRADER_NAMES = {"strict_pass": "Google strict", "helm_strict_pass": "HELM full pass",
-                "correct": "HELM", "tiger_correct": "TIGER-Lab",
-                "gpt": "GPT", "llama": "Llama", "claude": "Claude"}
+GRADER_NAMES = {
+    "strict_pass": "Google strict",
+    "helm_strict_pass": "HELM full pass",
+    "correct": "HELM",
+    "tiger_correct": "TIGER-Lab",
+    "gpt": "GPT",
+    "llama": "Llama",
+    "claude": "Claude",
+}
 
 
 def setup_style():
     plt.switch_backend("Agg")
-    plt.rcParams.update({
-        "font.family": "DejaVu Sans", "font.size": 9, "axes.spines.top": False,
-        "axes.spines.right": False, "axes.labelcolor": "#263c49", "axes.edgecolor": "#c5d1d8",
-        "text.color": "#142b39", "xtick.color": "#415964", "ytick.color": "#415964",
-        "svg.fonttype": "none", "svg.hashsalt": "caat-research",
-    })
+    plt.rcParams.update(
+        {
+            "font.family": "DejaVu Sans",
+            "font.size": 9,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "axes.labelcolor": "#263c49",
+            "axes.edgecolor": "#c5d1d8",
+            "text.color": "#142b39",
+            "xtick.color": "#415964",
+            "ytick.color": "#415964",
+            "svg.fonttype": "none",
+            "svg.hashsalt": "caat-research",
+        }
+    )
 
 
 def export(figure, destination):
     svg = destination.with_suffix(".svg")
     figure.savefig(svg, metadata={"Date": None, "Creator": "CAAT"})
     lines = svg.read_text(encoding="utf-8").splitlines()
-    svg.write_text("\n".join(line.rstrip() for line in lines) + "\n", encoding="utf-8", newline="\n")
-    figure.savefig(destination.with_suffix(".pdf"), metadata={"CreationDate": None, "Creator": "CAAT"})
+    svg.write_text(
+        "\n".join(line.rstrip() for line in lines) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    figure.savefig(
+        destination.with_suffix(".pdf"),
+        metadata={"CreationDate": None, "Creator": "CAAT"},
+    )
     plt.close(figure)
     print(f"Wrote {destination.name}.svg and .pdf")
 
@@ -45,11 +67,21 @@ def risk_coverage(rows, output):
         fig.subplots_adjust(left=0.10, right=0.97, top=0.88, bottom=0.30, wspace=0.17)
         for ax, grader in zip(axes, graders, strict=True):
             for i, method in enumerate(methods):
-                points = [row for row in subset if row["method"] == method and row["label_source"] == grader]
-                ax.plot([float(row["coverage"]) for row in points], [float(row["error_rate"]) for row in points],
-                        color=COLORS[i % len(COLORS)], linestyle=STYLES[(i // len(COLORS)) % len(STYLES)],
-                        marker=MARKERS[i % len(MARKERS)], markersize=3.3, linewidth=1.5,
-                        label=method.replace("_", " "))
+                points = [
+                    row
+                    for row in subset
+                    if row["method"] == method and row["label_source"] == grader
+                ]
+                ax.plot(
+                    [float(row["coverage"]) for row in points],
+                    [float(row["error_rate"]) for row in points],
+                    color=COLORS[i % len(COLORS)],
+                    linestyle=STYLES[(i // len(COLORS)) % len(STYLES)],
+                    marker=MARKERS[i % len(MARKERS)],
+                    markersize=3.3,
+                    linewidth=1.5,
+                    label=method.replace("_", " "),
+                )
             ax.set_title(GRADER_NAMES[grader])
             ax.set_xlabel("Coverage")
             ax.xaxis.set_major_formatter(PercentFormatter(1))
@@ -58,8 +90,15 @@ def risk_coverage(rows, output):
             ax.set_axisbelow(True)
         axes[0].set_ylabel("Accepted error rate")
         handles, labels = axes[0].get_legend_handles_labels()
-        fig.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.5, 0.03),
-                   frameon=False, fontsize=8, ncols=3)
+        fig.legend(
+            handles,
+            labels,
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.03),
+            frameon=False,
+            fontsize=8,
+            ncols=3,
+        )
         export(fig, output / f"risk-coverage-{archive.replace('_', '-')}")
 
 
@@ -68,45 +107,80 @@ def short_model(model):
 
 
 def wildbench_shifts(rows, output):
-    pairs = list(dict.fromkeys((row["first_judge"], row["second_judge"]) for row in rows))
+    pairs = list(
+        dict.fromkeys((row["first_judge"], row["second_judge"]) for row in rows)
+    )
     models = sorted({row["model"] for row in rows}, reverse=True)
-    fig, axes = plt.subplots(1, len(pairs), figsize=(11.7, 5.8), sharey=True, sharex=True)
+    fig, axes = plt.subplots(
+        1, len(pairs), figsize=(11.7, 5.8), sharey=True, sharex=True
+    )
     fig.subplots_adjust(left=0.28, right=0.98, top=0.89, bottom=0.13, wspace=0.18)
     for index, (ax, pair) in enumerate(zip(axes, pairs, strict=True)):
         ax.axvline(0, color="#67818f", linewidth=1, linestyle="--")
-        cells = {row["model"]: row for row in rows if (row["first_judge"], row["second_judge"]) == pair}
+        cells = {
+            row["model"]: row
+            for row in rows
+            if (row["first_judge"], row["second_judge"]) == pair
+        }
         for y, model in enumerate(models):
             row = cells[model]
-            lower, point, upper = (100 * float(row[key]) for key in ("lower_95", "excess_shift", "upper_95"))
+            lower, point, upper = (
+                100 * float(row[key])
+                for key in ("lower_95", "excess_shift", "upper_95")
+            )
             ax.hlines(y, lower, upper, linewidth=1.3, color=COLORS[index])
-            ax.scatter(point, y, s=19, marker=MARKERS[index], color=COLORS[index], zorder=2)
+            ax.scatter(
+                point, y, s=19, marker=MARKERS[index], color=COLORS[index], zorder=2
+            )
         ax.set_title(f"{GRADER_NAMES[pair[0]]} to {GRADER_NAMES[pair[1]]}")
         ax.set_xscale("symlog", linthresh=10)
         ax.set_xticks([-5, 0, 5, 10, 25, 50], ["−5", "0", "5", "10", "25", "50"])
         ax.grid(axis="y", color="#e7edef", linewidth=0.65)
         ax.set_axisbelow(True)
         ax.yaxis.set_tick_params(length=0)
-    axes[0].set_yticks(range(len(models)), [short_model(model) for model in models], fontsize=8)
+    axes[0].set_yticks(
+        range(len(models)), [short_model(model) for model in models], fontsize=8
+    )
     fig.supxlabel("Excess shift in percentage points", x=0.63, y=0.03)
     export(fig, output / "wildbench-grader-shifts")
 
 
 def wildbench_auroc(rows, output):
-    data = [row for row in rows if row["scenario"] == "wildbench" and row["outcome_cutoff"] == "7"]
+    data = [
+        row
+        for row in rows
+        if row["scenario"] == "wildbench" and row["outcome_cutoff"] == "7"
+    ]
     judges = list(dict.fromkeys(row["judge"] for row in data))
     scores = list(dict.fromkeys(row["score"] for row in data))
     models = sorted({row["model"] for row in data}, reverse=True)
-    fig, axes = plt.subplots(1, len(judges), figsize=(12.5, 6.4), sharey=True, sharex=True)
+    fig, axes = plt.subplots(
+        1, len(judges), figsize=(12.5, 6.4), sharey=True, sharex=True
+    )
     fig.subplots_adjust(left=0.26, right=0.98, top=0.91, bottom=0.21, wspace=0.16)
     for ax, judge in zip(axes, judges, strict=True):
         ax.axvline(0.5, color="#67818f", linewidth=1, linestyle="--")
-        pairs = {(row["model"], row["score"]): row["auroc"] for row in data if row["judge"] == judge}
+        pairs = {
+            (row["model"], row["score"]): row["auroc"]
+            for row in data
+            if row["judge"] == judge
+        }
         for index, score in enumerate(scores):
-            available = [(y + (index - 2) * 0.11, float(pairs[model, score]))
-                         for y, model in enumerate(models) if pairs[model, score]]
+            available = [
+                (y + (index - 2) * 0.11, float(pairs[model, score]))
+                for y, model in enumerate(models)
+                if pairs[model, score]
+            ]
             y, x = zip(*available)
-            ax.scatter(x, y, label=score.replace("_", " "), marker=MARKERS[index],
-                       s=23, color=COLORS[index], zorder=2)
+            ax.scatter(
+                x,
+                y,
+                label=score.replace("_", " "),
+                marker=MARKERS[index],
+                s=23,
+                color=COLORS[index],
+                zorder=2,
+            )
         ax.set_title(GRADER_NAMES[judge])
         ax.set_xlabel("AUROC")
         ax.set_xlim(-0.025, 1.025)
@@ -114,9 +188,18 @@ def wildbench_auroc(rows, output):
         ax.grid(axis="y", color="#e7edef", linewidth=0.65)
         ax.set_axisbelow(True)
         ax.yaxis.set_tick_params(length=0)
-    axes[0].set_yticks(range(len(models)), [short_model(model) for model in models], fontsize=8)
+    axes[0].set_yticks(
+        range(len(models)), [short_model(model) for model in models], fontsize=8
+    )
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", bbox_to_anchor=(0.58, 0.035), frameon=False, ncols=3)
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.58, 0.035),
+        frameon=False,
+        ncols=3,
+    )
     export(fig, output / "wildbench-auroc")
 
 

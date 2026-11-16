@@ -16,7 +16,14 @@ def split_rows(rows, seed, *, id_key=attrgetter("id")):
 
 
 def policy(
-    rows, *, graders, check_graders=(), risk_target, failure_rate=0.05, rule="ltt-bonferroni", seed=42
+    rows,
+    *,
+    graders,
+    check_graders=(),
+    risk_target,
+    failure_rate=0.05,
+    rule="ltt-bonferroni",
+    seed=42,
 ) -> dict:
     """Select a cutoff on calibration rows and replay it unchanged on held-out rows.
 
@@ -28,16 +35,28 @@ def policy(
     if not graders:
         raise ValueError("provide at least one grader for selection")
     if len(rows) < 5:
-        raise ValueError("at least five rows are required for the design, calibration, and held-out splits")
+        raise ValueError(
+            "at least five rows are required for the design, calibration, and held-out splits"
+        )
     design, calibration, heldout = split_rows(rows, seed)
     ranking = {
-        name: ranking_metrics(threshold_points((row.score, not row.outcomes[index]) for row in calibration))
+        name: ranking_metrics(
+            threshold_points(
+                (row.score, not row.outcomes[index]) for row in calibration
+            )
+        )
         for index, name in enumerate(everyone)
     }
     selection = select(
-        (GradedRow(row.id, row.score, row.outcomes[:len(graders)]) for row in calibration),
-        graders=graders, thresholds=design_thresholds(row.score for row in design),
-        risk_target=risk_target, failure_rate=failure_rate, rule=rule,
+        (
+            GradedRow(row.id, row.score, row.outcomes[: len(graders)])
+            for row in calibration
+        ),
+        graders=graders,
+        thresholds=design_thresholds(row.score for row in design),
+        risk_target=risk_target,
+        failure_rate=failure_rate,
+        rule=rule,
     )
     threshold = selection["selected_threshold"]
     check = None
@@ -45,7 +64,11 @@ def policy(
         accepted = [row for row in heldout if row.score >= threshold]
         results = {}
         for index, name in enumerate(everyone):
-            counts = Counts(len(heldout), len(accepted), sum(not row.outcomes[index] for row in accepted))
+            counts = Counts(
+                len(heldout),
+                len(accepted),
+                sum(not row.outcomes[index] for row in accepted),
+            )
             risk = counts.error_rate
             results[name] = {
                 **counts.metrics(),
@@ -58,10 +81,16 @@ def policy(
             )["accepted_comparisons"]
     return {
         "schema_version": 1,
-        "split": {"seed": seed, "design": len(design), "calibration": len(calibration), "heldout": len(heldout)},
+        "split": {
+            "seed": seed,
+            "design": len(design),
+            "calibration": len(calibration),
+            "heldout": len(heldout),
+        },
         "check_graders": list(check_graders),
         "ranking": ranking,
         "selection": selection,
         "heldout": check,
-        "confirmed": check is not None and all(result["meets_target"] is True for result in check["graders"].values()),
+        "confirmed": check is not None
+        and all(result["meets_target"] is True for result in check["graders"].values()),
     }

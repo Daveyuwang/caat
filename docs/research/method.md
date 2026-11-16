@@ -113,7 +113,7 @@ that at least one grader's risk is at or above the limit at a fixed
 threshold. Bonferroni corrects for a search over the fixed grid.
 Fixed-sequence testing evaluates from the strictest cutoff and stops at
 the first failure. The resulting statement concerns the specified grades
-under the calibration sampling assumptions. [Held-out policy results](module-study.md) ·
+under the calibration sampling assumptions. [Held-out policy results](benchmarks.md#module-study) ·
 [Learn then Test](https://arxiv.org/abs/2110.01052)
 
 ## Open-source use
@@ -124,7 +124,7 @@ identities. It reports what changed at a frozen cutoff and identifies the
 affected rows. Versioned JSON and exit codes let CI consume the output.
 The evaluator and audit run on the standard library. Dataset preparation
 and scorer fitting live in standalone benchmark scripts.
-[Runnable examples](../README.md#compare-graders-on-the-same-outputs)
+[Runnable examples](../../README.md#compare-graders-on-the-same-outputs)
 
 The release criterion for this workflow is that an outside user can replay
 their own artifacts, interpret the report, and diagnose an incorrect join
@@ -150,7 +150,7 @@ full scorer by less than 0.1 percentage point at this coverage. These
 comparisons motivate using the single-feature result as a baseline for
 each classification task. The course sample boundaries limit
 generalization, especially for Jigsaw.
-[Retrospective comparisons](../results/baselines/course.csv) ·
+[Retrospective comparisons](../../results/course/course.csv) ·
 [Maximum softmax probability baseline](https://arxiv.org/abs/1610.02136)
 
 Start a scorer comparison with signals already available from one response.
@@ -172,7 +172,7 @@ The log probability of the explicit answer token improved the held-out
 ranking over mean token log probability on both MMLU-Pro models at 75%
 coverage. The gain on Llama was clearer than the gain on Qwen. The
 benchmarks keep scores configurable by task and evaluate each score on the
-same saved outputs. [Score ablations](module-study.md#confidence-scores)
+same saved outputs. [Score ablations](benchmarks.md#confidence-scores)
 
 Use P(True) or semantic entropy as additional comparators when saved
 verifier outputs or repeated generations are available. They require more

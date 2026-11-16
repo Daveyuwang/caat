@@ -22,7 +22,13 @@ SCENARIOS = {
     "omni_math": ("equivalence_judgement", "omni_math_accuracy"),
 }
 JUDGES = ("gpt", "llama", "claude")
-MATCHED_TOKEN_TEXT = {"literal", "terminal_marker", "byte_level", "final_channel", "byte_level_final_channel"}
+MATCHED_TOKEN_TEXT = {
+    "literal",
+    "terminal_marker",
+    "byte_level",
+    "final_channel",
+    "byte_level_final_channel",
+}
 
 
 def read_json(path):
@@ -59,7 +65,9 @@ def read_csv(path, *, encoding="utf-8"):
 
 def write_report(path, rows, fields=None):
     with path.open("w", encoding="utf-8", newline="") as target:
-        writer = csv.DictWriter(target, fieldnames=fields or list(rows[0]), lineterminator="\n")
+        writer = csv.DictWriter(
+            target, fieldnames=fields or list(rows[0]), lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(rows)
     print(f"Wrote {path}")
@@ -71,6 +79,8 @@ def risk_at_count(points, target):
         if counts.accepted >= target:
             # Include the expected errors from a uniform draw inside the boundary tie.
             share = (target - previous_accepted) / (counts.accepted - previous_accepted)
-            return (previous_errors + share * (counts.errors - previous_errors)) / target
+            return (
+                previous_errors + share * (counts.errors - previous_errors)
+            ) / target
         previous_accepted, previous_errors = counts.accepted, counts.errors
     raise ValueError("Target exceeds the sample size")

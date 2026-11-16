@@ -26,10 +26,16 @@ def readme_commands():
 
 
 def run_readme(command, arguments):
-    result = subprocess.run([*CLI, command, *arguments], cwd=ROOT, capture_output=True, encoding="utf-8")
-    expected = int(command == "audit")  # The alternate grader misses the example's target.
+    result = subprocess.run(
+        [*CLI, command, *arguments], cwd=ROOT, capture_output=True, encoding="utf-8"
+    )
+    expected = int(
+        command == "audit"
+    )  # The alternate grader misses the example's target.
     if result.returncode != expected:
-        raise ValueError(f"{command} returned {result.returncode}, expected {expected}: {result.stderr}")
+        raise ValueError(
+            f"{command} returned {result.returncode}, expected {expected}: {result.stderr}"
+        )
     return result.stdout
 
 
@@ -46,7 +52,9 @@ def normalize_paths(report):
         if inputs.get(name):
             inputs[name] = relative(inputs[name])
     if "grader_files" in inputs:
-        inputs["grader_files"] = {name: relative(path) for name, path in inputs["grader_files"].items()}
+        inputs["grader_files"] = {
+            name: relative(path) for name, path in inputs["grader_files"].items()
+        }
     return report
 
 
@@ -63,15 +71,29 @@ class ReadmeReportTests(unittest.TestCase):
         else:
             selection, reference = actual, frozen
         if "candidates" in selection:
-            for candidate, expected in zip(selection["candidates"], reference["candidates"], strict=True):
+            for candidate, expected in zip(
+                selection["candidates"], reference["candidates"], strict=True
+            ):
                 # lgamma can round differently on different Python platforms.
                 self.assertIs(type(candidate["pvalue"]), float)
-                self.assertTrue(math.isclose(candidate["pvalue"], expected["pvalue"], rel_tol=1e-11, abs_tol=1e-15))
+                self.assertTrue(
+                    math.isclose(
+                        candidate["pvalue"],
+                        expected["pvalue"],
+                        rel_tol=1e-11,
+                        abs_tol=1e-15,
+                    )
+                )
                 candidate["pvalue"] = expected["pvalue"]
-        self.assertEqual(json.dumps(actual, sort_keys=True, indent=2), json.dumps(frozen, sort_keys=True, indent=2))
+        self.assertEqual(
+            json.dumps(actual, sort_keys=True, indent=2),
+            json.dumps(frozen, sort_keys=True, indent=2),
+        )
 
     def test_readme_examples_have_golden_reports(self):
-        self.assertEqual(set(self.examples), {"evaluate", "policy", "audit", "select", "features"})
+        self.assertEqual(
+            set(self.examples), {"evaluate", "policy", "audit", "select", "features"}
+        )
 
     def test_evaluate_example(self):
         with TemporaryDirectory() as directory:
@@ -91,17 +113,27 @@ class ReadmeReportTests(unittest.TestCase):
         self.assert_golden_report(report, "audit.json")
 
     def test_select_example(self):
-        self.assert_golden_report(json.loads(run_readme("select", [*self.examples["select"], "--json"])), "select.json")
+        self.assert_golden_report(
+            json.loads(run_readme("select", [*self.examples["select"], "--json"])),
+            "select.json",
+        )
 
     def test_policy_example(self):
         with TemporaryDirectory() as directory:
             arguments = self.examples["policy"].copy()
             plot = Path(directory) / "policy.svg"
             arguments[arguments.index("--plot") + 1] = str(plot)
-            self.assertEqual(run_readme("policy", arguments), (GOLDEN / "policy.txt").read_text(encoding="utf-8"))
-            self.assert_golden_report(json.loads(run_readme("policy", [*arguments, "--json"])), "policy.json")
+            self.assertEqual(
+                run_readme("policy", arguments),
+                (GOLDEN / "policy.txt").read_text(encoding="utf-8"),
+            )
+            self.assert_golden_report(
+                json.loads(run_readme("policy", [*arguments, "--json"])), "policy.json"
+            )
             expected = ROOT / "docs" / "figures" / "policy-example.svg"
-            self.assertEqual(plot.read_text(encoding="utf-8"), expected.read_text(encoding="utf-8"))
+            self.assertEqual(
+                plot.read_text(encoding="utf-8"), expected.read_text(encoding="utf-8")
+            )
 
     def test_features_example(self):
         with TemporaryDirectory() as directory:
@@ -109,7 +141,10 @@ class ReadmeReportTests(unittest.TestCase):
             output = Path(directory) / "features.csv"
             args[args.index("--output") + 1] = str(output)
             run_readme("features", args)
-            self.assertEqual(output.read_text(encoding="utf-8"), (GOLDEN / "features.csv").read_text(encoding="utf-8"))
+            self.assertEqual(
+                output.read_text(encoding="utf-8"),
+                (GOLDEN / "features.csv").read_text(encoding="utf-8"),
+            )
 
     def test_output_file_for_each_command(self):
         with TemporaryDirectory() as directory:
@@ -122,7 +157,9 @@ class ReadmeReportTests(unittest.TestCase):
                     if command == "evaluate":
                         args[args.index("--output-dir") + 1] = directory
                     if command == "policy":
-                        args[args.index("--plot") + 1] = str(Path(directory) / "policy.svg")
+                        args[args.index("--plot") + 1] = str(
+                            Path(directory) / "policy.svg"
+                        )
                     output = run_readme(command, [*args, "--output", str(path)])
                     self.assertFalse(output.lstrip().startswith("{"))
                     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -132,26 +169,42 @@ class ReadmeReportTests(unittest.TestCase):
     def test_documented_fields_exist_in_real_reports(self):
         text = (ROOT / "docs" / "guide" / "reports.md").read_text(encoding="utf-8")
         fields = {
-            name.lower(): re.findall(r"^\| `([^\x60]+)` \|", section, flags=re.MULTILINE)
-            for name, section in re.findall(r"^## (\w+)\n(.*?)(?=^## |\Z)", text, flags=re.MULTILINE | re.DOTALL)
+            name.lower(): re.findall(
+                r"^\| `([^\x60]+)` \|", section, flags=re.MULTILINE
+            )
+            for name, section in re.findall(
+                r"^## (\w+)\n(.*?)(?=^## |\Z)", text, flags=re.MULTILINE | re.DOTALL
+            )
         }
-        self.assertEqual(set(fields), {"common", "evaluate", "audit", "select", "policy"})
+        self.assertEqual(
+            set(fields), {"common", "evaluate", "audit", "select", "policy"}
+        )
         with TemporaryDirectory() as directory:
             for command, args in self.examples.items():
                 if command not in fields:
                     continue
                 args = args.copy()
                 if command == "evaluate":
-                    del args[args.index("--output-dir"):args.index("--output-dir") + 2]
+                    del args[
+                        args.index("--output-dir") : args.index("--output-dir") + 2
+                    ]
                 if command == "policy":
                     args[args.index("--plot") + 1] = str(Path(directory) / "policy.svg")
                 if command == "audit":
                     predictions = Path(directory) / "predictions.csv"
-                    header, *rows = (ROOT / args[0]).read_text(encoding="utf-8").splitlines()
-                    predictions.write_text(header + ",batch\n" + "\n".join(row + ",current" for row in rows),
-                                           encoding="utf-8")
+                    header, *rows = (
+                        (ROOT / args[0]).read_text(encoding="utf-8").splitlines()
+                    )
+                    predictions.write_text(
+                        header
+                        + ",batch\n"
+                        + "\n".join(row + ",current" for row in rows),
+                        encoding="utf-8",
+                    )
                     args[0] = str(predictions)
-                    args.extend(("--prediction-filter", "batch=current", "--bootstrap", "5"))
+                    args.extend(
+                        ("--prediction-filter", "batch=current", "--bootstrap", "5")
+                    )
                 report = json.loads(run_readme(command, [*args, "--json"]))
                 for field in fields["common"] + fields[command]:
                     with self.subTest(command=command, field=field):
@@ -160,7 +213,11 @@ class ReadmeReportTests(unittest.TestCase):
                             if key == "[]":
                                 values = [entry for value in values for entry in value]
                             elif key == "*":
-                                values = [entry for value in values for entry in value.values()]
+                                values = [
+                                    entry
+                                    for value in values
+                                    for entry in value.values()
+                                ]
                             else:
                                 values = [value[key] for value in values]
                             self.assertTrue(values)

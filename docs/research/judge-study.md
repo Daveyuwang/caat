@@ -17,7 +17,7 @@ The release map identifies the source suite for each run. The generated
 | --- | --- | --- |
 | WildBench v2 | `allenai/WildBench` at `7c05c1b4550282b2ed6a2e6ac5db069f1e07df5c`, test | All 68 release runs scanned. Sixteen had at least one response with three 1–10 grades and genuine token log probabilities. [HELM scenario](https://raw.githubusercontent.com/stanford-crfm/helm/b1bc37e9223645ce91070e4fffd86dd46a04ca75/src/helm/benchmark/scenarios/wildbench_scenario.py) |
 | Omni-MATH | `KbsdJames/Omni-MATH` at `40ba231d8f16e29ecd40e6407e2c8640145a8f62`, test | Qwen2.5-7B-Instruct-Turbo in suite v1.0.0, 999 complete responses with Boolean answer-equivalence judgments from all three judges. [HELM scenario](https://raw.githubusercontent.com/stanford-crfm/helm/b1bc37e9223645ce91070e4fffd86dd46a04ca75/src/helm/benchmark/scenarios/omni_math_scenario.py) · [Saved grades and prompts](https://storage.googleapis.com/crfm-helm-public/capabilities/benchmark_output/runs/v1.0.0/omni_math:model=qwen_qwen2.5-7b-instruct-turbo/display_predictions.json) |
-| IFEval and MMLU-Pro | HELM Capabilities v1.0.0 test archives | Qwen2.5-7B-Instruct-Turbo and Llama 3.1 8B Instruct Turbo. IFEval uses the pinned Google strict regrade and HELM's full pass. MMLU-Pro uses HELM's answer parser and the pinned TIGER-Lab parser. [Dataset revisions, runs, and grader definitions](module-study.md#replay) |
+| IFEval and MMLU-Pro | HELM Capabilities v1.0.0 test archives | Qwen2.5-7B-Instruct-Turbo and Llama 3.1 8B Instruct Turbo. IFEval uses the pinned Google strict regrade and HELM's full pass. MMLU-Pro uses HELM's answer parser and the pinned TIGER-Lab parser. [Dataset revisions, runs, and grader definitions](benchmarks.md#replay) |
 
 At HELM commit `b1bc37e9223645ce91070e4fffd86dd46a04ca75`, `gpt` is
 GPT-4o (`2024-05-13`), `llama` is Llama 3.1 405B Instruct Turbo
@@ -137,7 +137,7 @@ zero at 50% coverage. The same IFEval run had a disagreement AUROC of
 ## Reproduce the gate
 
 Prepare the four full deterministic control CSVs using the installation
-and preparation commands in the [module study](module-study.md#replay).
+and preparation commands in the [module study](benchmarks.md#replay).
 The following commands cache the HELM judge archives and run the CPU
 analysis. The replay was verified with Python 3.12 and NumPy 2.5.5.
 The installed `caat` commands only require the standard library.
@@ -163,7 +163,7 @@ decision and sensitivity counts.
 After preparing the module CSVs and the judge replay, run
 `python scripts/verify_toolkit.py` in the research environment above.
 
-- All 48 policy rows in the [module study](../results/module_study/policies.csv)
+- All 48 policy rows in the [module study](../../results/module_study/policies.csv)
   reproduced their thresholds and held-out risk counts through `caat select`
   and `caat audit`. The original fixtures still give 12 accepted with 4
   errors, 12 with 5, and 13 with 0.
