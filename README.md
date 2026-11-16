@@ -2,9 +2,10 @@
 
 [![CI](https://github.com/Daveyuwang/caat/actions/workflows/ci.yml/badge.svg)](https://github.com/Daveyuwang/caat/actions/workflows/ci.yml)
 
-CAAT evaluates which saved model predictions to accept automatically and
-which to send for review. It reports coverage, errors among accepted
-predictions, and the risk–coverage curve. Use Python 3.10 or later.
+CAAT scores, calibrates, evaluates, and triages saved model predictions.
+Compare confidence signals, measure correctness probabilities, and choose
+which outputs to accept automatically or send for review. The analysis
+commands run on a CPU with Python 3.10 or later.
 
 ```bash
 git clone https://github.com/Daveyuwang/caat.git
@@ -170,7 +171,14 @@ examples, and builds and installs the wheel.
 
 [Evaluation method and related work](https://github.com/Daveyuwang/caat/blob/main/docs/research/method.md)
 
-[Contributing](https://github.com/Daveyuwang/caat/blob/main/CONTRIBUTING.md) · [Changelog](https://github.com/Daveyuwang/caat/blob/main/CHANGELOG.md)
+`caat plugins` lists built-in and installed components. The optional
+Transformers backend collects model outputs for later scoring and replay.
+[Plugin guide](https://github.com/Daveyuwang/caat/blob/main/docs/guide/plugins.md) ·
+[Local model collection](https://github.com/Daveyuwang/caat/blob/main/docs/guide/collect.md)
+
+[Contributing](https://github.com/Daveyuwang/caat/blob/main/CONTRIBUTING.md) ·
+[Roadmap](https://github.com/Daveyuwang/caat/blob/main/docs/ROADMAP.md) ·
+[Changelog](https://github.com/Daveyuwang/caat/blob/main/CHANGELOG.md)
 
 ## License
 

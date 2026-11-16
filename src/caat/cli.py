@@ -646,7 +646,8 @@ def output_paths(args):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        prog="caat", description="Evaluate saved predictions and review policies."
+        prog="caat",
+        description="Score, calibrate, evaluate, and triage saved model predictions.",
     )
     parser.add_argument(
         "--version", action="version", version=f"caat {version('caat-annotation')}"

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "caat-annotation"
 version = "0.1.0"
-description = "Evaluate confidence-based review policies for model annotations"
+description = "Score, calibrate, evaluate, and triage saved model predictions"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -27,7 +27,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/Daveyuwang/caat"
-Documentation = "https://github.com/Daveyuwang/caat/blob/main/docs/research/method.md"
+Documentation = "https://github.com/Daveyuwang/caat/blob/main/README.md"
 Issues = "https://github.com/Daveyuwang/caat/issues"
 
 [project.scripts]
