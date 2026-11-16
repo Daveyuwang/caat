@@ -65,31 +65,50 @@ def audit(
         risk = overall.error_rate
         results[name] = {
             **overall.metrics(),
-            "meets_target": risk <= risk_target if risk is not None and risk_target is not None else None,
+            "meets_target": risk <= risk_target
+            if risk is not None and risk_target is not None
+            else None,
             "by_group": {group: counts.metrics() for group, counts in groups.items()},
         }
 
     comparisons = {}
     for index, name in enumerate(graders[1:], start=1):
-        newly_failed = sum(row.outcomes[0] and not row.outcomes[index] for row in accepted)
-        newly_passed = sum(not row.outcomes[0] and row.outcomes[index] for row in accepted)
+        newly_failed = sum(
+            row.outcomes[0] and not row.outcomes[index] for row in accepted
+        )
+        newly_passed = sum(
+            not row.outcomes[0] and row.outcomes[index] for row in accepted
+        )
         primary = results[graders[0]]["meets_target"]
         alternate = results[name]["meets_target"]
-        risk_change = (newly_failed - newly_passed) / len(accepted) if accepted else None
-        changes = [(row.score >= threshold, row.outcomes[0] - row.outcomes[index]) for row in rows]
+        risk_change = (
+            (newly_failed - newly_passed) / len(accepted) if accepted else None
+        )
+        changes = [
+            (row.score >= threshold, row.outcomes[0] - row.outcomes[index])
+            for row in rows
+        ]
         overall_change = sum(delta for _, delta in changes) / len(rows)
         comparisons[name] = {
             "newly_failed": newly_failed,
             "newly_passed": newly_passed,
             "risk_change": risk_change,
             "overall_risk_change": overall_change,
-            "excess_risk_change": risk_change - overall_change if risk_change is not None else None,
-            "target_decision_changed": primary != alternate if primary is not None else None,
+            "excess_risk_change": risk_change - overall_change
+            if risk_change is not None
+            else None,
+            "target_decision_changed": primary != alternate
+            if primary is not None
+            else None,
         }
         if bootstrap is not None:
-            comparisons[name]["bootstrap_95"] = bootstrap_shifts(changes, bootstrap, seed)
+            comparisons[name]["bootstrap_95"] = bootstrap_shifts(
+                changes, bootstrap, seed
+            )
 
-    discordant = [row for row in rows if any(bit != row.outcomes[0] for bit in row.outcomes[1:])]
+    discordant = [
+        row for row in rows if any(bit != row.outcomes[0] for bit in row.outcomes[1:])
+    ]
     report = {
         "schema_version": 1,
         "threshold": threshold,

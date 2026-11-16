@@ -7,7 +7,13 @@ import random
 import sys
 from pathlib import Path
 
-from caat.features import FULL_SCORE_FIELDS, SavedResponse, full_scores, mean_token_logprob, token_logprobs
+from caat.features import (
+    FULL_SCORE_FIELDS,
+    SavedResponse,
+    full_scores,
+    mean_token_logprob,
+    token_logprobs,
+)
 
 from common import fetch
 
@@ -50,9 +56,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--model", choices=HELM_MODELS, default="qwen")
-    parser.add_argument("--full", action="store_true", help="Grade every archived response.")
+    parser.add_argument(
+        "--full", action="store_true", help="Grade every archived response."
+    )
     args = parser.parse_args()
-    output = args.output_dir or Path("replay") / ("ifeval" if args.model == "qwen" else "ifeval_llama")
+    output = args.output_dir or Path("replay") / (
+        "ifeval" if args.model == "qwen" else "ifeval_llama"
+    )
     run_url = HELM_BASE + HELM_MODELS[args.model]
 
     import nltk
@@ -64,7 +74,9 @@ def main():
     try:
         nltk.data.find("tokenizers/punkt_tab/english/")
     except LookupError:
-        nltk.download("punkt_tab", download_dir=nltk_data, quiet=True, raise_on_error=True)
+        nltk.download(
+            "punkt_tab", download_dir=nltk_data, quiet=True, raise_on_error=True
+        )
 
     grader = cache / "google" / GRADER_REVISION / "instruction_following_eval"
     for filename in (
@@ -76,14 +88,17 @@ def main():
         fetch(f"{GRADER_URL}/{filename}", grader / filename)
     (grader / "__init__.py").touch()
     sys.path.insert(0, str(grader.parent))
-    from instruction_following_eval.evaluation_lib import InputExample, test_instruction_following_strict
+    from instruction_following_eval.evaluation_lib import (
+        InputExample,
+        test_instruction_following_strict,
+    )
 
     dataset = fetch(DATASET_URL, cache / "ifeval_input_data.jsonl")
     with dataset.open(encoding="utf-8") as source:
         examples = {row["key"]: InputExample(**row) for row in map(json.loads, source)}
-    with fetch(f"{run_url}/scenario_state.json", cache / f"{args.model}_scenario_state.json").open(
-        encoding="utf-8"
-    ) as source:
+    with fetch(
+        f"{run_url}/scenario_state.json", cache / f"{args.model}_scenario_state.json"
+    ).open(encoding="utf-8") as source:
         states = json.load(source)["request_states"]
     sample = states if args.full else states[:SAMPLE_SIZE]
 
@@ -104,14 +119,22 @@ def main():
             or instance["extra_data"]["instruction_ids"] != example.instruction_id_list
             or instruction_kwargs != example.kwargs
         ):
-            raise ValueError(f"Archived prompt or instructions differ for IFEval key {example.key}")
+            raise ValueError(
+                f"Archived prompt or instructions differ for IFEval key {example.key}"
+            )
         if state["prompt_truncated"] or not state["result"]["success"]:
             raise ValueError(f"Invalid saved generation for IFEval key {example.key}")
-        completion, = state["result"]["completions"]
-        graded = test_instruction_following_strict(example, {example.prompt: completion["text"]})
+        (completion,) = state["result"]["completions"]
+        graded = test_instruction_following_strict(
+            example, {example.prompt: completion["text"]}
+        )
         scores = token_logprobs(completion, example.key)
         response = SavedResponse(completion["text"], completion["tokens"], scores)
-        row = (example.key, mean_token_logprob(response), int(graded.follow_all_instructions))
+        row = (
+            example.key,
+            mean_token_logprob(response),
+            int(graded.follow_all_instructions),
+        )
         if args.full:
             needs_language = any(
                 name.startswith(("change_case:english_", "language:"))
@@ -126,9 +149,13 @@ def main():
         raise ValueError(f"Expected {expected} distinct IFEval keys")
     fields = ("id", "mean_token_logprob", "strict_pass")
     if args.full:
-        published = helm_strict_passes(run_url, cache / f"{args.model}_per_instance_stats.json")
+        published = helm_strict_passes(
+            run_url, cache / f"{args.model}_per_instance_stats.json"
+        )
         if set(published) != examples.keys():
-            raise ValueError("Published IFEval scores do not match the pinned dataset keys")
+            raise ValueError(
+                "Published IFEval scores do not match the pinned dataset keys"
+            )
         fields = (*fields, *FULL_SCORE_FIELDS, "group", "helm_strict_pass")
         rows = [(*row, published[row[0]]) for row in rows]
     path = output / ("predictions_full.csv" if args.full else "predictions.csv")

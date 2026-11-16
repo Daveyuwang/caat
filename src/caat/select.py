@@ -11,12 +11,18 @@ from .table import validated_rows
 def design_thresholds(scores) -> list[float]:
     scores = list(scores)
     if not scores or any(not isfinite(score) for score in scores):
-        raise ValueError("design needs at least one score and all design scores must be finite")
+        raise ValueError(
+            "design needs at least one score and all design scores must be finite"
+        )
     scores.sort(reverse=True)
-    return sorted({scores[ceil(len(scores) * i / 10) - 1] for i in range(1, 11)}, reverse=True)
+    return sorted(
+        {scores[ceil(len(scores) * i / 10) - 1] for i in range(1, 11)}, reverse=True
+    )
 
 
-def select(rows, *, graders, thresholds, risk_target, failure_rate=0.05, rule="ltt-bonferroni"):
+def select(
+    rows, *, graders, thresholds, risk_target, failure_rate=0.05, rule="ltt-bonferroni"
+):
     """Select a cutoff using a fixed candidate list and paired calibration labels."""
     if not 0 <= risk_target <= 1:
         raise ValueError("risk target must be between 0 and 1")
@@ -37,14 +43,16 @@ def select(rows, *, graders, thresholds, risk_target, failure_rate=0.05, rule="l
                 errors[index] += not correct
             accepted += 1
         pvalue = binomial_pvalue(Counts(len(rows), accepted, max(errors)), risk_target)
-        candidates.append({
-            "threshold": threshold,
-            "accepted": accepted,
-            "coverage": accepted / len(rows),
-            "errors": dict(zip(graders, errors, strict=True)),
-            "worst_error_rate": max(errors) / accepted if accepted else None,
-            "pvalue": pvalue,
-        })
+        candidates.append(
+            {
+                "threshold": threshold,
+                "accepted": accepted,
+                "coverage": accepted / len(rows),
+                "errors": dict(zip(graders, errors, strict=True)),
+                "worst_error_rate": max(errors) / accepted if accepted else None,
+                "pvalue": pvalue,
+            }
+        )
     decision = RULES[rule](candidates, risk_target, failure_rate)
     for candidate, passes in zip(candidates, decision.decisions, strict=True):
         candidate.update(tested=passes is not None, passes=passes)
@@ -60,7 +68,9 @@ def select(rows, *, graders, thresholds, risk_target, failure_rate=0.05, rule="l
         "guarantee": {
             "confidence": 1 - failure_rate,
             "assumptions": "IID calibration from the target population and independent candidate thresholds",
-        } if decision.controls_risk and selected is not None else None,
+        }
+        if decision.controls_risk and selected is not None
+        else None,
         "calibration_total": len(rows),
         "selected_threshold": selected,
         "candidates": candidates,

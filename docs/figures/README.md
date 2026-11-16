@@ -2,7 +2,7 @@
 
 Run `python scripts/figures.py` from the repository after generating the
 judge replay. The script uses the saved tables and exports SVG and PDF
-without network access. [Judge replay](../judge-study.md)
+without network access. [Judge replay](../research/judge-study.md)
 
 ## Held-out risk and coverage
 

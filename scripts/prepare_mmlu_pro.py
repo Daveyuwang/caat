@@ -8,7 +8,14 @@ from dataclasses import replace
 from pathlib import Path
 from string import ascii_uppercase
 
-from caat.features import FULL_SCORE_FIELDS, SavedResponse, answer_span_logprob, full_scores, mean_token_logprob, token_logprobs
+from caat.features import (
+    FULL_SCORE_FIELDS,
+    SavedResponse,
+    answer_span_logprob,
+    full_scores,
+    mean_token_logprob,
+    token_logprobs,
+)
 
 from common import fetch
 
@@ -64,9 +71,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--model", choices=HELM_MODELS, default="qwen")
-    parser.add_argument("--full", action="store_true", help="Grade every archived response.")
+    parser.add_argument(
+        "--full", action="store_true", help="Grade every archived response."
+    )
     args = parser.parse_args()
-    output = args.output_dir or Path("replay") / ("mmlu_pro" if args.model == "qwen" else "mmlu_pro_llama")
+    output = args.output_dir or Path("replay") / (
+        "mmlu_pro" if args.model == "qwen" else "mmlu_pro_llama"
+    )
 
     from pyarrow.parquet import read_table
 
@@ -78,8 +89,18 @@ def main():
     for path, url in ((gold_file, DATASET_URL), (run_file, run_url)):
         fetch(url, path)
 
-    columns = ["question_id", "question", "options", "answer", "answer_index", "category"]
-    official = {row["question_id"]: row for row in read_table(gold_file, columns=columns).to_pylist()}
+    columns = [
+        "question_id",
+        "question",
+        "options",
+        "answer",
+        "answer_index",
+        "category",
+    ]
+    official = {
+        row["question_id"]: row
+        for row in read_table(gold_file, columns=columns).to_pylist()
+    }
     with run_file.open(encoding="utf-8") as source:
         states = json.load(source)["request_states"]
     sample = states if args.full else states[:SAMPLE_SIZE]
@@ -92,7 +113,9 @@ def main():
         options = dict(zip(ascii_uppercase, gold["options"]))
         reference = gold["answer"]
         helm_correct = [
-            ref["output"]["text"] for ref in instance["references"] if "correct" in ref["tags"]
+            ref["output"]["text"]
+            for ref in instance["references"]
+            if "correct" in ref["tags"]
         ]
         if (
             instance["split"] != "test"
@@ -101,20 +124,35 @@ def main():
             or reference != ascii_uppercase[gold["answer_index"]]
             or helm_correct != [options[reference]]
         ):
-            raise ValueError(f"Archived question or answer differs from official test row {question_id}")
+            raise ValueError(
+                f"Archived question or answer differs from official test row {question_id}"
+            )
         if not state["result"]["success"] or state["prompt_truncated"]:
-            raise ValueError(f"Invalid saved generation for MMLU-Pro question {question_id}")
-        completion, = state["result"]["completions"]
+            raise ValueError(
+                f"Invalid saved generation for MMLU-Pro question {question_id}"
+            )
+        (completion,) = state["result"]["completions"]
         scores = token_logprobs(completion, question_id)
         text = completion["text"]
         prediction = extract_answer(text)
         response = SavedResponse(completion["text"], completion["tokens"], scores)
-        row = (question_id, prediction, reference, int(prediction == reference),
-               mean_token_logprob(response), gold["category"])
+        row = (
+            question_id,
+            prediction,
+            reference,
+            int(prediction == reference),
+            mean_token_logprob(response),
+            gold["category"],
+        )
         if args.full:
             tiger = tiger_answer(text)
-            row = (*row, *full_scores(response), tiger,
-                   int(tiger == reference), answer_token_score(response))
+            row = (
+                *row,
+                *full_scores(response),
+                tiger,
+                int(tiger == reference),
+                answer_token_score(response),
+            )
         rows.append(row)
 
     expected = 1000 if args.full else SAMPLE_SIZE
@@ -123,9 +161,22 @@ def main():
     path = output / ("predictions_full.csv" if args.full else "predictions.csv")
     with path.open("w", encoding="utf-8", newline="") as target:
         writer = csv.writer(target, lineterminator="\n")
-        fields = ("id", "prediction", "reference", "correct", "mean_token_logprob", "group")
+        fields = (
+            "id",
+            "prediction",
+            "reference",
+            "correct",
+            "mean_token_logprob",
+            "group",
+        )
         if args.full:
-            fields = (*fields, *FULL_SCORE_FIELDS, "tiger_prediction", "tiger_correct", "answer_token_logprob")
+            fields = (
+                *fields,
+                *FULL_SCORE_FIELDS,
+                "tiger_prediction",
+                "tiger_correct",
+                "answer_token_logprob",
+            )
         writer.writerow(fields)
         writer.writerows(rows)
     print(f"Wrote {len(rows)} rows to {path}")

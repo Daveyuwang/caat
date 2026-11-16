@@ -27,11 +27,17 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/Daveyuwang/caat"
-Documentation = "https://github.com/Daveyuwang/caat/blob/main/docs/method.md"
+Documentation = "https://github.com/Daveyuwang/caat/blob/main/docs/research/method.md"
 Issues = "https://github.com/Daveyuwang/caat/issues"
 
 [project.scripts]
 caat = "caat.cli:main"
 
+[project.optional-dependencies]
+dev = ["ruff==0.14.14"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+target-version = "py310"

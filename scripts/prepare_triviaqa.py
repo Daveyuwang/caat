@@ -41,7 +41,9 @@ def main():
     for path, url in ((gold_path, DATASET_URL), (run_path, RUN_URL)):
         fetch(url, path)
 
-    gold_rows = read_table(gold_path, columns=["question", "question_id", "answer"]).to_pylist()
+    gold_rows = read_table(
+        gold_path, columns=["question", "question_id", "answer"]
+    ).to_pylist()
     official = {row["question"]: row for row in gold_rows}
     if len(official) != len(gold_rows):
         raise ValueError("Official question text must identify a unique TriviaQA row")
@@ -52,11 +54,17 @@ def main():
     for index, row in enumerate(sample):
         gold = official.get(row["question"])
         if gold is None:
-            raise ValueError(f"Archived row {index} has no exact question match in Web validation")
+            raise ValueError(
+                f"Archived row {index} has no exact question match in Web validation"
+            )
         question_id = gold["question_id"]
-        aliases = {normalize_answer(alias) for alias in gold["answer"]["normalized_aliases"]}
+        aliases = {
+            normalize_answer(alias) for alias in gold["answer"]["normalized_aliases"]
+        }
         if normalize_answer(row["target"]) not in aliases:
-            raise ValueError(f"Archived target differs from official aliases for TriviaQA {question_id}")
+            raise ValueError(
+                f"Archived target differs from official aliases for TriviaQA {question_id}"
+            )
         score = row["response_prob"]
         if score is None or not isfinite(score) or not 0 <= score <= 1:
             raise ValueError(f"Invalid saved response score for TriviaQA {question_id}")

@@ -32,12 +32,20 @@ def evaluate(
     metrics = {
         "threshold": threshold,
         "overall": overall.metrics(),
-        "by_reference": {label: counts.metrics() for label, counts in by_reference.items()},
+        "by_reference": {
+            label: counts.metrics() for label, counts in by_reference.items()
+        },
         "by_group": {group: counts.metrics() for group, counts in by_group.items()},
         "brier_score": (
-            mean((row.score - (not error)) ** 2 for row, error in zip(rows, errors, strict=True))
-            if probability else None
+            mean(
+                (row.score - (not error)) ** 2
+                for row, error in zip(rows, errors, strict=True)
+            )
+            if probability
+            else None
         ),
     }
-    curve = threshold_points((row.score, error) for row, error in zip(rows, errors, strict=True))
+    curve = threshold_points(
+        (row.score, error) for row, error in zip(rows, errors, strict=True)
+    )
     return {**metrics, **ranking_metrics(curve)}, curve

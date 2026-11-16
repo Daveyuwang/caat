@@ -18,7 +18,11 @@ class GradedRow:
 
 
 def validated_rows(rows, graders, *, minimum_graders=1):
-    if len(graders) < minimum_graders or len(graders) != len(set(graders)) or not all(graders):
+    if (
+        len(graders) < minimum_graders
+        or len(graders) != len(set(graders))
+        or not all(graders)
+    ):
         raise ValueError(f"provide at least {minimum_graders} distinct grader names")
     rows = list(rows)
     if not rows:
@@ -30,7 +34,9 @@ def validated_rows(rows, graders, *, minimum_graders=1):
         seen.add(row.id)
         if not isfinite(row.score):
             raise ValueError(f"score for id {row.id!r} must be finite")
-        if len(row.outcomes) != len(graders) or any(type(bit) is not bool for bit in row.outcomes):
+        if len(row.outcomes) != len(graders) or any(
+            type(bit) is not bool for bit in row.outcomes
+        ):
             raise ValueError(f"id {row.id!r} must have one boolean result per grader")
     return rows
 
@@ -46,7 +52,9 @@ def open_predictions_csv(path: Path, required: set[str], group_column: str | Non
             required = required | {group_column}
         missing = sorted(required.difference(header))
         if missing:
-            raise ValueError(f"missing CSV columns: {', '.join(missing)}. The file has: {', '.join(header)}")
+            raise ValueError(
+                f"missing CSV columns: {', '.join(missing)}. The file has: {', '.join(header)}"
+            )
         if group_column is None and "group" in header:
             group_column = "group"
         yield reader, group_column
@@ -67,7 +75,9 @@ def parse_correct(value, line):
 
 def exact_match(item_id, prediction, reference):
     if not prediction or not reference:
-        raise ValueError(f"id {item_id!r} needs a prediction and reference or a correctness result")
+        raise ValueError(
+            f"id {item_id!r} needs a prediction and reference or a correctness result"
+        )
     return prediction == reference
 
 
@@ -83,16 +93,33 @@ def open_selected_predictions(path, required, group_column, selection):
         yield rows, reader, group_column
 
 
-def read_csv_rows(path, *, id_column="id", score_column="score", correct_columns=(),
-                  group_column=None, output_key_column=None, prediction_column=None,
-                  reference_column=None, selection=None):
+def read_csv_rows(
+    path,
+    *,
+    id_column="id",
+    score_column="score",
+    correct_columns=(),
+    group_column=None,
+    output_key_column=None,
+    prediction_column=None,
+    reference_column=None,
+    selection=None,
+):
     if not correct_columns:
         prediction_column = prediction_column or "prediction"
         reference_column = reference_column or "reference"
     required = {id_column, score_column, *correct_columns}
-    required.update(column for column in (prediction_column, reference_column, output_key_column) if column)
+    required.update(
+        column
+        for column in (prediction_column, reference_column, output_key_column)
+        if column
+    )
     path = Path(path)
-    with open_selected_predictions(path, required, group_column, selection) as (source, reader, group_column):
+    with open_selected_predictions(path, required, group_column, selection) as (
+        source,
+        reader,
+        group_column,
+    ):
         rows = []
         for row in source:
             item_id = row[id_column]
@@ -103,16 +130,27 @@ def read_csv_rows(path, *, id_column="id", score_column="score", correct_columns
             if output_key_column is not None and not key:
                 raise ValueError(f"{path}: missing output key for {item_id!r}")
             if correct_columns:
-                outcomes = tuple(parse_correct(row[column], reader.line_num) for column in correct_columns)
+                outcomes = tuple(
+                    parse_correct(row[column], reader.line_num)
+                    for column in correct_columns
+                )
             else:
                 outcomes = (exact_match(item_id, row[prediction_column], reference),)
             rows.append(GradedRow(item_id, score, outcomes, group, key, reference))
     return rows, group_column
 
 
-def load_csv(path, *, id_column="id", score_column="score", correct_columns=(),
-             group_column=None, output_key_column=None, prediction_column=None,
-             reference_column=None):
+def load_csv(
+    path,
+    *,
+    id_column="id",
+    score_column="score",
+    correct_columns=(),
+    group_column=None,
+    output_key_column=None,
+    prediction_column=None,
+    reference_column=None,
+):
     """Read rows from CSV, using correctness columns or exact label matching.
 
     Outcome order follows correct_columns. The default exact match uses
@@ -120,9 +158,14 @@ def load_csv(path, *, id_column="id", score_column="score", correct_columns=(),
     """
     columns = tuple(correct_columns)
     rows, _ = read_csv_rows(
-        path, id_column=id_column, score_column=score_column, correct_columns=columns,
-        group_column=group_column, output_key_column=output_key_column,
-        prediction_column=prediction_column, reference_column=reference_column,
+        path,
+        id_column=id_column,
+        score_column=score_column,
+        correct_columns=columns,
+        group_column=group_column,
+        output_key_column=output_key_column,
+        prediction_column=prediction_column,
+        reference_column=reference_column,
     )
     return validated_rows(rows, columns or ("correct",))
 
@@ -132,10 +175,22 @@ def read_design_scores(path, score_column):
         return [parse_score(row[score_column], reader.line_num) for row in reader]
 
 
-def join_grader_files(path, grader_files, *, id_column, score_column, output_key_column,
-                      group_column=None, selection=None):
+def join_grader_files(
+    path,
+    grader_files,
+    *,
+    id_column,
+    score_column,
+    output_key_column,
+    group_column=None,
+    selection=None,
+):
     required = {id_column, score_column, output_key_column}
-    with open_selected_predictions(path, required, group_column, selection) as (rows, reader, group_column):
+    with open_selected_predictions(path, required, group_column, selection) as (
+        rows,
+        reader,
+        group_column,
+    ):
         predictions = {}
         for row in rows:
             item_id, key = row[id_column], row[output_key_column]
@@ -154,7 +209,9 @@ def join_grader_files(path, grader_files, *, id_column, score_column, output_key
     outcomes = []
     for name, grader_path in grader_files:
         bits = {}
-        with open_predictions_csv(grader_path, {id_column, output_key_column, "correct"}, None) as (reader, _):
+        with open_predictions_csv(
+            grader_path, {id_column, output_key_column, "correct"}, None
+        ) as (reader, _):
             for row in reader:
                 item_id = row[id_column]
                 if item_id not in predictions:
@@ -166,7 +223,9 @@ def join_grader_files(path, grader_files, *, id_column, score_column, output_key
                 bits[item_id] = parse_correct(row["correct"], reader.line_num)
         missing = predictions.keys() - bits.keys()
         if missing:
-            raise ValueError(f"{name}: missing {len(missing)} ids, including {min(missing)!r}")
+            raise ValueError(
+                f"{name}: missing {len(missing)} ids, including {min(missing)!r}"
+            )
         outcomes.append(bits)
     return [
         GradedRow(item_id, score, tuple(bits[item_id] for bits in outcomes), group, key)

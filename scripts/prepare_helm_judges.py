@@ -9,23 +9,48 @@ from statistics import mean
 from urllib.error import HTTPError
 from urllib.parse import quote
 
-from caat.features import FULL_SCORE_FIELDS, SavedResponse, full_scores, mean_token_logprob, token_logprobs
+from caat.features import (
+    FULL_SCORE_FIELDS,
+    SavedResponse,
+    full_scores,
+    mean_token_logprob,
+    token_logprobs,
+)
 
 from common import JUDGES, MATCHED_TOKEN_TEXT, SCENARIOS, fetch, read_json
 
 
 BASE = "https://storage.googleapis.com/crfm-helm-public/capabilities/benchmark_output"
-INVENTORY = ("release", "scenario", "model", "suite", "run", "kept", "excluded", "status",
-             "token_text_verified")
+INVENTORY = (
+    "release",
+    "scenario",
+    "model",
+    "suite",
+    "run",
+    "kept",
+    "excluded",
+    "status",
+    "token_text_verified",
+)
 EXCLUSION = ("release", "scenario", "model", "id", "reason")
-LITERAL_TERMINATORS = {"<|im_end|>", "<|eot_id|>", "<|end_of_text|>", "<|endoftext|>", "</s>", "<|return|>"}
+LITERAL_TERMINATORS = {
+    "<|im_end|>",
+    "<|eot_id|>",
+    "<|end_of_text|>",
+    "<|endoftext|>",
+    "</s>",
+    "<|return|>",
+}
 TERMINATORS = LITERAL_TERMINATORS | {"<|eot|>", "<|user|>"}
 
 # Reverse the standard GPT-2 byte-to-Unicode table used by ByteLevel tokenizers.
 VISIBLE_BYTES = set(range(33, 127)) | set(range(161, 173)) | set(range(174, 256))
-BYTE_LEVEL_DECODER = str.maketrans({
-    chr(256 + index): chr(byte) for index, byte in enumerate(sorted(set(range(256)) - VISIBLE_BYTES))
-})
+BYTE_LEVEL_DECODER = str.maketrans(
+    {
+        chr(256 + index): chr(byte)
+        for index, byte in enumerate(sorted(set(range(256)) - VISIBLE_BYTES))
+    }
+)
 
 
 def indexed(rows, key):
@@ -64,7 +89,9 @@ def read_judges(display, scenario):
     if any(value is None for value in values):
         return None
     if scenario == "wildbench":
-        if any(type(value) not in (int, float) or not 1 <= value <= 10 for value in values):
+        if any(
+            type(value) not in (int, float) or not 1 <= value <= 10 for value in values
+        ):
             return None
         recomputed = (mean(values) - 1) / 9
     else:
@@ -73,13 +100,17 @@ def read_judges(display, scenario):
         recomputed = mean(values)
         values = tuple(int(value) for value in values)
     published = display["stats"].get(metric)
-    if published is None or not isclose(published, recomputed, rel_tol=0, abs_tol=1e-12):
+    if published is None or not isclose(
+        published, recomputed, rel_tol=0, abs_tol=1e-12
+    ):
         raise ValueError(f"{metric} differs for instance {display['instance_id']}")
     return (*values, published)
 
 
 def same_response(rendered, text, terminators):
-    return rendered == text or (rendered.startswith(text) and rendered[len(text):] in terminators)
+    return rendered == text or (
+        rendered.startswith(text) and rendered[len(text) :] in terminators
+    )
 
 
 def final_channel(rendered):
@@ -103,7 +134,9 @@ def token_alignment(completion):
     if final and same_response(final.lstrip(), text, TERMINATORS):
         return 0, "final_channel"
     try:
-        decoded = rendered.translate(BYTE_LEVEL_DECODER).encode("latin-1").decode("utf-8")
+        decoded = (
+            rendered.translate(BYTE_LEVEL_DECODER).encode("latin-1").decode("utf-8")
+        )
     except UnicodeError:
         decoded = rendered
     if same_response(decoded, text, TERMINATORS):
@@ -123,7 +156,9 @@ def prepare_run(cache, output, release, scenario, model, suite, run):
     display_url = f"{run_url}/display_predictions.json"
     display_cache = run_cache / "display_predictions.json"
     try:
-        state = read_json(fetch(f"{run_url}/scenario_state.json", run_cache / "scenario_state.json"))
+        state = read_json(
+            fetch(f"{run_url}/scenario_state.json", run_cache / "scenario_state.json")
+        )
     except HTTPError as exc:
         if exc.code != 404:
             raise
@@ -135,9 +170,18 @@ def prepare_run(cache, output, release, scenario, model, suite, run):
                 raise
             display = []
         shown = indexed(display, lambda row: row["instance_id"])
-        exclusions = [{**stamp, "id": item, "reason": "unavailable_state"} for item in shown]
-        return {**stamp, "suite": suite, "run": run, "kept": 0, "excluded": len(exclusions),
-                "status": "unavailable_state", "token_text_verified": 0}, exclusions
+        exclusions = [
+            {**stamp, "id": item, "reason": "unavailable_state"} for item in shown
+        ]
+        return {
+            **stamp,
+            "suite": suite,
+            "run": run,
+            "kept": 0,
+            "excluded": len(exclusions),
+            "status": "unavailable_state",
+            "token_text_verified": 0,
+        }, exclusions
 
     states = indexed(state["request_states"], lambda row: row["instance"]["id"])
     del state
@@ -149,17 +193,33 @@ def prepare_run(cache, output, release, scenario, model, suite, run):
             {**stamp, "id": item, "reason": reason}
             for item, _, _, reason in genuine_completions(states)
         ]
-        return {**stamp, "suite": suite, "run": run, "kept": 0, "excluded": len(exclusions),
-                "status": "no_real_logprobs", "token_text_verified": 0}, exclusions
+        return {
+            **stamp,
+            "suite": suite,
+            "run": run,
+            "kept": 0,
+            "excluded": len(exclusions),
+            "status": "no_real_logprobs",
+            "token_text_verified": 0,
+        }, exclusions
     try:
         display = read_json(fetch(display_url, display_cache))
     except HTTPError as exc:
         if exc.code != 404:
             raise
         path.unlink(missing_ok=True)
-        exclusions = [{**stamp, "id": item, "reason": "unavailable_display"} for item in states]
-        return {**stamp, "suite": suite, "run": run, "kept": 0, "excluded": len(exclusions),
-                "status": "unavailable_display", "token_text_verified": 0}, exclusions
+        exclusions = [
+            {**stamp, "id": item, "reason": "unavailable_display"} for item in states
+        ]
+        return {
+            **stamp,
+            "suite": suite,
+            "run": run,
+            "kept": 0,
+            "excluded": len(exclusions),
+            "status": "unavailable_display",
+            "token_text_verified": 0,
+        }, exclusions
     shown = indexed(display, lambda row: row["instance_id"])
     if shown.keys() != states.keys():
         raise ValueError(f"{run}: state and display instance IDs differ")
@@ -169,7 +229,10 @@ def prepare_run(cache, output, release, scenario, model, suite, run):
     verified = 0
     for item, completion, scores, reason in genuine_completions(states):
         judgment = read_judges(shown[item], scenario)
-        if completion is not None and shown[item]["predicted_text"] != completion["text"]:
+        if (
+            completion is not None
+            and shown[item]["predicted_text"] != completion["text"]
+        ):
             raise ValueError(f"{run}: displayed response differs for {item}")
         if reason is None and judgment is None:
             reason = "incomplete_or_invalid_judge_scores"
@@ -179,20 +242,43 @@ def prepare_run(cache, output, release, scenario, model, suite, run):
         literal_match, alignment = token_alignment(completion)
         verified += alignment in MATCHED_TOKEN_TEXT
         response = SavedResponse(completion["text"], completion["tokens"], scores)
-        rows.append((item, mean_token_logprob(response), *full_scores(response), literal_match, alignment, *judgment))
+        rows.append(
+            (
+                item,
+                mean_token_logprob(response),
+                *full_scores(response),
+                literal_match,
+                alignment,
+                *judgment,
+            )
+        )
     if rows:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8", newline="") as target:
             writer = csv.writer(target)
-            writer.writerow((
-                "id", "mean_token_logprob", *FULL_SCORE_FIELDS, "token_text_matches", "token_alignment",
-                *(f"{judge}_{suffix}" for judge in JUDGES), metric,
-            ))
+            writer.writerow(
+                (
+                    "id",
+                    "mean_token_logprob",
+                    *FULL_SCORE_FIELDS,
+                    "token_text_matches",
+                    "token_alignment",
+                    *(f"{judge}_{suffix}" for judge in JUDGES),
+                    metric,
+                )
+            )
             writer.writerows(rows)
     else:
         path.unlink(missing_ok=True)
-    return {**stamp, "suite": suite, "run": run, "kept": len(rows), "excluded": len(exclusions),
-            "status": "complete" if rows else "no_complete_rows", "token_text_verified": verified}, exclusions
+    return {
+        **stamp,
+        "suite": suite,
+        "run": run,
+        "kept": len(rows),
+        "excluded": len(exclusions),
+        "status": "complete" if rows else "no_complete_rows",
+        "token_text_verified": verified,
+    }, exclusions
 
 
 def update_table(path, fields, records, selection):
@@ -200,15 +286,24 @@ def update_table(path, fields, records, selection):
     if path.is_file():
         with path.open(encoding="utf-8", newline="") as source:
             previous = [
-                row for row in csv.DictReader(source)
+                row
+                for row in csv.DictReader(source)
                 if (row["release"], row["scenario"], row["model"]) not in selection
             ]
     with path.open("w", encoding="utf-8", newline="") as target:
         writer = csv.DictWriter(target, fieldnames=fields)
         writer.writeheader()
-        writer.writerows(sorted(
-            previous + records, key=lambda r: (r["release"], r["scenario"], r["model"], r.get("id", ""))
-        ))
+        writer.writerows(
+            sorted(
+                previous + records,
+                key=lambda r: (
+                    r["release"],
+                    r["scenario"],
+                    r["model"],
+                    r.get("id", ""),
+                ),
+            )
+        )
 
 
 def main():
@@ -229,25 +324,41 @@ def main():
                 parser.error("use a separate --output-dir for each HELM release")
     cache = args.output_dir / "sources"
     url = f"{BASE}/releases/{args.release}"
-    mapping = read_json(fetch(f"{url}/runs_to_run_suites.json", cache / f"runs_to_run_suites_{args.release}.json"))
-    specs = read_json(fetch(f"{url}/run_specs.json", cache / f"run_specs_{args.release}.json"))
+    mapping = read_json(
+        fetch(
+            f"{url}/runs_to_run_suites.json",
+            cache / f"runs_to_run_suites_{args.release}.json",
+        )
+    )
+    specs = read_json(
+        fetch(f"{url}/run_specs.json", cache / f"run_specs_{args.release}.json")
+    )
     runs = {}
     for spec in specs:
         run = spec["name"]
         if run.startswith(f"{args.scenario}:"):
             model = re.search(r"(?:^|[:,])model=([^,]+)", run).group(1)
             if model in runs:
-                raise ValueError(f"multiple release runs for {args.scenario} and {model}")
+                raise ValueError(
+                    f"multiple release runs for {args.scenario} and {model}"
+                )
             runs[model] = (mapping[run], run)
     chosen = sorted(set(args.model) if args.model else runs)
     if not chosen or set(chosen) - runs.keys():
-        parser.error(f"model absent from {args.release} {args.scenario}: {sorted(set(chosen) - runs.keys())}")
+        parser.error(
+            f"model absent from {args.release} {args.scenario}: {sorted(set(chosen) - runs.keys())}"
+        )
     inventory, exclusions = [], []
     for model in chosen:
-        row, excluded = prepare_run(cache, args.output_dir, args.release, args.scenario, model, *runs[model])
+        row, excluded = prepare_run(
+            cache, args.output_dir, args.release, args.scenario, model, *runs[model]
+        )
         inventory.append(row)
         exclusions.extend(excluded)
-        print(f"{model}: {row['status']}, {row['kept']} kept, {row['excluded']} excluded", flush=True)
+        print(
+            f"{model}: {row['status']}, {row['kept']} kept, {row['excluded']} excluded",
+            flush=True,
+        )
     selection = {(args.release, args.scenario, model) for model in chosen}
     update_table(inventory_path, INVENTORY, inventory, selection)
     update_table(args.output_dir / "exclusions.csv", EXCLUSION, exclusions, selection)

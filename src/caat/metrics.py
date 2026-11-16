@@ -22,10 +22,16 @@ class Counts:
         return self.errors / self.accepted if self.accepted else None
 
     def metrics(self) -> dict:
-        return {**asdict(self), "coverage": self.coverage, "error_rate": self.error_rate}
+        return {
+            **asdict(self),
+            "coverage": self.coverage,
+            "error_rate": self.error_rate,
+        }
 
 
-def threshold_points(scored_errors: Iterable[tuple[float, bool]]) -> list[tuple[float, Counts]]:
+def threshold_points(
+    scored_errors: Iterable[tuple[float, bool]],
+) -> list[tuple[float, Counts]]:
     """Count accepted rows and errors at each distinct score threshold."""
     ranked = sorted(scored_errors, key=itemgetter(0), reverse=True)
     accepted = errors = 0
@@ -48,7 +54,9 @@ def ranking_metrics(points: list[tuple[float, Counts]]) -> dict:
     for _, counts in points:
         size = counts.accepted - previous_accepted
         tied_errors = counts.errors - previous_errors
-        pair_wins.append((size - tied_errors) * (total.errors - counts.errors + tied_errors / 2))
+        pair_wins.append(
+            (size - tied_errors) * (total.errors - counts.errors + tied_errors / 2)
+        )
         prefix_risks.extend(
             (previous_errors + tied_errors * i / size) / (previous_accepted + i)
             for i in range(1, size + 1)
@@ -59,10 +67,15 @@ def ranking_metrics(points: list[tuple[float, Counts]]) -> dict:
     gain = None
     if correct and total.errors:
         random_aurc = total.errors / total.total
-        oracle_aurc = fsum((k - correct) / k for k in range(correct + 1, total.total + 1)) / total.total
+        oracle_aurc = (
+            fsum((k - correct) / k for k in range(correct + 1, total.total + 1))
+            / total.total
+        )
         gain = (random_aurc - aurc) / (random_aurc - oracle_aurc)
     return {
-        "auroc": fsum(pair_wins) / (correct * total.errors) if correct and total.errors else None,
+        "auroc": fsum(pair_wins) / (correct * total.errors)
+        if correct and total.errors
+        else None,
         "aurc": aurc,
         "normalized_aurc_gain": gain,
     }

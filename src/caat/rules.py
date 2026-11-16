@@ -14,8 +14,16 @@ def log_lower_tail(n, k, log_p, log_q):
         mass += term
         if term == 0:
             break
-    return fsum((lgamma(n + 1), -lgamma(k + 1), -lgamma(n - k + 1),
-                 k * log_p, (n - k) * log_q, log(mass)))
+    return fsum(
+        (
+            lgamma(n + 1),
+            -lgamma(k + 1),
+            -lgamma(n - k + 1),
+            k * log_p,
+            (n - k) * log_q,
+            log(mass),
+        )
+    )
 
 
 def binomial_pvalue(counts: Counts, target: float) -> float:
@@ -43,19 +51,27 @@ class RuleResult:
 
     @property
     def selected_index(self):
-        return max((index for index, passed in enumerate(self.decisions) if passed), default=None)
+        return max(
+            (index for index, passed in enumerate(self.decisions) if passed),
+            default=None,
+        )
 
 
 def empirical(candidates, risk_target, failure_rate):
-    return RuleResult(tuple(
-        candidate["accepted"] > 0 and candidate["worst_error_rate"] <= risk_target
-        for candidate in candidates
-    ))
+    return RuleResult(
+        tuple(
+            candidate["accepted"] > 0 and candidate["worst_error_rate"] <= risk_target
+            for candidate in candidates
+        )
+    )
 
 
 def bonferroni(candidates, risk_target, failure_rate):
     level = failure_rate / len(candidates)
-    decisions = tuple(candidate["accepted"] > 0 and candidate["pvalue"] <= level for candidate in candidates)
+    decisions = tuple(
+        candidate["accepted"] > 0 and candidate["pvalue"] <= level
+        for candidate in candidates
+    )
     return RuleResult(decisions, level, controls_risk=True)
 
 
@@ -67,7 +83,9 @@ def fixed_sequence(candidates, risk_target, failure_rate):
         if not passed:
             break
     untested = len(candidates) - len(decisions)
-    return RuleResult(tuple(decisions) + (None,) * untested, failure_rate, controls_risk=True)
+    return RuleResult(
+        tuple(decisions) + (None,) * untested, failure_rate, controls_risk=True
+    )
 
 
 RULES = {

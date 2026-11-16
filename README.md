@@ -31,7 +31,7 @@ CAAT accepts every row with a score at or above `--threshold`. Use
 `--probability` to report Brier score for probabilities of correctness.
 All commands print a short summary. Add `--json` for machine-readable
 stdout or `--output FILE` to save the JSON report. The CLI and Python API
-use the standard library. [Report fields](docs/guide/reports.md)
+use the standard library. [CSV input](https://github.com/Daveyuwang/caat/blob/main/docs/guide/csv-format.md) · [Report fields](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md)
 
 ## Choose and check a cutoff in one command
 
@@ -47,7 +47,7 @@ Google's strict grader and by HELM. The command selects
 policy accepts 144 responses, with 33 errors (22.9%) under Google and 45
 (31.2%) under HELM. Both meet the 40% target.
 
-![Held-out IFEval risk for the Google and HELM graders](docs/figures/policy-example.svg)
+![Held-out IFEval risk for the Google and HELM graders](https://github.com/Daveyuwang/caat/raw/main/docs/figures/policy-example.svg)
 
 A `--check-column` grader is reported on held-out rows and takes no part in
 selection. Pass it as a second `--correct-column` to require the target
@@ -90,7 +90,7 @@ The first grader is the reference for directional differences.
 
 If a prediction CSV contains multiple runs for the same IDs, select one
 with `--prediction-filter COLUMN=VALUE`.
-[Real routing example and CI setup](https://github.com/Daveyuwang/caat/blob/main/docs/cfpb-audit.md)
+[Real routing example and CI setup](https://github.com/Daveyuwang/caat/blob/main/docs/guide/ci-audit.md)
 
 ## Select a threshold on calibration data
 
@@ -122,7 +122,7 @@ caat features examples/token_scores.jsonl --output replay/token_scores.csv
 
 The input supplies response text and token log probabilities. The CSV
 contains one row per response, with scores you can use as `--score-column`
-values. [JSONL format and available scores](docs/guide/features.md)
+values. [JSONL format and available scores](https://github.com/Daveyuwang/caat/blob/main/docs/guide/features.md)
 
 ## CPU benchmarks
 
@@ -134,8 +134,8 @@ The command replays the bundled 24-response samples for IFEval, MMLU-Pro, and
 TriviaQA and writes `replay/benchmarks/summary.csv`. The larger HELM comparison
 evaluates sequence probability and perplexity rankings and tests empirical
 threshold selection against Learn then Test.
-[Sources, results, and reproduction](https://github.com/Daveyuwang/caat/blob/main/docs/benchmarks.md) ·
-[WildBench and Omni-MATH grader replay](https://github.com/Daveyuwang/caat/blob/main/docs/judge-study.md)
+[Sources, results, and reproduction](https://github.com/Daveyuwang/caat/blob/main/docs/research/benchmarks.md) ·
+[WildBench and Omni-MATH grader replay](https://github.com/Daveyuwang/caat/blob/main/docs/research/judge-study.md)
 
 ## Development
 
@@ -148,7 +148,9 @@ The tests include the bundled benchmark replay. CI runs them on Python 3.10
 through 3.14 on Linux and on 3.10 and 3.14 on Windows, runs the README
 examples, and builds and installs the wheel.
 
-[Evaluation method and related work](https://github.com/Daveyuwang/caat/blob/main/docs/method.md)
+[Evaluation method and related work](https://github.com/Daveyuwang/caat/blob/main/docs/research/method.md)
+
+[Contributing](https://github.com/Daveyuwang/caat/blob/main/CONTRIBUTING.md) · [Changelog](https://github.com/Daveyuwang/caat/blob/main/CHANGELOG.md)
 
 ## License
 

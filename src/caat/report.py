@@ -52,16 +52,22 @@ def describe(report):
         for grader, counts in report["graders"].items():
             verdict = ""
             if report["risk_target"] is not None:
-                verdict = " Meets target." if counts["meets_target"] else " Target not met."
+                verdict = (
+                    " Meets target." if counts["meets_target"] else " Target not met."
+                )
             lines.append(f"{grader}: {counts_summary(counts)}{verdict}")
         lines.append(f"{len(report['discordant'])} outputs have differing outcomes.")
         return "\n".join(lines)
     threshold = report["selected_threshold"]
     if threshold is None:
         return f"No candidate threshold met the {percent(report['risk_target'])} target ({report['rule']})."
-    candidate = next(row for row in report["candidates"] if row["threshold"] == threshold)
-    return (f"Selected threshold {threshold!r} ({report['rule']}). "
-            f"Calibration accepted {candidate['accepted']} of {report['calibration_total']} rows.")
+    candidate = next(
+        row for row in report["candidates"] if row["threshold"] == threshold
+    )
+    return (
+        f"Selected threshold {threshold!r} ({report['rule']}). "
+        f"Calibration accepted {candidate['accepted']} of {report['calibration_total']} rows."
+    )
 
 
 def counts_summary(counts):
@@ -84,7 +90,9 @@ def describe_policy(report) -> str:
     for name, ranking in report["ranking"].items():
         auroc = ranking["auroc"]
         if auroc is None:
-            lines.append(f"Score ranking under {name}: undefined, every calibration row has the same outcome.")
+            lines.append(
+                f"Score ranking under {name}: undefined, every calibration row has the same outcome."
+            )
         elif auroc <= 0.5:
             lines.append(
                 f"Score ranking under {name}: AUROC {auroc:.3f}, no better than random on the "
@@ -96,9 +104,13 @@ def describe_policy(report) -> str:
     graders = " and ".join(selection["graders"])
     threshold = selection["selected_threshold"]
     if threshold is None:
-        lines.append(f"No candidate threshold met the {target} risk target under {graders} ({rule}).")
+        lines.append(
+            f"No candidate threshold met the {target} risk target under {graders} ({rule})."
+        )
         return "\n".join(lines)
-    lines.append(f"Selected threshold {threshold!r} for a {target} risk target under {graders} ({rule}).")
+    lines.append(
+        f"Selected threshold {threshold!r} for a {target} risk target under {graders} ({rule})."
+    )
     for name, result in report["heldout"]["graders"].items():
         role = " (check only)" if name in report["check_graders"] else ""
         if result["error_rate"] is None:
@@ -110,7 +122,8 @@ def describe_policy(report) -> str:
             f"with {result['errors']} errors ({percent(result['error_rate'])}), which {verdict} the target."
         )
     lines.append(
-        "The held-out rows confirm the policy." if report["confirmed"]
+        "The held-out rows confirm the policy."
+        if report["confirmed"]
         else "The held-out rows do not confirm the policy."
     )
     return "\n".join(lines)
