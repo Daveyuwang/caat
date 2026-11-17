@@ -61,6 +61,29 @@ class ScoreTests(unittest.TestCase):
             )
         )
 
+    def test_class_seen_only_before_holdout(self):
+        rows = [
+            ScoredRow(str(i), (1.0,), (True,), predicted_class=c)
+            for i, c in enumerate(["rare", "common", "common"])
+        ]
+        summary = compare_scores(
+            rows,
+            names=["s"],
+            graders=["g"],
+            coverages=[1],
+            bootstrap=0,
+            split_sizes=(1, 1, 1),
+        )
+        rare = summary["graders"]["g"]["scores"]["s"]["budgets"][0][
+            "by_predicted_class"
+        ]["rare"]
+        self.assertEqual(
+            (rare["total"], rare["scored"], rare["accepted"], rare["reviewed"]),
+            (0, 0, 0, 0),
+        )
+        self.assertIsNone(rare["coverage"])
+        self.assertIsNone(rare["error_rate"])
+
     def test_class_column_cli_with_exact_match(self):
         with TemporaryDirectory() as td:
             path = Path(td) / "data.csv"
