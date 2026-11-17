@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0rc1
 
 - Draw a reproducible, fixed-budget audit sample from new predictions with
   `caat plan --batch-predictions --label-budget`. A withheld policy keeps its
@@ -8,6 +8,8 @@
 - Check the completed fixed-budget draw against the original batch and report
   whether its error rate meets or exceeds the saved target, or the evidence is
   inconclusive.
+- Replay the prospective ANLI R2 audit and the BoolQ control from saved
+  predictions and grades. [Results](docs/research/fixed-batch-audit.md)
 
 ## 0.6.0
 

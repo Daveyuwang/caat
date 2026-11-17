@@ -102,6 +102,22 @@ The graded example adds labels to the same two rows. All four commands accept th
 
 To see who goes to review at one global budget, add `--class-column` to `caat scores`. To use a categorical prediction when fitting, set `scorer.class_column` in the workflow. [Class-aware classifier walkthrough](https://github.com/Daveyuwang/caat/blob/main/docs/guide/classifier.md#hand-off-a-class-aware-policy) · [ANLI evidence](https://github.com/Daveyuwang/caat/blob/main/docs/research/anli-results.md)
 
+## Audit a withheld policy on a new batch
+
+The ANLI policy missed its 20% error target on R1. To check it on R2,
+draw 100 rows from the outputs the same cutoff would accept. Grade those
+exact outputs, then evaluate the sample against the plan. The saved R2
+grades are included so you can run both commands from the checkout.
+
+```bash
+caat plan --threshold-report results/anli_r2/policy.json --batch-predictions results/anli_r2/predictions.csv --label-budget 100 --sample-seed 42 --sample-output replay/r2-sample.csv --output replay/r2-plan.json
+caat evaluate replay/r2-sample.csv --grader-file anli=results/anli_r2/sample-grades.csv --grader-output-key-column output_key --threshold-report results/anli_r2/policy.json --batch-predictions results/anli_r2/predictions.csv --plan-report replay/r2-plan.json
+```
+
+The sample found 43 errors. Its one-sided 95% lower limit was 35.34%, so
+the verdict is `exceeds` and evaluation returns status 1. Routing from
+the original policy stays disabled. [Fixed-batch guide](https://github.com/Daveyuwang/caat/blob/main/docs/guide/queue.md#draw-an-audit-sample-after-a-policy-misses-its-target) · [R2 results](https://github.com/Daveyuwang/caat/blob/main/docs/research/fixed-batch-audit.md)
+
 ## Set a cutoff
 
 `caat policy` sorts IDs and shuffles with `--seed` (default 42) to assign

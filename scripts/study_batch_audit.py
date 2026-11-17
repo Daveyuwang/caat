@@ -286,6 +286,13 @@ def replay():
         }:
             raise ValueError("census IDs or output keys differ from the candidate set")
         grade_map = {r["id"]: r for r in grades}
+        independent = {}
+        for row in read_csv(batch):
+            top, second, _ = sorted((float(row[c]) for c in "ABC"), reverse=True)
+            if top - second >= 4.75:
+                independent[row["id"]] = row["output_sha256"]
+        if independent != counted:
+            raise ValueError("candidate IDs differ from the original option logits")
         if any(grade_map[r["id"]] != r for r in read_csv(R2 / "sample-grades.csv")):
             raise ValueError("sample grades disagree with the census")
         observed = measure(batch, policy, sample, plan, R2 / "sample-grades.csv")
@@ -323,9 +330,15 @@ def replay():
                 for i in expected[:BUDGET]
             ],
         )
-        print(
-            "BoolQ:", measure(control, boolq, sample, plan, labels), "census 321/2666"
-        )
+        errors = sum(rows[i]["correct"] == "0" for i in baseline)
+        control_result = measure(control, boolq, sample, plan, labels)
+        if (errors, control_result["errors"], control_result["batch_verdict"]) != (
+            321,
+            12,
+            "meets",
+        ):
+            raise ValueError("BoolQ census or sampled verdict changed")
+        print("BoolQ:", control_result, f"census {errors}/{len(baseline)}")
 
 
 if __name__ == "__main__":

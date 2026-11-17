@@ -53,6 +53,7 @@ nav:
       - Routing stability: docs/research/routing-stability.md
       - Frozen score comparison: docs/research/frozen-score-comparison.md
       - ANLI results: docs/research/anli-results.md
+        - Fixed-budget batch audit: docs/research/fixed-batch-audit.md
       - ANLI protocol: docs/research/anli-protocol.md
       - BoolQ protocol: docs/research/boolq-protocol.md
       - BoolQ results: docs/research/boolq-results.md
