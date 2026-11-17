@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.0rc1
+## 0.6.0
 
 - Show expected accepts, accepted error, coverage and review volume by predicted class at the same global budget with `caat scores --class-column`.
 - Fit a portable scorer using a categorical prediction and numeric features. Replay it on raw rows in a base installation. Numeric-only artifacts retain their existing format.
