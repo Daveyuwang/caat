@@ -533,8 +533,13 @@ def describe(report):
                             if part["error_rate"] is not None
                             else "undefined"
                         )
+                        coverage = (
+                            percent(part["coverage"])
+                            if part["coverage"] is not None
+                            else "undefined"
+                        )
                         lines.append(
-                            f"{prefix}: {percent(part['coverage'])} class coverage, {risk} accepted error, {part['reviewed']:g} for review."
+                            f"{prefix}: {coverage} class coverage, {risk} accepted error, {part['reviewed']:g} for review."
                         )
         if (
             heldout
