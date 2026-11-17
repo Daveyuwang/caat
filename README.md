@@ -21,6 +21,8 @@ The [glossary](https://github.com/Daveyuwang/caat/blob/main/docs/guide/glossary.
 
 ## Try a review policy
 
+Install the CLI with `python -m pip install caat-annotation`. To run the bundled examples, clone the repository and install from the checkout.
+
 ```bash
 git clone https://github.com/Daveyuwang/caat.git
 cd caat
@@ -82,6 +84,21 @@ caat features examples/token_scores.jsonl --output replay/token_scores.csv
 The input supplies response text and token log probabilities. The CSV
 contains one row per response, with scores you can use as `--score-column`
 values. [JSONL format and available scores](https://github.com/Daveyuwang/caat/blob/main/docs/guide/features.md)
+
+## Reuse one fitted policy from routing through audit
+
+From the checkout, install the training extra and fit the digits example. On the next two illustrative predictions, the saved policy accepts `new-a` and sends `new-b` to review. The remaining commands also run in a base installation with a copy of the workflow JSON.
+
+```bash
+python -m pip install ".[scorer,workflow]"
+caat run examples/fitted_classifier.toml
+caat route examples/fitted_batch.csv --threshold-report replay/fitted-classifier/workflow.json --output replay/decisions.csv
+caat evaluate examples/fitted_batch_graded.csv --threshold-report replay/fitted-classifier/workflow.json --correct-column correct
+caat audit examples/fitted_batch_graded.csv --threshold-report replay/fitted-classifier/workflow.json --correct-column correct --correct-column second_grade
+caat monitor examples/fitted_batch_graded.csv --threshold-report replay/fitted-classifier/workflow.json --correct-column correct
+```
+
+The graded example adds labels to the same two rows. All four commands accept the same ID. The evaluation and audit exit 1 because a single accepted example cannot confirm a 2% error target. The sequential monitor exits 0 with no alert. To calibrate a score you already have, supply labeled calibration and holdout files plus fixed thresholds or an ungraded reference file. [Frozen-score workflow](https://github.com/Daveyuwang/caat/blob/main/docs/guide/workflow.md#calibrate-a-frozen-score) · [BoolQ results](https://github.com/Daveyuwang/caat/blob/main/docs/research/boolq-results.md)
 
 ## Set a cutoff
 

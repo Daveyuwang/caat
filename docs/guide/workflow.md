@@ -257,3 +257,50 @@ the `policy` report, and `review_queue`. The queue contains `eligible`,
 Exit code 0 means every grader passed the held-out check. Exit code 1
 means the policy did not qualify and the report was written. Exit code 2
 signals an invalid input or an I/O error. [Policy report fields](reports.md#policy)
+
+## Fit a confidence scorer and route the next batch
+
+Install the scorer extra to fit a standardized logistic regression. On Python 3.10 also install the workflow extra. The fitted parameters travel in the saved report. The base package can score and route a new batch from that report.
+
+```bash
+python -m pip install ".[scorer,workflow]"
+caat run examples/fitted_classifier.toml
+caat route new-digits.csv --threshold-report replay/fitted-classifier/workflow.json --output decisions.csv
+```
+
+The example uses the predicted and actual digit as its correctness label. A new batch needs only `image_id`, `top_prob` and `margin`. At the example's 2% target the fitted cutoff accepted 321 of 432 held-out predictions with one error. The one-sided 95% upper error bound was 1.47%. The scoring inputs and coefficients are available in the report's `scorer` field. [Classifier configuration](../../examples/fitted_classifier.toml)
+
+Set `prediction_column` and `reference_column` together for exact matching, or supply `correct_columns` or `grader_files`. The first selection grader supplies the binary training outcome. A `[scorer]` table opts into the fitted score. Its `regularization` setting is the inverse L2 penalty C, default 0.1. Use `"auto"` to choose from 0.01, 0.1 and 1 using stratified design folds and mean normalized AURC gain. With fewer than two examples of either class, the fit uses C = 0.1. A single-class design yields a constant score. The logistic decision score ranks answers. The existing probability calibration step estimates correctness probabilities. With `score_selection = "joint-calibration"`, all raw and fitted score/cutoff pairs share the same multiple-testing correction.
+
+With a fitted scorer, `refit_checks` defaults to 20. The workflow reshuffles only the original design and calibration rows, fits the scorer and cutoff again, and compares decisions on the same holdout IDs for each successive pair of fits. Every unqualified fit sends all rows to review. Supply an even number of checks, or zero to skip them. The report records the changed fraction, coverage and count of unqualified fits. Single-score workflows can request the same check explicitly.
+
+To use a scorer independently, supply labeled design rows to `fit`. The artifact records feature names, signs, standardization, weights, intercept, training count and a digest of sorted design IDs. Keep design rows separate from calibration and audit rows. Use `--lower-is-better NAME` for a lower-is-better feature. With `--review-missing-scores`, fit uses complete design rows and apply leaves incomplete rows unscored.
+
+```bash
+caat scorer fit design.csv --score-column top_prob --score-column margin --correct-column correct --output scorer.json
+caat scorer apply new-digits.csv --scorer scorer.json --output scored.csv
+```
+
+The Python equivalents are `fit_scorer`, `read_scorer` and `apply_scorer` in `caat.scorer`. Standalone apply also accepts a workflow JSON and writes a CSV with the extra `fitted_score` column. With the workflow report, `route`, `evaluate`, `audit` and `monitor` compute the same fitted score from the original features, including when the table contains a stale derived column. Routing requires a confirmed report. To use previously computed scores, pass `--score-column fitted_score`, or `--id-column id --score-column score` on a routed export. [Scorer benchmark](../research/routing-stability.md)
+
+## Calibrate a frozen score
+
+Bring labeled calibration and holdout files with disjoint IDs. For one existing scalar score, supply its column and predeclare cutoffs in the original column's units. A lower-is-better scalar uses the same `lower_is_better` setting as other workflows.
+
+```toml
+score_columns = ["confidence"]
+correct_columns = ["correct"]
+risk_target = 0.2
+json_output = "policy.json"
+
+[predictions]
+calibration = "calibration.csv"
+holdout = "holdout.csv"
+
+[frozen]
+thresholds = [0.7, 0.8, 0.9]
+```
+
+For rank-based cutoffs replace `thresholds` with `reference = "unlabeled.csv"`. CAAT builds the quantiles on that file using its IDs and scores. All calibration labels are available for testing the frozen cutoffs. To reuse a saved model, omit `score_columns` and set `scorer = "scorer.json"` in the frozen table. Its feature names, directions and weights travel with the new policy. Explicit cutoffs in that mode are on the saved scorer's decision scale.
+
+The report records cutoffs on the acceptance scale, reference size, label counts, and the saved scorer's file digest. CAAT checks IDs between input partitions. For a scorer from a workflow with tracked output identities, it also checks all inputs against those identities and retains them for subsequent audits. A standalone 0.4 scorer records only a digest of the full training list. Its training overlap is reported as unavailable. Use an independent calibration cohort for such a model.

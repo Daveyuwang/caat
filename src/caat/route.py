@@ -9,7 +9,7 @@ from .queue import shuffled_by_id
 from .table import (
     GradedRow,
     open_prediction_table,
-    open_selected_predictions,
+    open_scored_predictions,
     parse_score,
     write_rows,
 )
@@ -157,6 +157,7 @@ def route_batch(
     negate_score,
     review_missing_scores,
     keep_columns=(),
+    scorer=None,
 ):
     """Stream predictions through a cutoff and write all batch decisions.
 
@@ -171,11 +172,20 @@ def route_batch(
             "--keep-column names must be distinct and differ from "
             "id, score, decision, group, and output_key"
         )
-    required = {id_column, score_column, *keep_columns}
+    required = {id_column, *keep_columns}
     if output_key_column is not None:
         required.add(output_key_column)
     accepted = missing_scores = 0
-    with open_selected_predictions(path, required, group_column, selection) as (
+    with open_scored_predictions(
+        path,
+        required,
+        group_column,
+        selection,
+        score_column=score_column,
+        negate_score=negate_score,
+        review_missing_scores=review_missing_scores,
+        scorer=scorer,
+    ) as (
         rows,
         reader,
         group_column,
@@ -195,19 +205,15 @@ def route_batch(
         def decisions():
             nonlocal accepted, missing_scores
             seen = set()
-            for row in rows:
+            for row, score in rows:
                 item_id = row[id_column]
                 if not item_id or item_id in seen:
                     raise ValueError(f"empty or duplicate id: {item_id!r}")
                 seen.add(item_id)
-                raw_score = row[score_column]
-                if review_missing_scores and raw_score == "":
-                    score = None
+                if score is None:
                     missing_scores += 1
-                else:
-                    score = parse_score(raw_score, reader.line_num, negate=negate_score)
-                    if not isfinite(score):
-                        raise ValueError(f"score for id {item_id!r} must be finite")
+                elif not isfinite(score):
+                    raise ValueError(f"score for id {item_id!r} must be finite")
                 meets_cutoff = score is not None and score >= threshold
                 accepted += meets_cutoff
                 fields = [item_id, score, "accept" if meets_cutoff else "review"]

@@ -74,9 +74,12 @@ def read_score_rows(
                         else parse_score(row[column], reader.line_num, negate=negate)
                         for column, negate in columns
                     ),
-                    (exact_match(row[id_column], *(row[c] for c in label_columns)),)
-                    if label_columns
-                    else tuple(
+                    (
+                        (exact_match(row[id_column], *(row[c] for c in label_columns)),)
+                        if label_columns
+                        else ()
+                    )
+                    + tuple(
                         parse_correct(row[name], reader.line_num) for name in graders
                     ),
                     parse_score(row[length_column], reader.line_num)
@@ -256,6 +259,35 @@ def paired_risk_intervals(
     return [[interval for interval, _ in column] for column in stats]
 
 
+def design_recommendation(design, names, *, review_missing_scores=False):
+    design_gains, design_scored = {}, {}
+    if design:
+        for name, values in zip(
+            names, zip(*(row.scores for row in design), strict=True), strict=True
+        ):
+            if review_missing_scores:
+                design_scored[name] = len(values) - values.count(None)
+                if design_scored[name] < len(design):
+                    design_gains[name] = None
+                    continue
+            gains = []
+            for outcomes in zip(*(row.outcomes for row in design), strict=True):
+                points = threshold_points(
+                    (score, not y) for score, y in zip(values, outcomes, strict=True)
+                )
+                gain = ranking_metrics(points)["normalized_aurc_gain"]
+                if gain is not None:
+                    gains.append(gain)
+            design_gains[name] = mean(gains) if gains else None
+    recommendation = max(
+        (name for name, gain in design_gains.items() if gain is not None and gain > 0),
+        key=design_gains.get,
+        default=None,
+    )
+
+    return design_gains, design_scored, recommendation
+
+
 def compare_scores(
     rows,
     *,
@@ -348,27 +380,8 @@ def compare_scores(
     def scores_for(data):
         return tuple(zip(*(row.scores for row in data), strict=True))
 
-    design_gains, design_scored = {}, {}
-    if design:
-        for name, values in zip(names, scores_for(design), strict=True):
-            if review_missing_scores:
-                design_scored[name] = len(values) - values.count(None)
-                if design_scored[name] < len(design):
-                    design_gains[name] = None
-                    continue
-            gains = []
-            for outcomes in zip(*(row.outcomes for row in design), strict=True):
-                points = threshold_points(
-                    (score, not y) for score, y in zip(values, outcomes, strict=True)
-                )
-                gain = ranking_metrics(points)["normalized_aurc_gain"]
-                if gain is not None:
-                    gains.append(gain)
-            design_gains[name] = mean(gains) if gains else None
-    recommendation = max(
-        (name for name, gain in design_gains.items() if gain is not None and gain > 0),
-        key=design_gains.get,
-        default=None,
+    design_gains, design_scored, recommendation = design_recommendation(
+        design, names, review_missing_scores=review_missing_scores
     )
 
     scores = scores_for(target)

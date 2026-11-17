@@ -1,0 +1,14 @@
+predictions = "digit_classifier.jsonl"
+id_column = "image_id"
+score_columns = ["top_prob", "margin"]
+prediction_column = "predicted"
+reference_column = "actual"
+risk_target = 0.02
+holdout_confidence = 0.95
+json_output = "../replay/fitted-classifier/workflow.json"
+html = "../replay/fitted-classifier/report.html"
+holdout_output = "../replay/fitted-classifier/holdout.csv"
+
+[scorer]
+method = "logistic"
+regularization = 0.1

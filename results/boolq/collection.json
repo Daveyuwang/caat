@@ -1,0 +1,44 @@
+{
+  "generate": {
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+    "device": "NVIDIA GeForce RTX 5080",
+    "dtype": "bfloat16",
+    "transformers": "5.16.0.dev0",
+    "torch": "2.11.0+cu130",
+    "label_tokens": {
+      "Yes": 9454,
+      "No": 2753
+    },
+    "logical_requests": 4458,
+    "batches": 279,
+    "input_tokens": 793340,
+    "load_seconds": 11.536629099980928,
+    "wall_seconds": 220.46268100000452,
+    "peak_cuda_bytes": 13233580032,
+    "checked_rows": 224,
+    "batch_size": 16,
+    "teacher_forced_replays": 0
+  },
+  "verify": {
+    "model": "Qwen/Qwen3.5-2B",
+    "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+    "device": "NVIDIA GeForce RTX 5080",
+    "dtype": "bfloat16",
+    "transformers": "5.16.0.dev0",
+    "torch": "2.11.0+cu130",
+    "label_tokens": {
+      "True": 2434,
+      "False": 3913
+    },
+    "logical_requests": 4458,
+    "batches": 279,
+    "input_tokens": 791529,
+    "load_seconds": 3.3515185000142083,
+    "wall_seconds": 56.81009839999024,
+    "peak_cuda_bytes": 5527985664,
+    "checked_rows": 224,
+    "batch_size": 16,
+    "teacher_forced_replays": 0
+  }
+}

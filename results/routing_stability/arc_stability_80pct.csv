@@ -1,0 +1,7 @@
+case,score,grid,seeds,heldout,median_accepted,flip_rate,coverage,coverage_p10,coverage_p90,no_cutoff
+arc_challenge,single,ten,200,1172,0.0,0.0,0.0,0.0,0.0,200
+arc_challenge,single,three,200,1172,0.0,0.0,0.0,0.0,0.0,200
+arc_challenge,single,shortlist,200,1172,0.0,0.0,0.0,0.0,0.0,200
+arc_challenge,fitted,ten,200,1172,0.0,0.0007935153583617748,0.0003967576791808874,0.0,0.0,199
+arc_challenge,fitted,three,200,1172,0.0,0.0,0.0,0.0,0.0,200
+arc_challenge,fitted,shortlist,200,1172,0.0,0.0008532423208191127,0.0004266211604095563,0.0,0.0,199

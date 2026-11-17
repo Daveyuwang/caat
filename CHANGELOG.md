@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0
+
+- Route, evaluate, audit and monitor a saved fitted policy using its named features. Explicit score-column overrides still accept precomputed scores.
+- Calibrate one frozen score with preset cutoffs or unlabeled reference predictions and independent labeled calibration and holdout sets.
+- Replay the BoolQ verifier and label-budget comparisons on CPU. At 75% coverage the verifier combination improved on the best single score. An exploratory answer-aware native score had the lowest accepted error.
+
+## 0.4.0rc1
+
+- Fit standardized logistic confidence scorers on design data and reuse their JSON parameters on unlabeled batches. Fitting uses the optional scorer extra.
+- Use predicted/reference labels in TOML workflows, save the fitted scorer alongside the cutoff, and route original feature columns from the saved report.
+- Measure decision changes on fixed holdout rows when the design and calibration data are reassigned.
+
 ## 0.3.0
 
 - Refit `caat policy` on the next 20 seeds and report how many rows those cutoffs would accept, with `--split-checks` to change or skip it.

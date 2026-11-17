@@ -59,6 +59,7 @@ from .route import (
 )
 from .rules import RULES
 from .scores import COSTS, DEFAULT_COVERAGES, compare_scores, read_score_rows
+from .scorer import LinearScorer, configure_scorer, run_scorer
 from .select import DEFAULT_DESIGN_GRID_SIZE, design_thresholds, select
 from .table import (
     accepted_at,
@@ -217,7 +218,12 @@ def use_plan_sample_columns(args, saved, sample_path):
     )
     if raw_key is None and "output_key" in fields:
         raw_key = saved.get("output_key_column") or "output_sha256"
-    original_columns = {raw_id, raw_score, raw_key} - {None}
+    features = (
+        LinearScorer.from_dict(saved["scorer"]).columns
+        if args.score_column is None and "scorer" in saved
+        else ()
+    )
+    original_columns = {raw_id, raw_key, *(features or (raw_score,))} - {None}
     if (
         args.predictions.resolve() != Path(sample_path).resolve()
         and original_columns <= fields
@@ -252,6 +258,11 @@ def load_threshold_options(args, *, require_confirmed=False, label_plan=None):
             args, saved, sample_path
         )
     use_report_score = args.score_column is None
+    args.scorer = (
+        LinearScorer.from_dict(saved["scorer"])
+        if use_report_score and "scorer" in saved
+        else None
+    )
     options = vars(args)
     for name in (
         "threshold",
@@ -755,6 +766,7 @@ def run_monitor(args):
             require_labels=bool(columns),
             negate_score=args.negated_score_source is not None,
             review_missing_scores=bool(args.review_missing_scores),
+            scorer=args.scorer,
         )
     if fit_outputs is not None:
         check_fit_overlap(rows, fit_outputs, cohort="monitoring stream")
@@ -1467,6 +1479,7 @@ def run_route(args):
         negate_score=args.negated_score_source is not None,
         review_missing_scores=args.review_missing_scores,
         keep_columns=args.keep_column or (),
+        scorer=args.scorer,
     )
     meta = {
         "path": str(args.predictions),
@@ -1804,6 +1817,12 @@ def load_inputs(args, *, source_rows=None):
         "correct_columns": list(columns),
         "output_key_column": args.output_key_column,
     }
+    if getattr(args, "scorer", None) is not None:
+        if args.adapter not in (None, "csv"):
+            raise ValueError(
+                "use --score-column with a precomputed score for a custom adapter"
+            )
+        common["scorer"] = args.scorer
     if args.review_missing_scores:
         common["review_missing_scores"] = True
         meta["review_missing_scores"] = True
@@ -2379,6 +2398,10 @@ def main(argv=None):
         "collect", help="Save responses and confidence from a model or chat API."
     )
     collect_options(commands["collect"])
+    commands["scorer"] = subcommands.add_parser(
+        "scorer", help="Fit or apply a portable confidence scorer."
+    )
+    configure_scorer(commands["scorer"])
     commands["scores"] = subcommands.add_parser(
         "scores", help="Compare saved scores on shared labels and coverage budgets."
     )
@@ -2469,6 +2492,8 @@ def main(argv=None):
             return run_monitor(args)
         if args.command == "plan":
             return run_plan(args)
+        if args.command == "scorer":
+            return run_scorer(args)
         if args.command == "run":
             return run_workflow_command(args)
         if args.command == "plugins":

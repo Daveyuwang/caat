@@ -166,6 +166,8 @@ def read_threshold_report(path, *, require_confirmed=False):
         "review_missing_scores": read_review_missing_scores(path, report),
         "fit_outputs": fit_outputs,
     }
+    if command == "run" and score_column == "fitted_score" and "scorer" in report:
+        options["scorer"] = report["scorer"]
     if command != "select":
         # The first selection grader's held-out rate is a starting point for label plans.
         graders = (policy.get("heldout") or {}).get("graders") or {}
@@ -251,6 +253,14 @@ def emit(report, *, json_output, output=None):
     return serialized
 
 
+def describe_refits(diag):
+    return (
+        f"Refitting changed {diag['mean_changed_fraction']:.1%} of decisions on the same "
+        f"{diag['holdout']} held-out rows on average, over {diag['refits'] // 2} pairs of fits. "
+        f"{diag['no_cutoff']} of {diag['refits']} fits selected no cutoff."
+    )
+
+
 def describe(report):
     command = report["command"]
     if command == "plugins":
@@ -266,11 +276,21 @@ def describe(report):
         selected = report["selected_score"]
         choice = (
             f"Selected {selected} on {comparison['split']['design']} design rows."
-            if comparison["recommended_score"] is not None
+            if comparison and comparison["recommended_score"] is not None
             else f"Used the first configured score {selected}."
         )
+        if report.get("scorer") and selected == "fitted_score":
+            choice = (
+                "Fitted confidence score from "
+                + ", ".join(report["scorer"]["columns"])
+                + "."
+            )
+        if frozen := report["input"].get("frozen"):
+            choice = f"Frozen {selected} with {frozen['calibration_labels']} calibration labels and {frozen['reference_rows']} ungraded reference rows."
         if origin := joint_calibration_summary(report["policy"]["selection"]):
             choice = f"{selected}. {origin}"
+        if diag := report["policy"].get("refit_disagreement"):
+            choice += "\n" + describe_refits(diag)
         queue = report["review_queue"]
         return "\n".join(
             (
