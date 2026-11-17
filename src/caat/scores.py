@@ -2,7 +2,7 @@
 
 import os
 from bisect import bisect_left, bisect_right
-from collections import defaultdict, deque
+from collections import deque
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from fractions import Fraction
@@ -124,9 +124,9 @@ def coverage_budgets(points, coverages, *, total=None):
         }
 
 
-def _class_budgets(budgets, points, classes, values, errors):
+def _class_budgets(budgets, points, classes, vocabulary, values, errors):
     # Count rows against the global boundary. Integer weights preserve exact tie shares.
-    groups = defaultdict(list)
+    groups = {label: [] for label in vocabulary}
     for label, value, error in zip(classes, values, errors, strict=True):
         groups[label].append((value, error))
     for budget in budgets:
@@ -153,7 +153,7 @@ def _class_budgets(budgets, points, classes, values, errors):
                 accepted = mass / tied
                 mistakes = error_mass / tied
                 reviewed = (total * tied - mass) / tied
-                coverage = accepted / total
+                coverage = accepted / total if total else None
                 risk = error_mass / mass if mass else None
             breakdown[label] = {
                 "total": total,
@@ -437,6 +437,9 @@ def compare_scores(
         if any(row.predicted_class is not None for row in rows)
         else None
     )
+    vocabulary = (
+        {row.predicted_class or "" for row in rows} if classes is not None else set()
+    )
     scores = scores_for(target)
     control_scores = {"random": [0.0] * len(target)}
     if length_control:
@@ -467,7 +470,9 @@ def compare_scores(
                 coverage_budgets(points, coverages, total=len(target))
             )
             if classes is not None:
-                _class_budgets(result["budgets"], points, classes, values, errors)
+                _class_budgets(
+                    result["budgets"], points, classes, vocabulary, values, errors
+                )
             return result
 
         candidates = {}
