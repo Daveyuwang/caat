@@ -100,6 +100,8 @@ caat monitor examples/fitted_batch_graded.csv --threshold-report replay/fitted-c
 
 The graded example adds labels to the same two rows. All four commands accept the same ID. The evaluation and audit exit 1 because a single accepted example cannot confirm a 2% error target. The sequential monitor exits 0 with no alert. To calibrate a score you already have, supply labeled calibration and holdout files plus fixed thresholds or an ungraded reference file. [Frozen-score workflow](https://github.com/Daveyuwang/caat/blob/main/docs/guide/workflow.md#calibrate-a-frozen-score) · [BoolQ results](https://github.com/Daveyuwang/caat/blob/main/docs/research/boolq-results.md)
 
+To see who goes to review at one global budget, add `--class-column` to `caat scores`. To use a categorical prediction when fitting, set `scorer.class_column` in the workflow. [Class-aware classifier walkthrough](https://github.com/Daveyuwang/caat/blob/main/docs/guide/classifier.md#hand-off-a-class-aware-policy) · [ANLI evidence](https://github.com/Daveyuwang/caat/blob/main/docs/research/anli-results.md)
+
 ## Set a cutoff
 
 `caat policy` sorts IDs and shuffles with `--seed` (default 42) to assign

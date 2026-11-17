@@ -45,26 +45,69 @@ def command(cli, cwd, *args, status=0):
     return result.stdout
 
 
-def verify(wheel):
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    section = readme.split(
-        "## Reuse one fitted policy from routing through audit\n", 1
-    )[1]
+def documented_commands(document, heading):
+    text = (ROOT / document).read_text(encoding="utf-8")
+    section = text.split("## " + heading + "\n", 1)[1].split("\n## ", 1)[0]
     commands = {}
-    for line in section.split("\n## ", 1)[0].splitlines():
+    for line in section.splitlines():
         if line.startswith("caat "):
             _, name, *arguments = shlex.split(line)
             commands[name] = arguments
+    return commands
+
+
+def check_batch(cli, handoff, commands, expected):
+    command(cli, handoff, "route", *commands["route"])
+    output = commands["route"][commands["route"].index("--output") + 1]
+    with (handoff / output).open(encoding="utf-8", newline="") as source:
+        rows = list(csv.DictReader(source))
+    decisions = {r["id"]: r["decision"] for r in rows}
+    if decisions != expected or len(rows) != len(expected):
+        raise ValueError(f"unexpected routed IDs: {decisions}")
+    for cmd, status in (("evaluate", 1), ("audit", 1), ("monitor", 0)):
+        for item in (None, *expected):
+            filt = ["--prediction-filter", f"image_id={item}"] if item else []
+            result = json.loads(
+                command(
+                    cli, handoff, cmd, *commands[cmd], *filt, "--json", status=status
+                )
+            )
+            counts = (
+                result["graders"]["correct"] if cmd == "audit" else result["overall"]
+            )
+            accepted = (
+                sum(v == "accept" for v in expected.values())
+                if item is None
+                else int(expected[item] == "accept")
+            )
+            if counts["accepted"] != accepted or counts["total"] != (
+                len(expected) if item is None else 1
+            ):
+                raise ValueError(f"{cmd} disagrees on {item}")
+    return decisions
+
+
+def verify(wheel):
+    numeric = documented_commands(
+        "README.md", "Reuse one fitted policy from routing through audit"
+    )
+    categorical = documented_commands(
+        "docs/guide/classifier.md", "Hand off a class-aware policy"
+    )
     start = perf_counter()
     with TemporaryDirectory(prefix="caat-first-use-") as temp:
         root = Path(temp)
         examples = root / "examples"
         examples.mkdir()
-        for name in ("digit_classifier.jsonl", "fitted_classifier.toml"):
+        for name in (
+            "digit_classifier.jsonl",
+            "fitted_classifier.toml",
+            "class_aware_digits.toml",
+        ):
             copyfile(ROOT / "examples" / name, examples / name)
         _, train = install(root / "training", wheel, "[scorer,workflow]")
-        command(train, root, "run", *commands["run"])
-        report = root / "replay/fitted-classifier/workflow.json"
+        for cmds in (numeric, categorical):
+            command(train, root, "run", *cmds["run"])
         training_seconds = perf_counter() - start
         phase = perf_counter()
         python, base = install(root / "base", wheel, "")
@@ -79,44 +122,27 @@ def verify(wheel):
         )
         handoff = root / "handoff"
         (handoff / "examples").mkdir(parents=True)
-        for name in ("fitted_batch.csv", "fitted_batch_graded.csv"):
+        for name in (
+            "fitted_batch.csv",
+            "fitted_batch_graded.csv",
+            "class_batch.csv",
+            "class_batch_graded.csv",
+        ):
             copyfile(ROOT / "examples" / name, handoff / "examples" / name)
-        copied_report = handoff / report.relative_to(root)
-        copied_report.parent.mkdir(parents=True)
-        copyfile(report, copied_report)
-        command(base, handoff, "route", *commands["route"])
-        with (handoff / "replay/decisions.csv").open(
-            encoding="utf8", newline=""
-        ) as source:
-            decisions = {r["id"]: r["decision"] for r in csv.DictReader(source)}
-        if decisions != {"new-a": "accept", "new-b": "review"}:
-            raise ValueError(f"unexpected routed IDs: {decisions}")
-        for cmd, status in (("evaluate", 1), ("audit", 1), ("monitor", 0)):
-            # Check the aggregate verdict and each ID so opposite mistakes cannot cancel.
-            for item, expected in ((None, 1), ("new-a", 1), ("new-b", 0)):
-                filt = ["--prediction-filter", f"image_id={item}"] if item else []
-                result = json.loads(
-                    command(
-                        base,
-                        handoff,
-                        cmd,
-                        *commands[cmd],
-                        *filt,
-                        "--json",
-                        status=status,
-                    )
-                )
-                counts = (
-                    result["graders"]["correct"]
-                    if cmd == "audit"
-                    else result["overall"]
-                )
-                if counts["accepted"] != expected:
-                    raise ValueError(f"{cmd} disagrees on {item}")
+        for cmds in (numeric, categorical):
+            report = Path(cmds["route"][cmds["route"].index("--threshold-report") + 1])
+            (handoff / report).parent.mkdir(parents=True)
+            copyfile(root / report, handoff / report)
+        known = {"new-a": "accept", "new-b": "review"}
+        decisions = check_batch(base, handoff, numeric, known)
+        class_decisions = check_batch(
+            base, handoff, categorical, {**known, "new-c": "review", "new-d": "review"}
+        )
         return {
             "training_seconds": round(training_seconds, 2),
             "handoff_seconds": round(perf_counter() - phase, 2),
             "decisions": decisions,
+            "categorical_decisions": class_decisions,
             "exit_codes": {
                 "run": 0,
                 "route": 0,

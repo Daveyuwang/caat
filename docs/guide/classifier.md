@@ -123,3 +123,18 @@ scikit-learn. The script trains a deliberately weak logistic regression on
 40% of scikit-learn's bundled digits data and saves its predictions on the
 other 60%, so the file contains errors to route.
 [Source](../../scripts/prepare_digit_example.py)
+
+## Hand off a class-aware policy
+
+The digits workflow fits a scorer on two numeric features and the predicted digit. Its saved JSON includes the design vocabulary. A base installation can use that report and the raw batch without the training data or scikit-learn.
+
+```bash
+python -m pip install ".[scorer,workflow]"
+caat run examples/class_aware_digits.toml
+caat route examples/class_batch.csv --threshold-report replay/class-aware/policy.json --output replay/class-decisions.csv
+caat evaluate examples/class_batch_graded.csv --threshold-report replay/class-aware/policy.json --correct-column correct
+caat audit examples/class_batch_graded.csv --threshold-report replay/class-aware/policy.json --correct-column correct --correct-column second_grade
+caat monitor examples/class_batch_graded.csv --threshold-report replay/class-aware/policy.json --correct-column correct
+```
+
+The policy accepts `new-a` and sends `new-b` to review on its numeric evidence. The batch also includes an unseen class (`new-c`) and a missing prediction (`new-d`). With `review_missing_scores = true`, both go to review with an empty score. Evaluation and audit exit 1 because the one accepted grade cannot confirm a 2% target. Monitoring exits 0. [Training configuration](../../examples/class_aware_digits.toml) · [Unlabeled batch](../../examples/class_batch.csv) · [Graded batch](../../examples/class_batch_graded.csv)

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0rc1
+
+- Show expected accepts, accepted error, coverage and review volume by predicted class at the same global budget with `caat scores --class-column`.
+- Fit a portable scorer using a categorical prediction and numeric features. Replay it on raw rows in a base installation. Numeric-only artifacts retain their existing format.
+- Replay the fresh ANLI score comparison and independent cutoff audit. On the primary cohort the categorical feature gained 0.58 accepted-error points at 75% coverage. The design-selected cutoff missed its 20% risk target. [ANLI results](docs/research/anli-results.md)
+
 ## 0.5.0
 
 - Route, evaluate, audit and monitor a saved fitted policy using its named features. Explicit score-column overrides still accept precomputed scores.

@@ -1,0 +1,12 @@
+predictions = "digit_classifier.jsonl"
+id_column = "image_id"
+score_columns = ["top_prob", "margin"]
+prediction_column = "predicted"
+reference_column = "actual"
+risk_target = 0.02
+holdout_confidence = 0.95
+review_missing_scores = true
+json_output = "../replay/class-aware/policy.json"
+
+[scorer]
+class_column = "predicted"
