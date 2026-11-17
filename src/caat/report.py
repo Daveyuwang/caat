@@ -522,6 +522,20 @@ def describe(report):
                 lines.append(
                     f"  {name}{cost}. AUROC {roc}.{availability} {risks}.{warning}"
                 )
+                for budget in score["budgets"]:
+                    for label, part in budget.get("by_predicted_class", {}).items():
+                        prefix = f"    {percent(budget['target_coverage'])} global, {label!r} ({part['scored']}/{part['total']} scored)"
+                        if part["reviewed"] is None:
+                            lines.append(f"{prefix}: unreachable")
+                            continue
+                        risk = (
+                            percent(part["error_rate"])
+                            if part["error_rate"] is not None
+                            else "undefined"
+                        )
+                        lines.append(
+                            f"{prefix}: {percent(part['coverage'])} class coverage, {risk} accepted error, {part['reviewed']:g} for review."
+                        )
         if (
             heldout
             and recommended

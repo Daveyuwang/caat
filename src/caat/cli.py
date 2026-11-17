@@ -1668,6 +1668,10 @@ def scores_options(parser):
     parser.add_argument("--baseline", help="Default is the first score column.")
     parser.add_argument("--length-column")
     parser.add_argument(
+        "--class-column",
+        help="Report review volume by predicted class at each global coverage.",
+    )
+    parser.add_argument(
         "--score-cost", action="append", type=score_cost, metavar="COLUMN=CLASS"
     )
     parser.add_argument(
@@ -1731,6 +1735,7 @@ def run_scores(args, *, auto_workers=False):
         args.correct_column or (),
         id_column=args.id_column,
         length_column=args.length_column,
+        class_column=args.class_column,
         output_key_column=key,
         selection=args.prediction_filter,
         negated_scores={name: name for name in lower},
@@ -1780,6 +1785,8 @@ def run_scores(args, *, auto_workers=False):
         "length_column": args.length_column,
         "correct_columns": args.correct_column or [],
     }
+    if args.class_column is not None:
+        meta["class_column"] = args.class_column
     if labels:
         meta["prediction_column"], meta["reference_column"] = labels
     if key is not None:

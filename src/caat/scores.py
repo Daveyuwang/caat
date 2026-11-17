@@ -2,7 +2,7 @@
 
 import os
 from bisect import bisect_left, bisect_right
-from collections import deque
+from collections import defaultdict, deque
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from fractions import Fraction
@@ -29,6 +29,7 @@ class ScoredRow:
     outcomes: tuple[bool, ...]
     length: float | None = None
     output_key: str | None = None
+    predicted_class: str | None = None
 
 
 def read_score_rows(
@@ -38,6 +39,7 @@ def read_score_rows(
     *,
     id_column="id",
     length_column=None,
+    class_column=None,
     output_key_column=None,
     selection=None,
     source_rows=None,
@@ -56,7 +58,9 @@ def read_score_rows(
     needed = {id_column, *graders, *(label_columns or ())}
     needed.update(column for column, _ in columns)
     needed.update(
-        column for column in (length_column, output_key_column) if column is not None
+        column
+        for column in (length_column, output_key_column, class_column)
+        if column is not None
     )
     with open_selected_predictions(path, needed, None, selection) as (
         source,
@@ -86,6 +90,7 @@ def read_score_rows(
                     if length_column is not None
                     else None,
                     row[output_key_column] if output_key_column is not None else None,
+                    row[class_column] if class_column is not None else None,
                 )
             )
             if source_rows is not None:
@@ -117,6 +122,49 @@ def coverage_budgets(points, coverages, *, total=None):
             "coverage": count / total if feasible else None,
             "error_rate": risk_at_count(points, count) if feasible else None,
         }
+
+
+def _class_budgets(budgets, points, classes, values, errors):
+    # Count rows against the global boundary. Integer weights preserve exact tie shares.
+    groups = defaultdict(list)
+    for label, value, error in zip(classes, values, errors, strict=True):
+        groups[label].append((value, error))
+    for budget in budgets:
+        count = budget["accepted"]
+        if count is not None:
+            i = bisect_left(points, count, key=lambda point: point[1].accepted)
+            cutoff, counts = points[i]
+            before = points[i - 1][1].accepted if i else 0
+            tied = counts.accepted - before
+            take = count - before
+        breakdown = {}
+        for label, rows in sorted(groups.items()):
+            total = len(rows)
+            scored = sum(value is not None for value, _ in rows)
+            accepted = mistakes = reviewed = coverage = risk = None
+            if count is not None:
+                mass = error_mass = 0
+                for value, error in rows:
+                    if value is None or value < cutoff:
+                        continue
+                    weight = take if value == cutoff else tied
+                    mass += weight
+                    error_mass += weight * error
+                accepted = mass / tied
+                mistakes = error_mass / tied
+                reviewed = (total * tied - mass) / tied
+                coverage = accepted / total
+                risk = error_mass / mass if mass else None
+            breakdown[label] = {
+                "total": total,
+                "scored": scored,
+                "accepted": accepted,
+                "errors": mistakes,
+                "reviewed": reviewed,
+                "coverage": coverage,
+                "error_rate": risk,
+            }
+        budget["by_predicted_class"] = breakdown
 
 
 @dataclass(frozen=True)
@@ -384,6 +432,11 @@ def compare_scores(
         design, names, review_missing_scores=review_missing_scores
     )
 
+    classes = (
+        [row.predicted_class or "" for row in target]
+        if any(row.predicted_class is not None for row in rows)
+        else None
+    )
     scores = scores_for(target)
     control_scores = {"random": [0.0] * len(target)}
     if length_control:
@@ -413,6 +466,8 @@ def compare_scores(
             result["budgets"] = list(
                 coverage_budgets(points, coverages, total=len(target))
             )
+            if classes is not None:
+                _class_budgets(result["budgets"], points, classes, values, errors)
             return result
 
         candidates = {}

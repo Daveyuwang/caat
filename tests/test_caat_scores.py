@@ -15,6 +15,87 @@ from caat.scores import ScoredRow, compare_scores, paired_risk_intervals
 
 
 class ScoreTests(unittest.TestCase):
+    def test_predicted_class_budget_uses_one_boundary(self):
+        rows = [
+            ScoredRow(str(i), (s,), (ok,), predicted_class=label)
+            for i, (s, ok, label) in enumerate(
+                [
+                    (1.0, True, "Y"),
+                    (0.5, False, "Y"),
+                    (0.5, True, "N"),
+                    (0.5, False, "N"),
+                    (0.0, False, "Z"),
+                    (None, True, ""),
+                ]
+            )
+        ]
+
+        def budgets(data):
+            return compare_scores(
+                data,
+                names=["s"],
+                graders=["g"],
+                coverages=[0.5, 1],
+                bootstrap=0,
+                split="all",
+                review_missing_scores=True,
+            )["graders"]["g"]["scores"]["s"]["budgets"]
+
+        feasible, unreachable = budgets(rows)
+        self.assertEqual(budgets(reversed(rows)), [feasible, unreachable])
+        by = feasible["by_predicted_class"]
+        self.assertAlmostEqual(by["Y"]["accepted"], 1 + 2 / 3)
+        self.assertAlmostEqual(by["N"]["error_rate"], 0.5)
+        self.assertAlmostEqual(by["Y"]["error_rate"], 0.4)
+        self.assertEqual(by[""]["scored"], 0)
+        self.assertEqual(by["Z"]["reviewed"], 1)
+        self.assertIsNone(by["Z"]["error_rate"])
+        self.assertAlmostEqual(
+            sum(v["errors"] for v in by.values()) / 3, feasible["error_rate"]
+        )
+        self.assertAlmostEqual(sum(v["reviewed"] for v in by.values()), 3)
+        self.assertTrue(
+            all(
+                v["reviewed"] is None
+                for v in unreachable["by_predicted_class"].values()
+            )
+        )
+
+    def test_class_column_cli_with_exact_match(self):
+        with TemporaryDirectory() as td:
+            path = Path(td) / "data.csv"
+            path.write_text("id,p,r,s\na,A,A,1\nb,B,A,1\n", encoding="utf8")
+            out = io.StringIO()
+            with redirect_stdout(out):
+                self.assertEqual(
+                    main(
+                        [
+                            "scores",
+                            str(path),
+                            "--split",
+                            "all",
+                            "--coverage",
+                            ".5",
+                            "--bootstrap",
+                            "0",
+                            "--prediction-column",
+                            "p",
+                            "--reference-column",
+                            "r",
+                            "--class-column",
+                            "p",
+                            "--score-column",
+                            "s",
+                            "--json",
+                        ]
+                    ),
+                    0,
+                )
+            report = json.loads(out.getvalue())
+            budget = report["graders"]["r"]["scores"]["s"]["budgets"][0]
+            self.assertEqual(report["input"]["class_column"], "p")
+            self.assertEqual(budget["by_predicted_class"]["B"]["errors"], 0.5)
+
     def test_compare_matches_separate_grades_before_ranking(self):
         with (
             TemporaryDirectory() as directory,
