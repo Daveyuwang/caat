@@ -276,7 +276,7 @@ def describe(report):
         selected = report["selected_score"]
         choice = (
             f"Selected {selected} on {comparison['split']['design']} design rows."
-            if comparison["recommended_score"] is not None
+            if comparison and comparison["recommended_score"] is not None
             else f"Used the first configured score {selected}."
         )
         if report.get("scorer") and selected == "fitted_score":
@@ -285,6 +285,8 @@ def describe(report):
                 + ", ".join(report["scorer"]["columns"])
                 + "."
             )
+        if frozen := report["input"].get("frozen"):
+            choice = f"Frozen {selected} with {frozen['calibration_labels']} calibration labels and {frozen['reference_rows']} ungraded reference rows."
         if origin := joint_calibration_summary(report["policy"]["selection"]):
             choice = f"{selected}. {origin}"
         if diag := report["policy"].get("refit_disagreement"):

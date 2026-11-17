@@ -144,7 +144,7 @@ def workflow_sections(report, sections, add_chart):
     selected = escape(report["selected_score"])
     origin = joint_calibration_summary(policy["selection"]) or (
         f"Selected on {policy['split']['design']} design rows."
-        if comparison["recommended_score"] is not None
+        if comparison and comparison["recommended_score"] is not None
         else "First score in the configuration."
     )
     if report.get("scorer"):
@@ -159,19 +159,27 @@ def workflow_sections(report, sections, add_chart):
             origin = "Configured fitted scorer."
     if diag := policy.get("refit_disagreement"):
         sections.append(f"<p>{escape(describe_refits(diag))}</p>")
-    sections.extend(
-        (
-            "<h2>Score choice</h2>",
-            f"<p><code>{selected}</code>. {origin}</p>",
-            table(
-                ("Candidate score", "Design normalized AURC gain"),
-                (
-                    (name, f"{gain:.4f}" if gain is not None else "Undefined")
-                    for name, gain in comparison["design_normalized_aurc_gain"].items()
-                ),
-            ),
+    if frozen := report["input"].get("frozen"):
+        sections.append(
+            f"<h2>Frozen score</h2><p><code>{selected}</code> with "
+            f"{frozen['calibration_labels']} calibration labels and {frozen['reference_rows']} ungraded reference rows.</p>"
         )
-    )
+    else:
+        sections.extend(
+            (
+                "<h2>Score choice</h2>",
+                f"<p><code>{selected}</code>. {origin}</p>",
+                table(
+                    ("Candidate score", "Design normalized AURC gain"),
+                    (
+                        (name, f"{gain:.4f}" if gain is not None else "Undefined")
+                        for name, gain in comparison[
+                            "design_normalized_aurc_gain"
+                        ].items()
+                    ),
+                ),
+            )
+        )
     workflow_calibration(policy, sections, add_chart)
 
     selection = policy["selection"]

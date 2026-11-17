@@ -282,3 +282,25 @@ caat scorer apply new-digits.csv --scorer scorer.json --output scored.csv
 ```
 
 The Python equivalents are `fit_scorer`, `read_scorer` and `apply_scorer` in `caat.scorer`. Standalone apply also accepts a workflow JSON and writes a CSV with the extra `fitted_score` column. With the workflow report, `route`, `evaluate`, `audit` and `monitor` compute the same fitted score from the original features, including when the table contains a stale derived column. Routing requires a confirmed report. To use previously computed scores, pass `--score-column fitted_score`, or `--id-column id --score-column score` on a routed export. [Scorer benchmark](../research/routing-stability.md)
+
+## Calibrate a frozen score
+
+Bring labeled calibration and holdout files with disjoint IDs. For one existing scalar score, supply its column and predeclare cutoffs in the original column's units. A lower-is-better scalar uses the same `lower_is_better` setting as other workflows.
+
+```toml
+score_columns = ["confidence"]
+correct_columns = ["correct"]
+risk_target = 0.2
+json_output = "policy.json"
+
+[predictions]
+calibration = "calibration.csv"
+holdout = "holdout.csv"
+
+[frozen]
+thresholds = [0.7, 0.8, 0.9]
+```
+
+For rank-based cutoffs replace `thresholds` with `reference = "unlabeled.csv"`. CAAT builds the quantiles on that file using its IDs and scores. All calibration labels are available for testing the frozen cutoffs. To reuse a saved model, omit `score_columns` and set `scorer = "scorer.json"` in the frozen table. Its feature names, directions and weights travel with the new policy. Explicit cutoffs in that mode are on the saved scorer's decision scale.
+
+The report records cutoffs on the acceptance scale, reference size, label counts, and the saved scorer's file digest. CAAT checks IDs between input partitions. For a scorer from a workflow with tracked output identities, it also checks all inputs against those identities and retains them for subsequent audits. A standalone 0.4 scorer records only a digest of the full training list. Its training overlap is reported as unavailable. Use an independent calibration cohort for such a model.
