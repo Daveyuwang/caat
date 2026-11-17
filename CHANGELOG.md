@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0rc1
+## 0.5.0
 
 - Route, evaluate, audit and monitor a saved fitted policy using its named features. Explicit score-column overrides still accept precomputed scores.
 - Calibrate one frozen score with preset cutoffs or unlabeled reference predictions and independent labeled calibration and holdout sets.

@@ -21,6 +21,8 @@ The [glossary](https://github.com/Daveyuwang/caat/blob/main/docs/guide/glossary.
 
 ## Try a review policy
 
+Install the CLI with `python -m pip install caat-annotation`. To run the bundled examples, clone the repository and install from the checkout.
+
 ```bash
 git clone https://github.com/Daveyuwang/caat.git
 cd caat
