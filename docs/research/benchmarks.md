@@ -2,6 +2,8 @@
 
 The [module study](#module-study) extends this replay to two model
 families and compares score features and grader changes on frozen outputs.
+The [matched-cost replay](matched-cost.md) compares a score-gated
+7B/72B cascade with 72B alone and random routing on WildBench.
 
 The bundled samples contain 24 rows each. Run `python scripts/replay_benchmarks.py`
 from an installed checkout to check the evaluator on instruction following,
@@ -36,9 +38,10 @@ reuses the prepared CSVs. It writes `ranking.csv`,
 `--full` to regenerate the 24-row samples.
 
 [`examples/ifeval_graders.csv`](../../examples/ifeval_graders.csv) carries the
-`id`, `mean_token_logprob`, `strict_pass`, and `helm_strict_pass` columns of
-the full Qwen IFEval file, `replay/ifeval/predictions_full.csv`, for the
-[`caat policy` example](../../README.md#choose-and-check-a-cutoff-in-one-command).
+`id`, `mean_token_logprob`, `sequence_logprob`, `strict_pass`, and
+`helm_strict_pass` columns of the full Qwen IFEval file,
+`replay/ifeval/predictions_full.csv`.
+[Policy example](../../README.md#try-a-review-policy) · [Workflow example](../guide/workflow.md)
 
 ### Confidence rankings
 
@@ -168,6 +171,260 @@ with the cutoff recorded in `policies.csv`.
 ```bash
 caat audit replay/module_study/ifeval_qwen_heldout.csv --score-column mean_token_logprob --correct-column strict_pass --correct-column helm_strict_pass --threshold -0.43964836263206303 --risk-target 0.30
 ```
+
+## Fitted cutoffs versus CalibRoute
+
+CAAT 0.3.0rc1 and CalibRoute 0.4.0 fit their own cutoffs on five HELM
+archives. Each tool receives the same `exp(mean_token_logprob)` score,
+calibration rows, primary grade, and risk target. IFEval and MMLU-Pro use
+the seed-42 split above. Omni-MATH uses the saved chronological split
+of 200 design, 400 calibration, and 400 holdout rows.
+[Omni-MATH partitions](../guide/monitor.md#chronological-omni-math-replay)
+
+CAAT uses design-score deciles with either Bonferroni or Holm correction
+at a 5% family-wise failure rate. CalibRoute searches among calibration
+scores with a pointwise 95% Clopper–Pearson upper bound. After fitting,
+each cutoff stays fixed. The table gives automatic acceptance at the
+cutoff and the observed error among accepted answers, with the one-sided
+95% exact upper bound in parentheses. Acceptance is measured before batch
+routing. A missing cutoff gives zero acceptance and undefined error.
+
+| Archive | Target | Fit rule | Accepted | Primary error (upper bound) | Alternate error (upper bound) |
+| --- | ---: | --- | ---: | ---: | ---: |
+| IFEval Qwen | 40% | CAAT Bonferroni | 144/217 (66.36%) | 22.92% (29.42%) | 31.25% (38.20%) |
+| IFEval Qwen | 40% | CAAT Holm | 189/217 (87.10%) | 26.46% (32.25%) | 34.92% (41.04%) |
+| IFEval Qwen | 40% | CalibRoute | 213/217 (98.16%) | 25.82% (31.22%) | 34.74% (40.48%) |
+| IFEval Llama | 40% | CAAT Bonferroni | 215/217 (99.08%) | 22.79% (28.00%) | 34.42% (40.12%) |
+| IFEval Llama | 40% | CAAT Holm | 215/217 (99.08%) | 22.79% (28.00%) | 34.42% (40.12%) |
+| IFEval Llama | 40% | CalibRoute | 216/217 (99.54%) | 22.69% (27.87%) | 34.26% (39.94%) |
+| MMLU-Pro Qwen | 40% | CAAT Bonferroni | 0/400 (0.00%) | n/a | n/a |
+| MMLU-Pro Qwen | 40% | CAAT Holm | 0/400 (0.00%) | n/a | n/a |
+| MMLU-Pro Qwen | 40% | CalibRoute | 145/400 (36.25%) | 37.93% (45.05%) | 35.86% (42.93%) |
+| MMLU-Pro Llama | 40% | CAAT Bonferroni | 0/400 (0.00%) | n/a | n/a |
+| MMLU-Pro Llama | 40% | CAAT Holm | 0/400 (0.00%) | n/a | n/a |
+| MMLU-Pro Llama | 40% | CalibRoute | 0/400 (0.00%) | n/a | n/a |
+| Omni-MATH Qwen | 80% | CAAT Bonferroni | 398/400 (99.50%) | 69.85% (73.64%) | 69.85% (73.64%) |
+| Omni-MATH Qwen | 80% | CAAT Holm | 398/400 (99.50%) | 69.85% (73.64%) | 69.85% (73.64%) |
+| Omni-MATH Qwen | 80% | CalibRoute | 398/400 (99.50%) | 69.85% (73.64%) | 69.85% (73.64%) |
+
+On IFEval Qwen, both grader bounds fell below 40% at the CAAT Bonferroni
+cutoff. On IFEval Llama, both fell below 40% at the CalibRoute cutoff.
+CalibRoute's MMLU-Pro Qwen cutoff missed the target on both holdout
+grades. At the 80% Omni-MATH target, all three rules accepted the same
+398 answers. The complete table includes cutoff values and pass flags.
+[Results](../../results/decision_baselines/comparison.csv) · [Protocol and hashes](../../results/decision_baselines/protocol.json)
+
+Prepare the four IFEval and MMLU-Pro CSVs with the commands in
+[Replay](#replay). For `HELM_OMNI_MATH_RUN`, use the directory containing
+`scenario_state.json` and `per_instance_stats.json` from the Qwen
+Omni-MATH v1.0.0 run. The replay uses Google strict and HELM full pass
+for IFEval, HELM and TIGER-Lab parsing for MMLU-Pro, and the archived
+GPT and Llama verdicts for Omni-MATH.
+[Archive provenance](judge-study.md#archived-inputs)
+
+```bash
+python -m pip install calibroute-ai==0.4.0
+caat helm HELM_OMNI_MATH_RUN --metric omni_math_accuracy --annotation omni_math.gpt_equivalence_judgement --annotation omni_math.llama_equivalence_judgement --output replay/helm-import/omni.csv
+python scripts/study_decision_baselines.py
+```
+
+The [replay script](../../scripts/study_decision_baselines.py) uses
+`caat select` and one `caat audit` call per fitted CAAT cutoff. It uses
+`calibroute fit` and one `calibroute validate` call per grader and fitted
+CalibRoute cutoff. CAAT's audit verifies that holdout outputs were absent
+from fitting. The replay checks both tools against direct acceptance
+counts and binomial calculations and saves the command reports under
+`replay/decision-baselines/`.
+
+### Candidate grid and multiple-testing correction
+
+The diagnostic applies CalibRoute's exported 95% Clopper–Pearson bound
+at the same design-score deciles as CAAT's Learn then Test rules. It
+selects the lowest cutoff whose bound meets the target and accepts at
+least one calibration row. The next step uses CalibRoute's native fit
+over the distinct calibration scores with that same pointwise test.
+Each selected cutoff is frozen for the original paired holdout.
+[CalibRoute 0.4.0](https://pypi.org/project/calibroute-ai/0.4.0/)
+
+| Archive | Accepted with pointwise design cutoffs | Change from Bonferroni | Change from Holm | Change from switching to calibration cutoffs |
+| --- | ---: | ---: | ---: | ---: |
+| IFEval Qwen | 211/217 | +67 | +22 | +2 |
+| IFEval Llama | 215/217 | 0 | 0 | +1 |
+| MMLU-Pro Qwen | 88/400 | +88 | +88 | +57 |
+| MMLU-Pro Llama | 0/400 | 0 | 0 | 0 |
+| Omni-MATH Qwen | 398/400 | 0 | 0 | 0 |
+
+The changes count accepted holdout rows. The two correction columns
+keep the design grid fixed. The last column changes the grid with the
+pointwise test fixed. On IFEval Qwen, the shared-grid pointwise cutoff
+had a 40.36% upper bound under the alternate grader at the 40% target.
+On MMLU-Pro Qwen, its primary-grader error was 28/88 (31.82%) with a
+40.93% upper bound at the same target.
+[Cutoffs and holdout counts](../../results/decision_baselines/cutoff_grid_comparison.csv) · [Protocol](../../results/decision_baselines/cutoff_grid_protocol.json)
+
+After preparing the same archives and installing CalibRoute 0.4.0, run
+the diagnostic to write the two CSVs and protocol to `replay/cutoff-grid/`.
+
+```bash
+python scripts/study_cutoff_grid.py
+```
+
+[Replay script](../../scripts/study_cutoff_grid.py)
+
+### Design quantile count
+
+The replay fixes the splits and risk targets and tests 10, 20, and 50
+design-score quantiles with each correction. Each setting applies the
+5% family-wise error rate to its distinct candidates, then checks its
+frozen cutoff on the paired holdout.
+[Learn then Test](https://arxiv.org/abs/2110.01052)
+
+On MMLU-Pro Qwen, 20 quantiles qualified the same cutoff under
+Bonferroni and Holm. It accepted 74 of 400, with 19 errors under the HELM
+grader and 17 under TIGER-Lab. The 95% upper bounds were 35.36% and
+32.44% at a 40% target. The 10- and 50-quantile fits found no eligible
+cutoff for either correction. On IFEval Qwen, Bonferroni accepted 144,
+120, and 118 of 217 as the grid grew. Both graders' upper bounds stayed
+below the 40% target in those three fits. The full table includes each cutoff and
+held-out check.
+[Results](../../results/decision_baselines/grid_density_comparison.csv) · [Protocol](../../results/decision_baselines/grid_density_protocol.json)
+
+Set `--design-grid-size` on `caat select --design` and `caat policy`, or
+`design_grid_size` in the TOML workflow. Choose the setting before
+calibration and evaluate the frozen cutoff on an independent holdout.
+Run the comparison from the environment used for the candidate-grid
+diagnostic.
+
+```bash
+python scripts/study_grid_density.py
+```
+
+[Replay script](../../scripts/study_grid_density.py) · [TOML settings](../guide/workflow.md#run-on-your-own-data)
+
+### Fitting with several graders
+
+The six-archive replay uses the five HELM splits and the original Inspect
+TriviaQA split. Each setting keeps the score, design grid, and calibration
+rows fixed. It fits three policies with Bonferroni or Holm at 5% using
+10 or 20 design quantiles. One uses the primary labels, one applies the
+target to each grader, and one counts a row as an error if either grader
+marks it wrong. Each cutoff stays fixed for the paired holdout audit.
+[Risk definitions](method.md#calibrate-for-several-graders)
+
+For IFEval Qwen with Holm and ten quantiles, using both graders for
+calibration reduced held-out acceptance from 189 to 92 of 217. The
+alternate grader's one-sided 95% upper bound went from 41.04% to 33.52%,
+below the 40% target. The fitted policy used 216 additional calibration
+labels from the alternate grader. On Inspect, the primary fit accepted
+101 of 400, with an upper bound of 46.25% under canonical grading. Both
+rules and both grids produced zero eligible cutoffs when each grader
+had to meet the target. The lowest p-value with 20 quantiles was 0.1584,
+above the unadjusted 0.05 level. That candidate accepted 22 calibration
+answers with 6 canonical errors.
+
+On MMLU-Pro Qwen with 20 quantiles, all three fits accepted 74 of 400
+with both grader bounds below 40%. On Omni-MATH at 80%, they accepted
+398 of 400. Its bound was 73.64% for each grader and 74.12% for an
+error under either grader. The two fits that used both graders chose
+the same cutoffs in all 24 settings. At the tested targets and grids,
+requiring the alternate grader yielded 8 settings with a cutoff and both
+holdout bounds below target. The primary-only fit yielded 18 cutoffs,
+9 of which met both holdout targets.
+[All 72 fits](../../results/decision_baselines/paired_calibration_comparison.csv) · [Protocol and hashes](../../results/decision_baselines/paired_calibration_protocol.json)
+
+The replay uses the prepared HELM archives from the fitted cutoff
+comparison above. Pass the original Inspect partitions to include the
+sixth archive. It runs `caat select` and `caat audit` and independently
+recomputes the qualification decisions and holdout bounds.
+
+```bash
+python scripts/study_paired_calibration.py --inspect-splits replay/inspect-pilot/risk-40
+```
+
+[Replay script](../../scripts/study_paired_calibration.py)
+
+### Choosing a score for a risk target
+
+The replay compares three choices on the same design, calibration, and
+holdout rows. The workflow baseline picks normalized AURC gain on design
+rows. The target-coverage choice uses the largest design acceptance count
+whose observed error meets the risk target, breaking ties with AURC gain.
+Each design choice tests the chosen score's cutoffs on calibration rows.
+The joint choice tests all prespecified score-cutoff pairs in one
+Bonferroni family and picks the qualifying pair with the largest
+calibration acceptance count. For equal counts it takes the smaller
+p-value, then the first candidate in the configured order. Every score
+uses ten design quantiles with ties deduplicated. The calibration failure
+rate is 5% in each setting.
+[Learn then Test, Theorem 1](https://arxiv.org/abs/2110.01052)
+
+| Cohort | Target | Design AURC | Design coverage at target | Joint calibration |
+| --- | ---: | ---: | ---: | ---: |
+| IFEval Qwen | 40% | 55/217 | 55/217 | 108/217 |
+| TriviaQA Qwen2.5-7B | 40% | 191/400 | 165/400 | 159/400 |
+| TriviaQA Phi-4-mini | 40% | 111/400 | 111/400 | 124/400 |
+| MMLU-Pro Qwen2.5-7B | 80% | 393/400 | 393/400 | 399/400 |
+
+The table shows the settings where the methods differed in confirmed
+acceptance. The holdout check uses a one-sided 95% upper bound for each
+grader at the frozen cutoff. All three methods cleared the holdout target
+in the same 5 of 18 settings. On IFEval Qwen, the joint fit selected mean
+token log probability. The Google and HELM upper bounds for its 108
+accepted answers were 27.79% and 33.78%. On TriviaQA Qwen2.5-7B, the joint
+fit selected summed token log probability at a stricter cutoff. That fit
+used a family of 71 candidates across all scores. The design AURC fit
+used ten cutoffs for its chosen score.
+[All results](../../results/decision_baselines/score_choice_comparison.csv) · [Protocol and hashes](../../results/decision_baselines/score_choice_protocol.json)
+
+Use the prepared IFEval archives and frozen three-family score tables.
+For Inspect, give the original split files and the joined P(True) and
+negative output-token-count scores. The replay checks Inspect IDs,
+completion keys, original scores, and grades before using the joined
+table. The family comparison uses the shared rows and excludes the random
+control and optional estimators. The script verifies calibration decisions
+against direct binomial calculations.
+[Model-family data](model-families.md) · [Joining Inspect scores](../guide/inspect.md)
+
+```bash
+python scripts/study_score_choice.py --inspect-splits replay/inspect-pilot/risk-40 --inspect-scores replay/inspect-pilot/multiple-scores/installed/joined.csv
+```
+
+[Replay script](../../scripts/study_score_choice.py)
+
+### Shared cutoffs with MAPIE
+
+The same five cohorts also compare CAAT with MAPIE's binary precision
+controller. Both use the design-score deciles, the same calibration
+labels, and a 5% family-wise error rate. MAPIE controls precision at
+one minus the error target and minimizes abstention among the qualified
+cutoffs. The held-out error rates and exact upper bounds use the common
+replay calculation for both tools.
+[MAPIE risk controller](https://mapie.readthedocs.io/en/stable/api/risk-control/)
+
+MAPIE 1.4.1 and 1.6.0 match CAAT on all 100 candidate qualification
+decisions under Bonferroni and Holm. They select the same cutoff in six
+settings. The four MMLU-Pro settings produce no cutoff. The frozen
+cutoffs give the same holdout coverage and error under both graders.
+[Comparison](../../results/decision_baselines/mapie_comparison.csv) · [Candidate results](../../results/decision_baselines/mapie_candidates.csv)
+
+MAPIE's multiple-testing functions also reproduce CAAT's qualification
+decisions when given SciPy's exact binomial tails from integer counts.
+In the native precision controller, the conversion from precision to an
+error count rounds up by one on 8 of the 50 distinct candidates. Seven
+p-values differ by more than `1e-12`. Each candidate keeps the same
+qualification decision on this replay.
+[MAPIE 1.4.1 p-value calculation](https://github.com/scikit-learn-contrib/MAPIE/blob/v1.4.1/mapie/risk_control/methods.py#L428) · [MAPIE 1.6.0 p-value calculation](https://github.com/scikit-learn-contrib/MAPIE/blob/v1.6.0/mapie/risk_control/methods.py#L291)
+
+After preparing the same five archives, install the research requirements
+and run the comparison. This writes the selected cutoffs, per-candidate
+p-values, and a protocol with the package versions and split hashes.
+
+```bash
+python -m pip install -r scripts/requirements.txt
+python scripts/study_mapie.py
+```
+
+[Replay script](../../scripts/study_mapie.py) · [MAPIE 1.4.1 protocol](../../results/decision_baselines/mapie_protocol.json) · [MAPIE 1.6.0 protocol](../../results/decision_baselines/mapie_1.6_protocol.json)
 
 ## Design score screen
 

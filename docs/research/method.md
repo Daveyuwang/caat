@@ -49,10 +49,37 @@ from the boundary tie group, the expected additional errors are the number
 of slots left times the error fraction in that group. If the task instead
 specifies a risk target, choose the policy with design and calibration data
 and apply its frozen threshold to a held-out split. `caat select` implements
-empirical selection and two versions of Learn then Test, Bonferroni
-and fixed sequence.
+empirical selection and Learn then Test with Bonferroni, Holm, or fixed
+sequence.
 [Benchmark protocol and results](benchmarks.md) ·
 [Learn then Test, §3.2](https://arxiv.org/pdf/2110.01052)
+
+## Calibrate for several graders
+
+At a candidate cutoff $t$, let $n_t$ be the number of accepted calibration
+rows and $e_{tg}$ the number grader $g$ marks incorrect. Under independent
+calibration rows from the target population, the one-sided test against
+the risk limit $r$ uses
+
+$$
+p_{tg} = \Pr\{\operatorname{Binomial}(n_t, r) \le e_{tg}\},
+\qquad p_t = \max_g p_{tg}.
+$$
+
+To qualify a cutoff for every grader, the test must reject each null that
+the corresponding grader's risk exceeds $r$. If one grader's risk exceeds
+$r$, the event $p_t \le u$ requires that grader's p-value to be at most $u$.
+This gives a level-$u$ intersection–union test at one cutoff, even when the
+graders' outcomes are correlated. Apply the Learn then Test correction
+across cutoffs fixed independently of the calibration rows.
+[Berger and Hsu, Theorem 1](https://doi.org/10.1214/ss/1032280304) · [Learn then Test](https://arxiv.org/abs/2110.01052)
+
+For an error defined as a failure from any grader on the same answer, use
+one label $z_{i,\mathrm{all}} = \prod_g z_{ig}$. The test on this label
+bounds the probability of any grader finding an error. On the Omni-MATH
+holdout, each grader marked 278 of 398 accepted outputs wrong and their
+combined error set contained 280 outputs.
+[Paired calibration replay](benchmarks.md#fitting-with-several-graders)
 
 ## Closest work
 
@@ -124,7 +151,7 @@ identities. It reports what changed at a frozen cutoff and identifies the
 affected rows. Versioned JSON and exit codes let CI consume the output.
 The evaluator and audit run on the standard library. Dataset preparation
 and scorer fitting live in standalone benchmark scripts.
-[Runnable examples](../../README.md#compare-graders-on-the-same-outputs)
+[Runnable examples](../../README.md#check-a-grader-change)
 
 The release criterion for this workflow is that an outside user can replay
 their own artifacts, interpret the report, and diagnose an incorrect join
