@@ -3,7 +3,7 @@
 from html import escape
 
 from .plots import grader_comparison, reliability_diagram, risk_coverage
-from .report import describe, joint_calibration_summary, percent
+from .report import describe, describe_refits, joint_calibration_summary, percent
 
 
 def table(headers, rows, *, scroll_label=None):
@@ -147,6 +147,18 @@ def workflow_sections(report, sections, add_chart):
         if comparison["recommended_score"] is not None
         else "First score in the configuration."
     )
+    if report.get("scorer"):
+        sections.append(
+            "<p>Fitted confidence features: "
+            + escape(", ".join(report["scorer"]["columns"]))
+            + ".</p>"
+        )
+        if report["selected_score"] == "fitted_score" and not joint_calibration_summary(
+            policy["selection"]
+        ):
+            origin = "Configured fitted scorer."
+    if diag := policy.get("refit_disagreement"):
+        sections.append(f"<p>{escape(describe_refits(diag))}</p>")
     sections.extend(
         (
             "<h2>Score choice</h2>",

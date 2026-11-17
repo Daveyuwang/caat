@@ -2,6 +2,8 @@
 
 from dataclasses import replace
 from itertools import chain
+from random import Random
+from statistics import fmean
 
 from .artifacts import staged_outputs
 from .calibrate import CALIBRATORS, check_scale, default_scale
@@ -10,12 +12,14 @@ from .queue import review_queue
 from .renderers import render_report
 from .report import fit_outputs_metadata, make_report
 from .rules import RULES, validate_holdout_confidence
-from .scores import compare_scores, read_score_rows
+from .scores import compare_scores, design_recommendation, read_score_rows
+from .scorer import FITTED_SCORE, fit_scorer, positive_number
 from .select import (
     DEFAULT_DESIGN_GRID_SIZE,
     build_threshold_candidates,
     design_thresholds,
     test_candidates,
+    select,
 )
 from .table import (
     accepted_at,
@@ -36,6 +40,10 @@ DEFAULTS = {
     "prediction_filter": None,
     "review_missing_scores": False,
     "correct_columns": (),
+    "prediction_column": None,
+    "reference_column": None,
+    "scorer": None,
+    "refit_checks": 0,
     "check_columns": (),
     "grader_files": {},
     "holdout_grader_files": {},
@@ -118,8 +126,15 @@ def load_workflow(path):
         }
     grader_files = settings["grader_files"]
     holdout_files = settings["holdout_grader_files"]
-    if bool(grader_files) == ("correct_columns" in config):
-        raise ValueError("set exactly one of correct_columns or grader_files")
+    labels = (settings["prediction_column"], settings["reference_column"])
+    if any(v is not None for v in labels) and not all(
+        isinstance(v, str) and v.strip() for v in labels
+    ):
+        raise ValueError("set both prediction_column and reference_column")
+    if sum((bool(grader_files), "correct_columns" in config, bool(labels[0]))) != 1:
+        raise ValueError(
+            "set exactly one of correct_columns or grader_files or prediction/reference columns"
+        )
     external_graders = (*grader_files, *holdout_files)
     if external_graders:
         key_column = settings["output_key_column"] or "output_sha256"
@@ -144,7 +159,7 @@ def load_workflow(path):
     ):
         values = settings[name]
         optional = name in {"check_columns", "lower_is_better"} or (
-            name == "correct_columns" and bool(grader_files)
+            name == "correct_columns" and (bool(grader_files) or bool(labels[0]))
         )
         if (
             not isinstance(values, (tuple, list))
@@ -156,10 +171,30 @@ def load_workflow(path):
         settings[name] = tuple(values)
     other_columns = (
         settings["id_column"],
+        *(labels if labels[0] else ()),
         *settings["correct_columns"],
         *settings["check_columns"],
         *external_graders,
     )
+    scorer = settings["scorer"]
+    if scorer is not None:
+        if (
+            not isinstance(scorer, dict)
+            or scorer.keys() - {"method", "regularization"}
+            or scorer.get("method", "logistic") != "logistic"
+            or (
+                scorer.get("regularization") != "auto"
+                and not positive_number(scorer.get("regularization", 0.1))
+            )
+        ):
+            raise ValueError(
+                "scorer needs method logistic and positive regularization C"
+            )
+        if "refit_checks" not in config:
+            settings["refit_checks"] = 20
+    checks = settings["refit_checks"]
+    if type(checks) is not int or checks < 0 or checks % 2:
+        raise ValueError("refit_checks must be an even nonnegative integer")
     raw_scores = settings["score_columns"]
     columns = (*raw_scores, *other_columns)
     if len(set(columns)) != len(columns):
@@ -175,6 +210,8 @@ def load_workflow(path):
         negated[name] = raw_scores[index]
         scores[index] = name
     oriented_columns = (*scores, *other_columns)
+    if scorer is not None and FITTED_SCORE in (*columns, *oriented_columns):
+        raise ValueError("fitted_score is reserved for the learned score")
     if len(set(oriented_columns)) != len(oriented_columns):
         raise ValueError(
             "derived score names must be distinct from other scores, IDs, and graders"
@@ -329,6 +366,110 @@ def _read_grader_exports(files, rows, *, id_column, output_key_column):
     }
 
 
+def _augment_scores(partitions, settings):
+    names = settings["score_columns"]
+    if settings["scorer"] is None:
+        return partitions, None, names
+    negated = settings["negated_scores"]
+    raw_names = tuple(negated.get(c, c) for c in names)
+
+    def raw_values(row):
+        return tuple(
+            -v if c in negated and v is not None else v
+            for c, v in zip(names, row.scores, strict=True)
+        )
+
+    model = fit_scorer(
+        raw_names,
+        (replace(r, scores=raw_values(r)) for r in partitions[0]),
+        lower_is_better=settings["lower_is_better"],
+        regularization=settings["scorer"].get("regularization", 0.1),
+    )
+    scored = [
+        [replace(r, scores=(*r.scores, model.score(raw_values(r)))) for r in part]
+        for part in partitions
+    ]
+    return scored, model, (*names, FITTED_SCORE)
+
+
+def _refitted_acceptances(design, calibration, holdout, settings, graders):
+    if settings["scorer"] is not None and not any(None not in r.scores for r in design):
+        return None
+    missing = settings["review_missing_scores"]
+    (d, c, h), scorer, names = _augment_scores((design, calibration, holdout), settings)
+    selected = (
+        FITTED_SCORE
+        if scorer
+        else design_recommendation(d, names, review_missing_scores=missing)[2]
+        or names[0]
+    )
+    if settings["score_selection"] == "joint-calibration":
+        selected, selection = _joint_calibration(
+            d, c, {**settings, "score_columns": names}, selected, graders=graders
+        )
+    else:
+        col = names.index(selected)
+        grid = design_thresholds(
+            (r.scores[col] for r in d),
+            grid_size=settings["design_grid_size"] or DEFAULT_DESIGN_GRID_SIZE,
+            review_missing_scores=missing,
+        )
+        selection = select(
+            (graded_row(r.id, r.scores[col], r.outcomes) for r in c),
+            graders=graders,
+            thresholds=grid,
+            risk_target=settings["risk_target"],
+            failure_rate=settings["failure_rate"],
+            rule=settings["rule"],
+            review_missing_scores=missing,
+        )
+    cutoff = selection["selected_threshold"]
+    if cutoff is None:
+        return None
+    col = names.index(selected)
+    return {
+        r.id
+        for r in h
+        if cutoff is not None and r.scores[col] is not None and r.scores[col] >= cutoff
+    }
+
+
+def _refit_disagreement(partitions, settings, graders):
+    design, calibration, holdout = partitions
+    pool = sorted(
+        (
+            replace(r, outcomes=r.outcomes[: len(graders)])
+            for r in (*design, *calibration)
+        ),
+        key=lambda r: r.id,
+    )
+    n = settings["refit_checks"]
+    previous = set()
+    flips = []
+    counts = []
+    unqualified = 0
+    for index in range(n):
+        draw = pool.copy()
+        Random(settings["seed"] + 1 + index).shuffle(draw)
+        decisions = _refitted_acceptances(
+            draw[: len(design)], draw[len(design) :], holdout, settings, graders
+        )
+        unqualified += decisions is None
+        accepted = decisions or set()
+        counts.append(len(accepted))
+        if index % 2:
+            flips.append(len(previous.symmetric_difference(accepted)) / len(holdout))
+        else:
+            previous = accepted
+    return {
+        "refits": n,
+        "holdout": len(holdout),
+        "mean_changed_fraction": fmean(flips),
+        "mean_coverage": fmean(counts) / len(holdout),
+        "no_cutoff": unqualified,
+    }
+
+
 def run_workflow(path, *, save_outputs=False):
     path = path.resolve()
     settings = load_workflow(path)
@@ -339,7 +480,12 @@ def run_workflow(path, *, save_outputs=False):
     )
     grader_files = settings["grader_files"]
     holdout_files = settings["holdout_grader_files"]
-    graders = tuple(grader_files) or inline_correct
+    labels = (
+        (settings["prediction_column"], settings["reference_column"])
+        if settings["prediction_column"]
+        else None
+    )
+    graders = tuple(grader_files) or inline_correct or (labels[1],)
     checks = (*inline_checks, *holdout_files)
     inline_graders = (*inline_correct, *inline_checks)
     everyone = (*graders, *checks)
@@ -359,6 +505,7 @@ def run_workflow(path, *, save_outputs=False):
         "output_key_column": key_column,
         "selection": prediction_filter,
         "negated_scores": settings["negated_scores"],
+        "label_columns": labels,
         "review_missing_scores": review_missing_scores,
     }
     if provided:
@@ -426,6 +573,8 @@ def run_workflow(path, *, save_outputs=False):
                 for row in holdout_rows
             ],
         )
+    original_partitions = partitions
+    partitions, scorer, scores = _augment_scores(partitions, settings)
     comparison = compare_scores(
         (
             replace(row, outcomes=row.outcomes[: len(graders)])
@@ -438,12 +587,18 @@ def run_workflow(path, *, save_outputs=False):
         split_sizes=tuple(map(len, partitions)) if provided else None,
         review_missing_scores=review_missing_scores,
     )
-    selected_score = comparison["recommended_score"] or scores[0]
+    selected_score = (
+        FITTED_SCORE if scorer else comparison["recommended_score"] or scores[0]
+    )
     selection = None
     if settings["score_selection"] == "joint-calibration":
         design_rows, calibration_rows, _ = partitions
         selected_score, selection = _joint_calibration(
-            design_rows, calibration_rows, settings, selected_score, graders=graders
+            design_rows,
+            calibration_rows,
+            {**settings, "score_columns": scores},
+            selected_score,
+            graders=graders,
         )
     column = scores.index(selected_score)
     design, calibration, heldout = (
@@ -473,6 +628,10 @@ def run_workflow(path, *, save_outputs=False):
         selection=selection,
         review_missing_scores=review_missing_scores,
     )
+    if settings["refit_checks"]:
+        result["refit_disagreement"] = _refit_disagreement(
+            original_partitions, settings, graders
+        )
     cutoff = result["selection"]["selected_threshold"] if result["confirmed"] else None
     eligible = [
         row for row in heldout if cutoff is None or not accepted_at(row, cutoff)
@@ -501,6 +660,8 @@ def run_workflow(path, *, save_outputs=False):
         "correct_columns": list(inline_correct),
         "check_columns": list(inline_checks),
     }
+    if labels:
+        metadata.update(prediction_column=labels[0], reference_column=labels[1])
     for field in GRADER_FILE_SETTINGS:
         if files := settings[field]:
             metadata[field] = {name: str(file) for name, file in files.items()}
@@ -543,6 +704,8 @@ def run_workflow(path, *, save_outputs=False):
             },
         },
     )
+    if scorer:
+        report["scorer"] = scorer.to_dict()
     if save_outputs:
         html = settings["html"]
         outputs = [
@@ -553,6 +716,15 @@ def run_workflow(path, *, save_outputs=False):
                 render_report("html", report), encoding="utf-8", newline="\n"
             )
             if source_rows is not None:
+                if scorer:
+                    if FITTED_SCORE in source_rows[0]:
+                        raise ValueError("holdout input already contains fitted_score")
+                    heldout_scores = {r.id: r.scores[-1] for r in partitions[2]}
+                    source_rows = [
+                        {**row, FITTED_SCORE: heldout_scores[row[id_column]]}
+                        for row in source_rows
+                        if row[id_column] in heldout_scores
+                    ]
                 write_holdout_rows(
                     staged[holdout_output],
                     source_rows,

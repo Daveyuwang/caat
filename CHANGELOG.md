@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0rc1
+
+- Fit standardized logistic confidence scorers on design data and reuse their JSON parameters on unlabeled batches. Fitting uses the optional scorer extra.
+- Use predicted/reference labels in TOML workflows, save the fitted scorer alongside the cutoff, and route original feature columns from the saved report.
+- Measure decision changes on fixed holdout rows when the design and calibration data are reassigned.
+
 ## 0.3.0
 
 - Refit `caat policy` on the next 20 seeds and report how many rows those cutoffs would accept, with `--split-checks` to change or skip it.

@@ -157,6 +157,7 @@ def route_batch(
     negate_score,
     review_missing_scores,
     keep_columns=(),
+    scorer=None,
 ):
     """Stream predictions through a cutoff and write all batch decisions.
 
@@ -171,7 +172,11 @@ def route_batch(
             "--keep-column names must be distinct and differ from "
             "id, score, decision, group, and output_key"
         )
-    required = {id_column, score_column, *keep_columns}
+    required = {
+        id_column,
+        *keep_columns,
+        *(scorer.columns if scorer else (score_column,)),
+    }
     if output_key_column is not None:
         required.add(output_key_column)
     accepted = missing_scores = 0
@@ -200,14 +205,21 @@ def route_batch(
                 if not item_id or item_id in seen:
                     raise ValueError(f"empty or duplicate id: {item_id!r}")
                 seen.add(item_id)
-                raw_score = row[score_column]
-                if review_missing_scores and raw_score == "":
-                    score = None
-                    missing_scores += 1
+                if scorer is None:
+                    score = parse_score(
+                        row[score_column],
+                        reader.line_num,
+                        negate=negate_score,
+                        review_missing_scores=review_missing_scores,
+                    )
                 else:
-                    score = parse_score(raw_score, reader.line_num, negate=negate_score)
-                    if not isfinite(score):
-                        raise ValueError(f"score for id {item_id!r} must be finite")
+                    score = scorer.score_row(
+                        row, reader.line_num, review_missing_scores
+                    )
+                if score is None:
+                    missing_scores += 1
+                elif not isfinite(score):
+                    raise ValueError(f"score for id {item_id!r} must be finite")
                 meets_cutoff = score is not None and score >= threshold
                 accepted += meets_cutoff
                 fields = [item_id, score, "accept" if meets_cutoff else "review"]

@@ -59,6 +59,7 @@ from .route import (
 )
 from .rules import RULES
 from .scores import COSTS, DEFAULT_COVERAGES, compare_scores, read_score_rows
+from .scorer import LinearScorer, configure_scorer, run_scorer
 from .select import DEFAULT_DESIGN_GRID_SIZE, design_thresholds, select
 from .table import (
     accepted_at,
@@ -1451,7 +1452,13 @@ def route_options(parser):
 
 
 def run_route(args):
+    use_embedded = args.score_column is None and args.raw_score_column is None
     saved = load_threshold_options(args, require_confirmed=True)
+    scorer = (
+        LinearScorer.from_dict(saved["scorer"])
+        if use_embedded and "scorer" in saved
+        else None
+    )
     if args.output.resolve() in threshold_input_paths(args):
         raise ValueError("output would overwrite an input file")
     overall, group, key_column = route_batch(
@@ -1467,6 +1474,7 @@ def run_route(args):
         negate_score=args.negated_score_source is not None,
         review_missing_scores=args.review_missing_scores,
         keep_columns=args.keep_column or (),
+        scorer=scorer,
     )
     meta = {
         "path": str(args.predictions),
@@ -2379,6 +2387,10 @@ def main(argv=None):
         "collect", help="Save responses and confidence from a model or chat API."
     )
     collect_options(commands["collect"])
+    commands["scorer"] = subcommands.add_parser(
+        "scorer", help="Fit or apply a portable confidence scorer."
+    )
+    configure_scorer(commands["scorer"])
     commands["scores"] = subcommands.add_parser(
         "scores", help="Compare saved scores on shared labels and coverage budgets."
     )
@@ -2469,6 +2481,8 @@ def main(argv=None):
             return run_monitor(args)
         if args.command == "plan":
             return run_plan(args)
+        if args.command == "scorer":
+            return run_scorer(args)
         if args.command == "run":
             return run_workflow_command(args)
         if args.command == "plugins":

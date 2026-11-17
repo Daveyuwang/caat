@@ -83,6 +83,8 @@ The input supplies response text and token log probabilities. The CSV
 contains one row per response, with scores you can use as `--score-column`
 values. [JSONL format and available scores](https://github.com/Daveyuwang/caat/blob/main/docs/guide/features.md)
 
+To fit your own confidence scorer, install the scorer extra and run `caat run examples/fitted_classifier.toml`. The saved workflow applies the same feature weights and cutoff to the next unlabeled batch. [Fitted scorer workflow](https://github.com/Daveyuwang/caat/blob/main/docs/guide/workflow.md#fit-a-confidence-scorer-and-route-the-next-batch)
+
 ## Set a cutoff
 
 `caat policy` sorts IDs and shuffles with `--seed` (default 42) to assign
