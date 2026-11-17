@@ -51,6 +51,8 @@ nav:
       - Compare model families: docs/research/model-families.md
       - Combine confidence scores: docs/research/combined-scores.md
       - Routing stability: docs/research/routing-stability.md
+      - Frozen score comparison: docs/research/frozen-score-comparison.md
+      - BoolQ protocol: docs/research/boolq-protocol.md
       - Sampling budgets: docs/research/sample-budget.md
       - Grader changes: docs/research/judge-study.md
       - Model cascade costs: docs/research/matched-cost.md
