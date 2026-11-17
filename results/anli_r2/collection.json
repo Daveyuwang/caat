@@ -1,0 +1,17 @@
+{
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+  "label_tokens": {
+    "A": 32,
+    "B": 33,
+    "C": 34
+  },
+  "logical_requests": 879,
+  "batches": 55,
+  "input_tokens": 149208,
+  "wall_seconds": 37.65715420001652,
+  "device": "NVIDIA GeForce RTX 5080",
+  "checked_rows": 48,
+  "torch": "2.11.0+cu130",
+  "transformers": "5.16.0.dev0"
+}
