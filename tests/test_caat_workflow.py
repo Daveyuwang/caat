@@ -21,7 +21,7 @@ class WorkflowTests(unittest.TestCase):
     def setUp(self):
         workspace = TemporaryDirectory()
         self.addCleanup(workspace.cleanup)
-        self.root = Path(workspace.name)
+        self.root = Path(workspace.name).resolve()
         self.config_dir = self.root / "evaluation data"
         self.config_dir.mkdir()
         self.config = self.config_dir / "ifeval.toml"
