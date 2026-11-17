@@ -14,7 +14,7 @@ from sklearn.model_selection import StratifiedKFold
 
 from caat.cli import main
 from caat.metrics import ranking_metrics, threshold_points
-from caat.scorer import fit_scorer
+from caat.scorer import apply_scorer, fit_scorer
 from caat.scores import ScoredRow, _ScoreRanking, compare_scores
 from caat.workflow import run_workflow
 from common import ROOT, read_csv, write_report
@@ -167,6 +167,23 @@ def distributions(rows, vals):
     return {k: v["budgets"][0] for k, v in entries.items()}
 
 
+def cli(cmd, path, *args, expected_failure=None):
+    with redirect_stdout(StringIO()) as stream, redirect_stderr(StringIO()) as err:
+        try:
+            main([cmd, str(path), *map(str, args), "--json"])
+        except SystemExit as exc:
+            if (
+                exc.code == 2
+                and expected_failure
+                and expected_failure in err.getvalue()
+            ):
+                return None
+            raise ValueError(err.getvalue()) from exc
+        if expected_failure:
+            raise ValueError(f"{cmd} unexpectedly succeeded")
+        return json.loads(stream.getvalue())
+
+
 def deploy(parts, models, best, output):
     model = models[best]
     with TemporaryDirectory() as temp:
@@ -242,31 +259,32 @@ def deploy(parts, models, best, output):
                     n and abs(prod["risk_upper_bound"] - bound) > 1e-10
                 ):
                     raise ValueError("production and reference audit disagree")
-            if policy["confirmed"]:
-
-                def cli(cmd, path, *args):
-                    with (
-                        redirect_stdout(StringIO()) as stream,
-                        redirect_stderr(StringIO()),
-                    ):
-                        main(
-                            [
-                                cmd,
-                                str(path),
-                                "--threshold-report",
-                                str(root / "run.json"),
-                                *args,
-                                "--json",
-                            ]
-                        )
-                        return json.loads(stream.getvalue())
-
-                cli(
-                    "route",
-                    root / (role + ".csv"),
-                    "--output",
-                    str(root / "decisions.csv"),
-                )
+            if cutoff is not None:
+                path = root / (role + ".csv")
+                saved = ["--threshold-report", str(root / "run.json")]
+                route_policy = saved
+                if not policy["confirmed"]:
+                    cli(
+                        "route",
+                        path,
+                        *saved,
+                        "--output",
+                        root / "blocked.csv",
+                        expected_failure="requires a confirmed run report",
+                    )
+                    # Replay the candidate separately to check the reference mask.
+                    # The unconfirmed report itself cannot authorize routing.
+                    if model:
+                        scored = root / "explicit.csv"
+                        apply_scorer(path, scored, model)
+                        path = scored
+                    route_policy = [
+                        "--threshold",
+                        str(cutoff),
+                        "--score-column",
+                        "fitted_score" if model else "gap",
+                    ]
+                cli("route", path, *route_policy, "--output", root / "decisions.csv")
                 actual = {
                     r["id"]
                     for r in read_csv(root / "decisions.csv")
@@ -288,7 +306,7 @@ def deploy(parts, models, best, output):
                         args = ["--correct-column", "gold"]
                         if cmd == "audit":
                             args += ["--correct-column", "check"]
-                        got = cli(cmd, path, *args)
+                        got = cli(cmd, path, *saved, *args)
                         counts = (
                             got["graders"]["gold"] if cmd == "audit" else got["overall"]
                         )
@@ -301,6 +319,17 @@ def deploy(parts, models, best, output):
             "threshold": cutoff,
             "confirmed": policy["confirmed"],
             "audits": audits,
+            "calibration": {
+                "accepted": sum(
+                    predict(model, r) >= cutoff for r in parts["calibration"]
+                ),
+                "errors": sum(
+                    predict(model, r) >= cutoff and r["correct"] == "0"
+                    for r in parts["calibration"]
+                ),
+            }
+            if cutoff is not None
+            else None,
         }
 
 

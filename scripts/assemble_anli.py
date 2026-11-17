@@ -32,9 +32,20 @@ def assemble(directory, output, design_only):
     ]
     gold = {}
     for split in {r["split"] for r in selected}:
-        gold.update(
-            {r["uid"]: int(r["label"]) for r in source(split, ["uid", "label"])}
-        )
+        wanted = {
+            r["id"]
+            for r in selected
+            if r["split"] == split and r["role"] != "reference"
+        }
+        labels = {
+            r["uid"]: int(r["label"])
+            for r in source(split, ["uid", "label"], ids=wanted)
+        }
+        if labels.keys() != wanted or any(
+            i not in range(len(LABELS)) for i in labels.values()
+        ):
+            raise ValueError(f"invalid grades in {split}")
+        gold.update(labels)
     rows = []
     for r in sorted(selected, key=lambda r: r["id"]):
         i = r["id"]

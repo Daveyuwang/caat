@@ -12,7 +12,7 @@ SEED = 20261118
 SPLITS = ("test_r1", "test_r3", "train_r1")
 
 
-def source(split, columns):
+def source(split, columns, *, ids=None):
     import pyarrow.parquet as pq
     from huggingface_hub import hf_hub_download
 
@@ -22,7 +22,8 @@ def source(split, columns):
         revision=REVISION,
         repo_type="dataset",
     )
-    return pq.read_table(path, columns=columns).to_pylist()
+    filters = [("uid", "in", sorted(ids))] if ids is not None else None
+    return pq.read_table(path, columns=columns, filters=filters).to_pylist()
 
 
 def freeze(output):
