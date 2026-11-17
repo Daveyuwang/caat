@@ -2,77 +2,96 @@
 
 [![CI](https://github.com/Daveyuwang/caat/actions/workflows/ci.yml/badge.svg)](https://github.com/Daveyuwang/caat/actions/workflows/ci.yml)
 
-CAAT scores, calibrates, evaluates, and triages saved model predictions.
-Compare confidence signals, measure correctness probabilities, and choose
-which outputs to accept automatically or send for review. The analysis
+CAAT turns saved predictions, confidence scores, and grades into acceptance
+and review policies. Choose a cutoff for a target error rate, check it on
+held-out data, and audit what changes under a different grader. The analysis
 commands run on a CPU with Python 3.10 or later.
+
+## Try a review policy
 
 ```bash
 git clone https://github.com/Daveyuwang/caat.git
 cd caat
 python -m pip install .
-caat evaluate examples/ticket_triage.csv --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --group-column inbox --threshold 0.75 --probability --output-dir replay/tickets
-```
-
-The example accepts 3 of 5 tickets and makes 1 error. CAAT writes `metrics.json`
-with overall and per-group counts, AUROC, area under the risk–coverage curve
-(AURC), and normalized AURC gain. It writes `risk_coverage.csv` with the
-results at each distinct score threshold. A normalized gain of 0 matches
-random ordering and 1 matches ordering all correct predictions first.
-
-## CSV input
-
-Each row needs a unique `id` and a finite `score`. Larger scores indicate
-greater confidence. Supply `prediction` and `reference` for exact label
-matching, or use `--correct-column NAME` for a grader's 0/1 outcome. Map
-different headers with the flags above. An optional `group` column gives
-per-group metrics.
-
-CAAT accepts every row with a score at or above `--threshold`. Use
-`--probability` to report Brier score, ECE, ACE, and reliability bins for
-probabilities of correctness.
-The review commands print a short summary. Add `--json` for machine-readable
-stdout or `--output FILE` to save the JSON report. The CLI and Python API
-use the standard library. [CSV input](https://github.com/Daveyuwang/caat/blob/main/docs/guide/csv-format.md) · [Report fields](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md)
-
-Use `caat calibrate fit` to save a temperature, Platt, isotonic, or histogram
-map from labeled calibration rows. Use `caat calibrate apply` to add its
-probabilities to a held-out CSV. Add `--html report.html` to `evaluate`,
-`audit`, or `policy` for a self-contained report.
-[Calibration examples](https://github.com/Daveyuwang/caat/blob/main/docs/guide/calibration.md)
-
-![Reliability diagram for the ticket-triage example](https://github.com/Daveyuwang/caat/raw/main/docs/figures/calibration-example.svg)
-
-## Choose and check a cutoff in one command
-
-```bash
 caat policy examples/ifeval_graders.csv --score-column mean_token_logprob --correct-column strict_pass --check-column helm_strict_pass --risk-target 0.4 --plot replay/policy.svg
 ```
 
-`caat policy` splits one labeled CSV into design, calibration, and held-out
-rows. It selects a cutoff on the calibration rows and applies it unchanged
-to the held-out rows. The example holds 541 saved IFEval responses graded by
-Google's strict grader and by HELM. The command selects
-`-0.43964836263206303` under the Google grader. On the 217 held-out rows the
-policy accepts 144 responses, with 33 errors (22.9%) under Google and 45
-(31.2%) under HELM. Both meet the 40% target.
+The example selects a cutoff using Google's strict IFEval grader. On the
+217 held-out rows the frozen policy accepts 144 responses (66.4%). Google
+counts 33 errors among accepted responses (22.9%), and HELM counts 45
+(31.2%). Both observed rates meet the 40% target.
 
 ![Held-out IFEval risk for the Google and HELM graders](https://github.com/Daveyuwang/caat/raw/main/docs/figures/policy-example.svg)
 
-A `--check-column` grader is reported on held-out rows and takes no part in
-selection. Pass it as a second `--correct-column` to require the target
-under both graders. The cutoff then rises to `-0.3327795407672605` and the
-policy accepts 92 held-out responses, with 19 and 23 errors.
+## Bring your own evaluations and scores
 
-The summary reports AUROC for each grader on the calibration rows and says
-when the score ranks no better than random. The split sorts IDs, shuffles
-with `--seed` (default 42), and assigns about 20%, 40%, and 40% of the rows.
-`--rule` and `--failure-rate` work as in `caat select`. Add `--json` for the
-full report. The command returns 0 if the held-out rows meet the target
-under every listed grader, 1 if no cutoff qualifies or a grader exceeds the
-target, and 2 for invalid input.
+Use CSV or JSONL with one unique `id` and a finite `score` per row.
+Larger scores indicate greater confidence. Use `--correct-column NAME`
+for a grader's 0/1 outcome. `caat evaluate` can also match `prediction`
+and `reference` labels directly. Map different column names with the flags
+above. An optional `group` column gives per-group metrics.
 
-## Compare graders on the same outputs
+Add `--json` for machine-readable stdout or `--output FILE` to save the
+report. [Prediction tables](https://github.com/Daveyuwang/caat/blob/main/docs/guide/csv-format.md) · [Report fields](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md)
+
+To join external confidence scores to a saved Inspect run, use
+`caat inspect join`. [Inspect workflow](https://github.com/Daveyuwang/caat/blob/main/docs/guide/inspect.md)
+For lm-evaluation-harness sample files, use `caat lm-eval` to extract
+choice likelihoods or join external scores to saved generations.
+[lm-eval workflow](https://github.com/Daveyuwang/caat/blob/main/docs/guide/lm-eval.md)
+Use `caat eee` to export single-turn answers and join confidence scores
+to Every Eval Ever sample logs.
+[Every Eval Ever workflow](https://github.com/Daveyuwang/caat/blob/main/docs/guide/every-eval-ever.md)
+Use `caat helm` to read token confidence and grades from a saved run directory.
+[HELM workflow](https://github.com/Daveyuwang/caat/blob/main/docs/guide/helm.md)
+
+[Compare CAAT with UQLM, LM-Polygraph, MAPIE, and CalibRoute](https://github.com/Daveyuwang/caat/blob/main/docs/comparison.md)
+
+## Pick a confidence score
+
+Use `caat scores` to compare candidate columns at matched coverage budgets
+and pick a score on the design split before calibrating a threshold.
+[Score comparison guide](https://github.com/Daveyuwang/caat/blob/main/docs/guide/scores.md)
+
+```bash
+caat features examples/token_scores.jsonl --output replay/token_scores.csv
+```
+
+The input supplies response text and token log probabilities. The CSV
+contains one row per response, with scores you can use as `--score-column`
+values. [JSONL format and available scores](https://github.com/Daveyuwang/caat/blob/main/docs/guide/features.md)
+
+## Set a cutoff
+
+`caat policy` sorts IDs and shuffles with `--seed` (default 42) to assign
+about 20% of the rows to design, 40% to calibration, and 40% to holdout.
+It selects a cutoff on calibration data and applies it unchanged to the
+holdout. `--check-column` adds a grader for the holdout audit. Repeat
+`--correct-column` to require the risk target under multiple graders
+during selection. Use `--holdout-confidence 0.95` to check the target
+against a one-sided exact upper error bound.
+
+For a separate calibration file, supply fixed candidates with
+`--thresholds` or build the grid from a separate `--design` file.
+
+```bash
+caat select examples/ifeval_strict.csv --score-column mean_token_logprob --correct-column strict_pass --thresholds -0.20 -0.35 -0.60 --risk-target 0.4 --rule empirical
+```
+
+The example selects `-0.35`, accepting 12 of 24 responses with four
+errors on the calibration sample. For statistical risk control, use
+`ltt-bonferroni` (default), `ltt-holm`, or `ltt-fixed-sequence`. These rules
+assume independent calibration rows from the target population and a
+candidate grid fixed before calibration. `--failure-rate` defaults to 0.05.
+On an independent holdout, apply the selected cutoff unchanged with
+`caat evaluate` for one grader or `caat audit` for paired graders. Add
+`--risk-target` and `--holdout-confidence` to check the upper error bound.
+[Selection and policy reports](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md#select)
+
+Use `caat monitor` with the frozen cutoff as new labeled rows arrive.
+[Sequential risk monitoring](https://github.com/Daveyuwang/caat/blob/main/docs/guide/monitor.md)
+
+## Check a grader change
 
 Run a frozen threshold against separate grader exports. CAAT matches rows
 by ID and checks that each grader scored the same saved output.
@@ -95,50 +114,55 @@ For separate grader files, include `id`, `output_sha256`, and a 0/1
 `correct` column in each export. The prediction file supplies the same
 IDs and output hashes plus the score. Use `--output-key-column` if your
 pipeline already records another output identity. If the results are
-already aligned in one CSV, repeat `--correct-column NAME` for each grader.
+already aligned in one file, repeat `--correct-column NAME` for each grader.
 The first grader is the reference for directional differences.
 
-If a prediction CSV contains multiple runs for the same IDs, select one
+If a prediction file contains multiple runs for the same IDs, select one
 with `--prediction-filter COLUMN=VALUE`.
 [Real routing example and CI setup](https://github.com/Daveyuwang/caat/blob/main/docs/guide/ci-audit.md)
 
-## Select a threshold on calibration data
+On Python 3.10, install the workflow extra to run TOML configurations.
 
 ```bash
-caat select examples/ifeval_strict.csv --score-column mean_token_logprob --correct-column strict_pass --thresholds -0.20 -0.35 -0.60 --risk-target 0.4 --rule empirical
+python -m pip install ".[workflow]"
 ```
 
-The example selects `-0.35`, accepting 12 of 24 responses with four
-errors on the calibration sample. Supply a fixed list with `--thresholds`
-or use `--design DESIGN.csv` to derive candidates from score deciles on a
-separate file. Repeat `--correct-column` to require the target under every
-grader. The JSON includes per-candidate counts and `selected_threshold`.
-The command returns 0 if it selects a cutoff, 1 if none qualifies, and 2
-for invalid input.
+Run `caat run examples/ifeval.toml` to compare scores, calibrate, select
+a cutoff, check both graders, and generate a review queue in one HTML
+report. [Configuration and exit codes](https://github.com/Daveyuwang/caat/blob/main/docs/guide/workflow.md)
 
-For statistical risk control, use `--rule ltt-bonferroni` (default),
-`--rule ltt-holm`, or `--rule ltt-fixed-sequence`. These rules assume
-independent calibration rows from the target population and a candidate
-grid fixed before calibration. Holm's rule tests candidates in order of
-increasing p-value. [Holm's step-down procedure](https://www.jstor.org/stable/4615733)
-`--failure-rate` defaults to 0.05. Fixed-sequence testing proceeds from
-the strictest threshold and stops at the first failure. The empirical rule
-has no statistical guarantee. Apply the selected cutoff unchanged to
-held-out data with `caat evaluate` or `caat audit`.
+## Plan labels
 
-## Score saved responses
+Use `caat plan --risk-target 0.10 --expected-error 0.05` to size an
+independent holdout for a frozen policy. At 95% confidence, 179 labeled
+accepted rows give an 81.3% chance of certifying the 10% target if the
+policy's true error rate is 5%. Pass `--accepted N` in place of
+`--risk-target` to find the smallest target a fixed label budget can
+certify at the requested power. [Label planning](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md#plan)
+Use that budget to draw a seeded sample from the accepted rows of a routed
+batch. [Sample accepted rows for labeling](https://github.com/Daveyuwang/caat/blob/main/docs/guide/queue.md#sample-accepted-rows-for-labeling)
+
+## Evaluate or calibrate probabilities
 
 ```bash
-caat features examples/token_scores.jsonl --output replay/token_scores.csv
+caat evaluate examples/ticket_triage.csv --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --group-column inbox --threshold 0.75 --probability --output-dir replay/tickets
 ```
 
-The input supplies response text and token log probabilities. The CSV
-contains one row per response, with scores you can use as `--score-column`
-values. [JSONL format and available scores](https://github.com/Daveyuwang/caat/blob/main/docs/guide/features.md)
+The example accepts 3 of 5 tickets and makes 1 error. `--probability`
+adds Brier score, ECE, ACE, and reliability bins to `metrics.json`.
+`risk_coverage.csv` records the result at each distinct score threshold.
+Use `caat calibrate fit` to save a temperature, Platt, isotonic, or histogram
+map from labeled calibration rows and `caat calibrate apply` to apply it to
+held-out scores. Add `--html report.html` to `evaluate`, `audit`, or `policy`
+for a self-contained report.
+[Calibration examples](https://github.com/Daveyuwang/caat/blob/main/docs/guide/calibration.md)
 
-Use `caat scores` to compare candidate columns at matched coverage budgets
-and pick a score on the design split before calibrating a threshold.
-[Score comparison guide](https://github.com/Daveyuwang/caat/blob/main/docs/guide/scores.md)
+![Reliability diagram for the ticket-triage example](https://github.com/Daveyuwang/caat/raw/main/docs/figures/calibration-example.svg)
+
+## Queue reviews
+
+Use `caat route` to apply a frozen cutoff and write an `accept` or `review`
+decision for every scored prediction. [Route a scored batch](https://github.com/Daveyuwang/caat/blob/main/docs/guide/queue.md#route-a-scored-batch)
 
 Use `caat queue` to order saved predictions for review under a row budget.
 It can cap the number of rows per group and compare error yield with a
@@ -158,8 +182,9 @@ threshold selection against Learn then Test.
 [Sources, results, and reproduction](https://github.com/Daveyuwang/caat/blob/main/docs/research/benchmarks.md) ·
 [WildBench and Omni-MATH grader replay](https://github.com/Daveyuwang/caat/blob/main/docs/research/judge-study.md)
 
-The local Qwen2.5-7B study compares token scores, self-reports, and sample
-agreement on TriviaQA and MMLU-Pro. It includes a CPU replay and measured
+The expanded Qwen2.5-7B study compares token scores, self-reports, and
+sample-based scores on 1,000 TriviaQA and 1,000 MMLU-Pro questions. It
+includes UQLM and LM-Polygraph comparisons, a CPU replay, and measured
 collection costs from an RTX 5080.
 [Qwen confidence benchmark](https://github.com/Daveyuwang/caat/blob/main/docs/research/black-box-benchmark.md)
 
@@ -176,10 +201,10 @@ examples, and builds and installs the wheel.
 
 [Evaluation method and related work](https://github.com/Daveyuwang/caat/blob/main/docs/research/method.md)
 
-`caat plugins` lists built-in and installed components. The optional
-Transformers backend collects model outputs for later scoring and replay.
+`caat plugins` lists built-in and installed components. Use `caat collect`
+to save model outputs from Transformers or a Chat Completions endpoint.
 [Plugin guide](https://github.com/Daveyuwang/caat/blob/main/docs/guide/plugins.md) ·
-[Local model collection](https://github.com/Daveyuwang/caat/blob/main/docs/guide/collect.md)
+[Model response collection](https://github.com/Daveyuwang/caat/blob/main/docs/guide/collect.md)
 
 [Contributing](https://github.com/Daveyuwang/caat/blob/main/CONTRIBUTING.md) ·
 [Roadmap](https://github.com/Daveyuwang/caat/blob/main/docs/ROADMAP.md) ·

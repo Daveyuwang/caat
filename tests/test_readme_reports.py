@@ -5,6 +5,7 @@ import shlex
 import subprocess
 import sys
 import unittest
+from importlib.metadata import version
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -58,6 +59,12 @@ def normalize_paths(report):
     return report
 
 
+def load_golden_report(path):
+    report = json.loads(path.read_text(encoding="utf-8"))
+    report["caat_version"] = version("caat-annotation")
+    return report
+
+
 class ReadmeReportTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -65,7 +72,7 @@ class ReadmeReportTests(unittest.TestCase):
 
     def assert_golden_report(self, actual, filename):
         actual = normalize_paths(actual)
-        frozen = json.loads((GOLDEN / filename).read_text(encoding="utf-8"))
+        frozen = load_golden_report(GOLDEN / filename)
         if "selection" in actual:
             selection, reference = actual["selection"], frozen["selection"]
         else:
@@ -177,10 +184,20 @@ class ReadmeReportTests(unittest.TestCase):
             )
         }
         self.assertEqual(
-            set(fields), {"common", "evaluate", "audit", "select", "policy"}
+            set(fields),
+            {"common", "evaluate", "audit", "monitor", "plan", "select", "policy"},
         )
+        guide = (ROOT / "docs" / "guide" / "monitor.md").read_text(encoding="utf-8")
+        monitor = next(
+            line for line in guide.splitlines() if line.startswith("caat monitor ")
+        )
+        examples = {
+            **self.examples,
+            "monitor": [arg for arg in shlex.split(monitor)[2:] if arg != "--json"],
+            "plan": ["--risk-target", "0.10", "--expected-error", "0.05"],
+        }
         with TemporaryDirectory() as directory:
-            for command, args in self.examples.items():
+            for command, args in examples.items():
                 if command not in fields:
                     continue
                 args = args.copy()
@@ -188,8 +205,14 @@ class ReadmeReportTests(unittest.TestCase):
                     del args[
                         args.index("--output-dir") : args.index("--output-dir") + 2
                     ]
+                    args.extend(("--risk-target", "0.90"))
                 if command == "policy":
                     args[args.index("--plot") + 1] = str(Path(directory) / "policy.svg")
+                    args.extend(
+                        ("--holdout-output", str(Path(directory) / "holdout.csv"))
+                    )
+                if command in {"evaluate", "audit", "policy"}:
+                    args.extend(("--holdout-confidence", "0.95"))
                 if command == "audit":
                     predictions = Path(directory) / "predictions.csv"
                     header, *rows = (
@@ -203,10 +226,22 @@ class ReadmeReportTests(unittest.TestCase):
                     )
                     args[0] = str(predictions)
                     args.extend(
-                        ("--prediction-filter", "batch=current", "--bootstrap", "5")
+                        (
+                            "--prediction-filter",
+                            "batch=current",
+                            "--bootstrap",
+                            "5",
+                            "--disagreements-output",
+                            str(Path(directory) / "disagreements.csv"),
+                        )
                     )
                 report = json.loads(run_readme(command, [*args, "--json"]))
-                for field in fields["common"] + fields[command]:
+                common = [
+                    field
+                    for field in fields["common"]
+                    if command != "plan" or not field.startswith("input.")
+                ]
+                for field in common + fields[command]:
                     with self.subTest(command=command, field=field):
                         values = [report]
                         for key in field.replace("[]", ".[]").split("."):

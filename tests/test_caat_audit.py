@@ -3,13 +3,63 @@ import io
 import json
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
+from math import ceil, nextafter
 from pathlib import Path
+from random import Random
 from tempfile import TemporaryDirectory
 
+from caat import GradedRow, audit
 from caat.cli import main
 
 
 class AuditTests(unittest.TestCase):
+    def test_multiple_graders_match_direct_seeded_row_resampling(self):
+        rows = [
+            GradedRow("a", 0.8, (True, False, True)),
+            GradedRow("b", 0.7, (False, True, True)),
+            GradedRow("c", 0.6, (True, True, False)),
+            GradedRow("d", 0.5, (False, False, True)),
+        ]
+        threshold, replicates, seed = 0.8, 100, 17
+        report = audit(
+            rows,
+            graders=("primary", "one", "two"),
+            threshold=threshold,
+            bootstrap=replicates,
+            seed=seed,
+        )
+        for index, name in enumerate(("one", "two"), start=1):
+            rng = Random(seed)
+            risk_values, whole_values, excess_values = [], [], []
+            for _ in range(replicates):
+                sampled = rng.choices(rows, k=len(rows))
+                changes = [row.outcomes[0] - row.outcomes[index] for row in sampled]
+                accepted = [
+                    change
+                    for row, change in zip(sampled, changes, strict=True)
+                    if row.score >= threshold
+                ]
+                whole = sum(changes) / len(changes)
+                whole_values.append(whole)
+                if accepted:
+                    risk = sum(accepted) / len(accepted)
+                    risk_values.append(risk)
+                    excess_values.append(risk - whole)
+
+            compared = report["accepted_comparisons"][name]["bootstrap_95"]
+            self.assertLess(len(risk_values), replicates)
+            self.assertEqual(compared["replicates_with_acceptance"], len(risk_values))
+            for key, values in zip(
+                ("risk_change", "overall_risk_change", "excess_risk_change"),
+                (risk_values, whole_values, excess_values),
+                strict=True,
+            ):
+                ordered = sorted(values)
+                self.assertEqual(
+                    compared[key],
+                    [ordered[ceil(p * len(ordered)) - 1] for p in (0.025, 0.975)],
+                )
+
     def run_audit(self, rows, threshold, *flags):
         with TemporaryDirectory() as directory:
             source = Path(directory) / "graded.csv"
@@ -76,12 +126,63 @@ class AuditTests(unittest.TestCase):
         )
 
     def test_zero_coverage_has_no_risk(self):
-        exit_code, report = self.run_audit([("a", 0.1, 0, 0, "x")], 0.8)
+        with TemporaryDirectory() as directory:
+            exported = Path(directory) / "disagreements.csv"
+            exit_code, report = self.run_audit(
+                [("a", 0.1, 0, 0, "x")],
+                0.8,
+                "--holdout-confidence",
+                "0.95",
+                "--disagreements-output",
+                str(exported),
+            )
+            self.assertEqual(
+                exported.read_text(encoding="utf-8"),
+                "id,score,decision,group,grade_primary,grade_alternate\n",
+            )
         self.assertEqual(exit_code, 1)
         self.assertIsNone(report["graders"]["primary"]["error_rate"])
+        self.assertIsNone(report["graders"]["primary"]["risk_upper_bound"])
         self.assertIsNone(
             report["accepted_comparisons"]["alternate"]["target_decision_changed"]
         )
+
+    def test_holdout_bound_can_fail_when_observed_risk_passes(self):
+        exit_code, report = self.run_audit(
+            [(str(i), 0.9, 1, int(i >= 4), "x") for i in range(12)],
+            0.8,
+            "--holdout-confidence",
+            "0.95",
+        )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(report["holdout_confidence"], 0.95)
+        self.assertTrue(report["graders"]["primary"]["meets_target"])
+        alternate = report["graders"]["alternate"]
+        self.assertEqual(alternate["error_rate"], 1 / 3)
+        self.assertAlmostEqual(alternate["risk_upper_bound"], 0.6091376982290366)
+        self.assertFalse(alternate["meets_target"])
+        self.assertTrue(
+            report["accepted_comparisons"]["alternate"]["target_decision_changed"]
+        )
+
+    def test_fixed_population_audit_checks_both_upper_error_counts(self):
+        exit_code, report = self.run_audit(
+            [(str(i), 0.9, int(i >= 8), int(i >= 16), "x") for i in range(36)],
+            0.8,
+            "--holdout-confidence",
+            "0.95",
+            "--accepted-population",
+            "101",
+        )
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(report["accepted_population"], 101)
+        primary, alternate = report["graders"].values()
+        self.assertEqual(primary["risk_upper_errors"], 34)
+        self.assertEqual(alternate["risk_upper_errors"], 57)
+        self.assertEqual(primary["risk_upper_bound"], 34 / 101)
+        self.assertEqual(alternate["risk_upper_bound"], nextafter(57 / 101, 1.0))
+        self.assertTrue(primary["meets_target"])
+        self.assertFalse(alternate["meets_target"])
 
     def test_paired_bootstrap_for_all_and_zero_acceptance(self):
         rows = [("a", 0.7, 1, 0, "x"), ("b", 0.8, 1, 0, "x")]
@@ -115,13 +216,14 @@ class AuditTests(unittest.TestCase):
                 root / name for name in ("pred.csv", "first.csv", "second.csv")
             )
             predictions.write_text(
-                "id,score,output_sha256\na,0.9,a-out\nb,0.6,b-out\n", encoding="utf-8"
+                "id,score,output_sha256\nb,0.6,b-out\na,0.9,a-out\n", encoding="utf-8"
             )
             primary.write_text(
                 "id,output_sha256,correct\nb,b-out,0\na,a-out,1\n", encoding="utf-8"
             )
             header = "id,output_sha256,correct\n"
-            alternate.write_text(header + "a,a-out,0\nb,b-out,0\n", encoding="utf-8")
+            alternate.write_text(header + "a,a-out,0\nb,b-out,1\n", encoding="utf-8")
+            disagreements = root / "disagreements.csv"
             args = [
                 "audit",
                 str(predictions),
@@ -134,6 +236,8 @@ class AuditTests(unittest.TestCase):
                 f"primary={primary}",
                 "--grader-file",
                 f"alternate={alternate}",
+                "--disagreements-output",
+                str(disagreements),
             ]
             output = io.StringIO()
             with redirect_stdout(output):
@@ -144,6 +248,39 @@ class AuditTests(unittest.TestCase):
             )
             self.assertEqual(
                 report["input"]["grader_files"]["alternate"], str(alternate)
+            )
+            self.assertEqual(
+                report["input"]["disagreements_output"], str(disagreements)
+            )
+            expected = (
+                "id,score,decision,group,output_key,grade_primary,grade_alternate\n"
+                "a,0.9,accept,,a-out,1,0\nb,0.6,review,,b-out,0,1\n"
+            )
+            self.assertEqual(disagreements.read_text(encoding="utf-8"), expected)
+            queued = root / "queue.csv"
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "queue",
+                            str(disagreements),
+                            "--prediction-filter",
+                            "decision=accept",
+                            "--output-key-column",
+                            "output_key",
+                            "--correct-column",
+                            "grade_primary",
+                            "--budget",
+                            "1",
+                            "--output",
+                            str(queued),
+                        ]
+                    ),
+                    0,
+                )
+            self.assertEqual(
+                queued.read_text(encoding="utf-8"),
+                "id,score,group,output_key\na,0.9,,a-out\n",
             )
 
             for contents, message in (
@@ -161,6 +298,58 @@ class AuditTests(unittest.TestCase):
                         main(args)
                     self.assertEqual(raised.exception.code, 2)
                     self.assertIn(message, err.getvalue())
+                    self.assertEqual(
+                        disagreements.read_text(encoding="utf-8"), expected
+                    )
+
+    def test_full_grader_exports_match_selected_output_keys(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            predictions, primary, alternate = (
+                root / name for name in ("sample.csv", "full.csv", "mixed.jsonl")
+            )
+            predictions.write_text(
+                "id,score,output_key\nb,0.6,b-out\na,0.9,a-out\n", encoding="utf-8"
+            )
+            primary.write_text(
+                "grade_id,output_sha256,correct\n"
+                "other,other-out,0\na,old-a-out,0\na,a-out,1\nb,b-out,1\n",
+                encoding="utf-8",
+            )
+            alternate.write_text(
+                '{"grade_id":"b","output_sha256":"b-out","correct":0}\n'
+                '{"grade_id":"a","output_sha256":"a-out","correct":1}\n',
+                encoding="utf-8",
+            )
+            args = [
+                "audit",
+                str(predictions),
+                "--threshold",
+                "0.6",
+                "--output-key-column",
+                "output_key",
+                "--grader-id-column",
+                "grade_id",
+                "--grader-output-key-column",
+                "output_sha256",
+                "--allow-extra-grades",
+                "--grader-file",
+                f"primary={primary}",
+                "--grader-file",
+                f"alternate={alternate}",
+                "--json",
+            ]
+            with redirect_stdout(io.StringIO()) as stdout:
+                self.assertEqual(main(args), 0)
+            report = json.loads(stdout.getvalue())
+            self.assertTrue(report["input"]["allow_extra_grades"])
+            self.assertEqual(report["input"]["grader_id_column"], "grade_id")
+            self.assertEqual(
+                report["input"]["grader_output_key_column"], "output_sha256"
+            )
+            self.assertEqual(report["graders"]["primary"]["accepted"], 2)
+            self.assertEqual(report["graders"]["primary"]["errors"], 0)
+            self.assertEqual(report["graders"]["alternate"]["errors"], 1)
 
     def test_select_run_from_mixed_prediction_csv(self):
         with TemporaryDirectory() as directory:
@@ -213,3 +402,125 @@ class AuditTests(unittest.TestCase):
                 main([*args, "--correct-column", "old", "--correct-column", "new"])
             self.assertEqual(raised.exception.code, 2)
             self.assertIn("duplicate id", err.getvalue())
+
+    def test_malformed_grader_csv_cannot_change_an_audit_decision(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            predictions, reference, grader, report = (
+                root / name
+                for name in ("pred.csv", "ref.csv", "grader.csv", "report.json")
+            )
+            predictions.write_text(
+                "id,score,output_sha256\na,0.9,out\n", encoding="utf-8"
+            )
+            reference.write_text(
+                "id,output_sha256,correct\na,out,1\n", encoding="utf-8"
+            )
+            header = "id,output_sha256,annotation,correct\n\n"
+            args = [
+                "audit",
+                str(predictions),
+                "--threshold",
+                "0.8",
+                "--risk-target",
+                "0.4",
+                "--grader-file",
+                f"reference={reference}",
+                "--grader-file",
+                f"alternate={grader}",
+                "--output",
+                str(report),
+            ]
+            for row, message in (
+                ("a,out,label,1,0\n", "line 3 has 5 fields"),
+                ("a,out,0\n", "line 3 has 3 fields"),
+                ('a,out,"label,1,0\n', "CSV line 3"),
+            ):
+                with self.subTest(row=row), redirect_stderr(io.StringIO()) as err:
+                    grader.write_text(header + row, encoding="utf-8")
+                    with self.assertRaises(SystemExit) as raised:
+                        main(args)
+                    self.assertEqual(raised.exception.code, 2)
+                    self.assertIn(str(grader), err.getvalue())
+                    self.assertIn(message, err.getvalue())
+                    self.assertFalse(report.exists())
+
+            grader.write_text(header + 'a,out,"label,1\nchecked",0\n', encoding="utf-8")
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(main(args), 1)
+            saved = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual(saved["graders"]["alternate"]["errors"], 1)
+
+    def test_replay_a_saved_selection_at_full_precision(self):
+        with TemporaryDirectory() as directory, redirect_stdout(io.StringIO()):
+            root = Path(directory)
+            calibration = root / "cal.csv"
+            holdout = root / "holdout.csv"
+            selection = root / "cutoff.json"
+            result = root / "checked.json"
+            cutoff = "0.7981867790222168"
+            header = "answer_id,confidence,score,old,new\n"
+            calibration.write_text(header + f"cal,{cutoff},0,1,1\n", encoding="utf-8")
+            holdout.write_text(
+                header + f"a,{cutoff},0,1,0\nb,0.95,0,1,1\nc,0.7,1,1,1\n",
+                encoding="utf-8",
+            )
+            select_args = [
+                "select",
+                str(calibration),
+                "--thresholds",
+                cutoff,
+                "--id-column",
+                "answer_id",
+                "--score-column",
+                "confidence",
+                "--correct-column",
+                "old",
+                "--risk-target",
+                "0.4",
+                "--rule",
+                "empirical",
+                "--output",
+                str(selection),
+            ]
+            self.assertEqual(main(select_args), 0)
+            use_args = [
+                str(holdout),
+                "--threshold-report",
+                str(selection),
+                "--correct-column",
+                "old",
+                "--output",
+                str(result),
+            ]
+            self.assertEqual(main(["evaluate", *use_args]), 0)
+            report = json.loads(result.read_bytes())
+            self.assertEqual(report["overall"]["accepted"], 2)
+            self.assertEqual(report["input"]["score_column"], "confidence")
+            self.assertEqual(main(["audit", *use_args, "--correct-column", "new"]), 1)
+            report = json.loads(result.read_bytes())
+            self.assertEqual(report["threshold"], float(cutoff))
+            self.assertEqual(report["risk_target"], 0.4)
+            self.assertEqual(report["input"]["threshold_report"], str(selection))
+            self.assertEqual(report["graders"]["new"]["errors"], 1)
+
+            original = selection.read_bytes()
+            with (
+                redirect_stderr(io.StringIO()) as error,
+                self.assertRaises(SystemExit) as raised,
+            ):
+                main(["evaluate", *use_args, "--output", str(selection)])
+            self.assertEqual(raised.exception.code, 2)
+            self.assertIn("output would overwrite an input file", error.getvalue())
+            self.assertEqual(selection.read_bytes(), original)
+
+            empty = json.loads(original)
+            empty["selected_threshold"] = None
+            selection.write_text(json.dumps(empty), encoding="utf-8")
+            with (
+                redirect_stderr(io.StringIO()) as error,
+                self.assertRaises(SystemExit) as raised,
+            ):
+                main(["evaluate", *use_args])
+            self.assertEqual(raised.exception.code, 2)
+            self.assertIn("did not select a cutoff", error.getvalue())

@@ -1,0 +1,11 @@
+score_columns = ["mean_token_logprob"]
+correct_columns = ["correct"]
+risk_target = 0.8
+html = "../replay/workflow/omni-math.html"
+json_output = "../replay/workflow/omni-math.json"
+holdout_output = "../replay/workflow/omni-math-holdout.csv"
+
+[predictions]
+design = "../results/monitoring/design.csv"
+calibration = "../results/monitoring/calibration.csv"
+holdout = "../results/monitoring/heldout.csv"
