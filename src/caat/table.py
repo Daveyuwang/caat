@@ -270,8 +270,16 @@ def write_holdout_rows(output, source_rows, heldout, *, id_column, grader_column
     )
 
 
-def read_external_scores(path, score_column, columns, *, review_missing_scores=False):
+def read_external_scores(
+    path, score_column, columns, *, review_missing_scores=False, id_column=None
+):
+    """Read scores keyed by the identity columns, or by id_column alone.
+
+    With id_column the file carries no output hash, so the stored digest is None.
+    """
     *key_columns, digest_column = columns
+    if id_column is not None:
+        key_columns, digest_column, columns = [id_column], None, (id_column,)
     scores = {}
     with open_prediction_table(
         path, {*columns, score_column}, None, allow_empty_jsonl=review_missing_scores
@@ -286,8 +294,9 @@ def read_external_scores(path, score_column, columns, *, review_missing_scores=F
                 review_missing_scores=review_missing_scores,
             )
             if score is not None and not isfinite(score):
-                raise ValueError(f"score for sample {row['id']!r} must be finite")
-            scores[identity] = row[digest_column], score
+                raise ValueError(f"score for sample {identity[-1]!r} must be finite")
+            digest = row[digest_column] if digest_column is not None else None
+            scores[identity] = digest, score
     return scores
 
 
@@ -322,8 +331,13 @@ def write_external_score_join(
     score_files=(),
     lower_is_better=(),
     review_missing_scores=False,
+    score_id_column=None,
 ):
-    """Verify returned scores against the saved outputs and write the joined CSV."""
+    """Verify returned scores against the saved outputs and write the joined CSV.
+
+    With score_id_column, scores match on the sample ID alone and the output
+    hash is not checked.
+    """
     sources = tuple(score_files)
     if scores_file is not None:
         sources = ((score_column, scores_file), *sources)
@@ -353,12 +367,13 @@ def write_external_score_join(
                 name,
                 identity_columns,
                 review_missing_scores=review_missing_scores,
+                id_column=score_id_column,
             )
         except ValueError as exc:
             hint = (
                 ". Add your scores to the export command's output, which has the "
                 "identity columns"
-                if " columns: " in str(exc)
+                if " columns: " in str(exc) and score_id_column is None
                 else ""
             )
             raise ValueError(f"{path} ({name}): {exc}{hint}") from exc
@@ -367,8 +382,12 @@ def write_external_score_join(
 
     def rows():
         for identity, grades in samples:
-            key = tuple(map(str, identity[:-1]))
             item = identity[id_position]
+            key = (
+                tuple(map(str, identity[:-1]))
+                if score_id_column is None
+                else (str(item),)
+            )
             values = []
             for name, scores in tables:
                 stored = scores.pop(key, None)
@@ -378,7 +397,7 @@ def write_external_score_join(
                     values.append(None)
                     continue
                 digest, score = stored
-                if digest != identity[-1]:
+                if digest is not None and digest != identity[-1]:
                     raise ValueError(f"{name}: output key mismatch for sample {item!r}")
                 values.append(score)
             yield (

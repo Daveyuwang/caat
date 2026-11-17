@@ -234,6 +234,7 @@ def join_scores(
     score_files=(),
     lower_is_better=(),
     review_missing_scores=False,
+    scores_id_column=None,
 ):
     graders = tuple(graders)
 
@@ -241,15 +242,23 @@ def join_scores(
         for identity, sample in samples_from_log(log, epoch):
             yield identity, (binary_grade(sample, name) for name in graders)
 
-    return write_external_score_join(
-        log,
-        scores_file,
-        output,
-        rows(),
-        identity_columns=IDENTITY,
-        grade_columns=graders,
-        score_column=score_column,
-        score_files=score_files,
-        lower_is_better=lower_is_better,
-        review_missing_scores=review_missing_scores,
-    )
+    try:
+        return write_external_score_join(
+            log,
+            scores_file,
+            output,
+            rows(),
+            identity_columns=IDENTITY,
+            grade_columns=graders,
+            score_column=score_column,
+            score_files=score_files,
+            lower_is_better=lower_is_better,
+            review_missing_scores=review_missing_scores,
+            score_id_column=scores_id_column,
+        )
+    except ValueError as exc:
+        if scores_id_column is None and "identity columns" in str(exc):
+            raise ValueError(
+                f"{exc}, or match on the sample ID alone with --scores-id-column"
+            ) from exc
+        raise

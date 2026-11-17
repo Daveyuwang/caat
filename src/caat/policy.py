@@ -1,5 +1,6 @@
 from operator import attrgetter
 from random import Random
+from statistics import median
 from typing import Any, Iterable, Sequence
 
 from .audit import audit
@@ -36,23 +37,28 @@ def policy(
     calibration_input: str | None = None,
     design_grid_size: int = DEFAULT_DESIGN_GRID_SIZE,
     review_missing_scores: bool = False,
+    split_checks: int = 0,
 ) -> dict[str, Any]:
     """Select a cutoff on calibration rows and replay it unchanged on held-out rows.
 
     Each row holds one outcome per grader, selection graders first. The check
     graders take no part in selection and are reported on the held-out rows.
+    With split_checks, the report also says how the accepted count moves when
+    the next seeds draw the split.
     """
     validate_holdout_confidence(holdout_confidence)
     everyone = (*graders, *check_graders)
     rows = validated_rows(rows, everyone, review_missing_scores=review_missing_scores)
     if not graders:
         raise ValueError("provide at least one grader for selection")
+    if type(split_checks) is not int or split_checks < 0:
+        raise ValueError("split_checks must be a non-negative integer")
     if len(rows) < 5:
         raise ValueError(
             "at least five rows are required for the design, calibration, and held-out splits"
         )
     design, calibration, heldout = split_rows(rows, seed)
-    return _policy_for_splits(
+    report = _policy_for_splits(
         design,
         calibration,
         heldout,
@@ -69,6 +75,60 @@ def policy(
         design_grid_size=design_grid_size,
         review_missing_scores=review_missing_scores,
     )
+    if split_checks:
+        report["split_sensitivity"] = _split_sensitivity(
+            rows,
+            seeds=range(seed + 1, seed + 1 + split_checks),
+            graders=graders,
+            risk_target=risk_target,
+            failure_rate=failure_rate,
+            rule=rule,
+            design_grid_size=design_grid_size,
+            review_missing_scores=review_missing_scores,
+        )
+    return report
+
+
+def _split_sensitivity(
+    rows,
+    *,
+    seeds,
+    graders,
+    risk_target,
+    failure_rate,
+    rule,
+    design_grid_size,
+    review_missing_scores,
+):
+    """Count the rows each alternative split's cutoff accepts in the whole table."""
+    accepted = []
+    for seed in seeds:
+        design, calibration, _ = split_rows(rows, seed)
+        threshold = select(
+            (
+                graded_row(row.id, row.score, row.outcomes[: len(graders)])
+                for row in calibration
+            ),
+            graders=graders,
+            thresholds=design_thresholds(
+                (row.score for row in design),
+                grid_size=design_grid_size,
+                review_missing_scores=review_missing_scores,
+            ),
+            risk_target=risk_target,
+            failure_rate=failure_rate,
+            rule=rule,
+            review_missing_scores=review_missing_scores,
+        )["selected_threshold"]
+        if threshold is not None:
+            accepted.append(sum(accepted_at(row, threshold) for row in rows))
+    return {
+        "splits": len(seeds),
+        "selected": len(accepted),
+        "accepted_min": min(accepted, default=None),
+        "accepted_median": median(accepted) if accepted else None,
+        "accepted_max": max(accepted, default=None),
+    }
 
 
 def _policy_for_splits(

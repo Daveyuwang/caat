@@ -263,6 +263,14 @@ def render_html(report, curve=None, curves=None):
 
     title = "CAAT review workflow" if command == "run" else f"CAAT {command} report"
     main_class = ' class="workflow"' if command == "run" else ""
+    inputs = report.get("input") or {}
+    if command != "run" and inputs.get("path"):
+        source = f"Input: {inputs['path']}"
+        if inputs.get("score_column"):
+            source += f". Score column: {inputs['score_column']}"
+        sections.insert(
+            0, f"<p>{escape(source)}. CAAT {escape(report['caat_version'])}.</p>"
+        )
     body = "\n".join(sections)
     return f"""<!doctype html>
 <html lang="en">

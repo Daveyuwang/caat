@@ -50,30 +50,20 @@ with `--threshold-report`.
 
 ## Join scores keyed by sample ID
 
-A score file with only a sample ID and a confidence value lacks the
-evaluation ID, epoch, and completion hash, so the join rejects it. Copy the
-identity columns from the export onto your scores first. This example reads
-`my_confidence.csv` with `sample_id` and `confidence` columns.
+If your score file has only a sample ID and a confidence value, name the ID
+column with `--scores-id-column`. No export step is needed. This example
+reads `my_confidence.csv` with `sample_id` and `confidence` columns.
 
-```python
-import csv
-
-with open("my_confidence.csv", newline="", encoding="utf-8") as source:
-    confidence = {row["sample_id"]: row["confidence"] for row in csv.DictReader(source)}
-with (
-    open("scoring-input.csv", newline="", encoding="utf-8") as source,
-    open("scored.csv", "w", newline="", encoding="utf-8") as target,
-):
-    columns = ["eval_id", "id", "epoch", "output_sha256"]
-    writer = csv.DictWriter(target, [*columns, "confidence"])
-    writer.writeheader()
-    for row in csv.DictReader(source):
-        writer.writerow({name: row[name] for name in columns} | {"confidence": confidence[row["id"]]})
+```bash
+caat inspect join run.eval --scores my_confidence.csv --scores-id-column sample_id --grader primary --output graded.csv
 ```
 
-Then run `caat inspect join` with `--scores scored.csv`. The hash ties each
-score to the completion that was in the log when you exported it. Export
-again if the log is replaced.
+The join matches each score to the sample with that ID in the selected
+epoch and writes the same table as the hash-checked join. Every sample
+needs one score, unless you add `--review-missing-scores`. Without the
+output hash, CAAT cannot check that the scores were computed for the
+completions in this log. Use the export when the log may have been rerun
+since you scored it.
 
 ## Compare several score files
 

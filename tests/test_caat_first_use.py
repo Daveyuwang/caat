@@ -180,6 +180,13 @@ class FirstUseTests(unittest.TestCase):
         )
         code, summary, _ = run(*command, "--rule", "empirical")
         self.assertEqual(code, 0)
+        code, summary, _ = run(*command, "--rule", "ltt-fixed-sequence")
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "The strictest candidate (threshold 0.9, 4 accepted rows, 0% calibration "
+            "error) did not pass, and the fixed-sequence rule stops at the first failure.",
+            summary,
+        )
 
     def test_route_keeps_named_columns_and_omits_an_absent_group(self):
         decisions = self.root / "decisions.csv"
@@ -264,7 +271,9 @@ class FirstUseTests(unittest.TestCase):
             "--correct-column", "ok", "--bootstrap", "50",
         )  # fmt: skip
         self.assertEqual(code, 0)
-        self.assertIn("Compared scores on 40 held-out rows against score.", summary)
+        self.assertIn(
+            "Compared scores on 40 held-out rows. Baseline score: score.", summary
+        )
         self.assertIn("chosen by AURC gain on 20 design rows.", summary)
         # The twin column equals the baseline, so every paired difference is zero.
         self.assertIn(
@@ -272,6 +281,116 @@ class FirstUseTests(unittest.TestCase):
             summary,
         )
         self.assertNotIn("(unknown)", summary)
+        # Every wrong row outranks every right row, so the AUROC is 0.
+        _, summary, _ = run(
+            "scores", self.table(reversed_score=True), "--score-column", "score",
+            "--correct-column", "ok", "--bootstrap", "0",
+        )  # fmt: skip
+        self.assertIn("  score. AUROC 0.000.", summary)
+        self.assertIn(
+            "AUROC well below 0.5: the score may point the wrong way. If smaller "
+            "values mean more confidence, add --lower-is-better score.",
+            summary,
+        )
+
+    def test_policy_explains_the_cutoff_it_did_not_choose(self):
+        table = self.table()
+        base = ["policy", table, "--correct-column", "ok", "--risk-target", "0.3"]
+        _, summary, _ = run(*base)
+        _, report, _ = run(*base, "--json")
+        # The only looser cutoff accepts every calibration row, wrong ones included.
+        accept_all = json.loads(report)["selection"]["candidates"][-1]
+        wrong = accept_all["errors"]["ok"]
+        self.assertEqual(accept_all["accepted"], 40)
+        self.assertIn(
+            "The next looser candidate (threshold 0.1, 100% of calibration rows) had "
+            f"{100 * wrong / 40:.3g}% calibration error, above the target.",
+            summary,
+        )
+        # Every split puts the 50 right rows above the 0.9 cutoff.
+        self.assertIn(
+            "Split check: 20 of 20 other seeds selected a cutoff, accepting 50 to 50 "
+            "of the 100 rows (median 50).",
+            summary,
+        )
+        _, report, _ = run(*base, "--split-checks", "3", "--json")
+        check = json.loads(report)["split_sensitivity"]
+        counts = []
+        for seed in (43, 44, 45):
+            _, other, _ = run(*base, "--seed", seed, "--split-checks", "0", "--json")
+            other = json.loads(other)
+            self.assertNotIn("split_sensitivity", other)
+            counts.append(other["all_rows"]["accepted"])
+        self.assertEqual(
+            check,
+            {
+                "splits": 3,
+                "selected": 3,
+                "accepted_min": min(counts),
+                "accepted_median": sorted(counts)[1],
+                "accepted_max": max(counts),
+            },
+        )
+
+    def test_external_scores_can_match_on_the_sample_id_alone(self):
+        from caat.table import write_external_score_join
+
+        scores = self.root / "scores.csv"
+        scores.write_text("sample_id,confidence\nb,0.2\na,0.9\n", encoding="utf-8")
+        identity = ("eval_id", "id", "epoch", "output_sha256")
+
+        def join(**options):
+            samples = (
+                (("run", name, "1", f"hash-{name}"), (grade,))
+                for name, grade in (("a", 1), ("b", 0))
+            )
+            return write_external_score_join(
+                self.root / "log.eval",
+                scores,
+                self.root / "joined.csv",
+                samples,
+                identity_columns=identity,
+                grade_columns=("ok",),
+                score_column="confidence",
+                **options,
+            )
+
+        self.assertEqual(join(score_id_column="sample_id"), 2)
+        with (self.root / "joined.csv").open(newline="", encoding="utf-8") as source:
+            rows = list(csv.DictReader(source))
+        self.assertEqual(
+            [
+                (row["id"], row["output_sha256"], row["confidence"], row["ok"])
+                for row in rows
+            ],
+            [("a", "hash-a", "0.9", "1"), ("b", "hash-b", "0.2", "0")],
+        )
+        with self.assertRaisesRegex(ValueError, "which has the identity columns"):
+            join()
+
+    def test_policy_says_when_the_bound_is_above_the_target(self):
+        # A fifth of the confident rows are wrong: under a 30% target, but not
+        # by enough for about 20 held-out accepted rows to rule out more.
+        base = [
+            "policy", self.table(noisy=True), "--correct-column", "ok",
+            "--risk-target", "0.3", "--rule", "empirical",
+        ]  # fmt: skip
+        code, summary, _ = run(*base)
+        _, report, _ = run(*base, "--json")
+        held = json.loads(report)["heldout"]["graders"]["ok"]
+        self.assertTrue(held["meets_target"])
+        self.assertGreater(held["upper_bound_95"], 0.3)
+        self.assertEqual(code, 0)
+        self.assertIn(
+            "The observed rate meets the target, but the upper bound is above it: "
+            "these rows are too few to rule out a higher rate.",
+            summary,
+        )
+        self.assertIn(
+            "The held-out rows confirm the policy by the observed rate. "
+            "Add --holdout-confidence 0.95 to make the upper bound decide.",
+            summary,
+        )
 
     def test_plan_takes_the_expected_error_from_a_policy_report(self):
         report = self.root / "policy.json"

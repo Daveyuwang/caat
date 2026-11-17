@@ -56,7 +56,8 @@ Add `--json` for machine-readable stdout or `--output FILE` to save the
 report. [Prediction tables](https://github.com/Daveyuwang/caat/blob/main/docs/guide/csv-format.md) · [Report fields](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md)
 
 To join external confidence scores to a saved Inspect run, use
-`caat inspect join`. [Inspect workflow](https://github.com/Daveyuwang/caat/blob/main/docs/guide/inspect.md)
+`caat inspect join`. Scores keyed by sample ID alone join with
+`--scores-id-column`. [Inspect workflow](https://github.com/Daveyuwang/caat/blob/main/docs/guide/inspect.md)
 For lm-evaluation-harness sample files, use `caat lm-eval` to extract
 choice likelihoods or join external scores to saved generations.
 [lm-eval workflow](https://github.com/Daveyuwang/caat/blob/main/docs/guide/lm-eval.md)
@@ -87,7 +88,8 @@ values. [JSONL format and available scores](https://github.com/Daveyuwang/caat/b
 `caat policy` sorts IDs and shuffles with `--seed` (default 42) to assign
 about 20% of the rows to design, 40% to calibration, and 40% to holdout.
 It selects a cutoff on calibration data and applies it unchanged to the
-holdout. `--check-column` adds a grader for the holdout audit. Repeat
+holdout. The summary names the next looser candidate and why it was not
+selected, and reports how the accepted count moves over 20 other seeds. `--check-column` adds a grader for the holdout audit. Repeat
 `--correct-column` to require the risk target under multiple graders
 during selection. Use `--holdout-confidence 0.95` to check the target
 against a one-sided exact upper error bound.
