@@ -21,12 +21,26 @@ def table(headers, rows, *, scroll_label=None):
 
 
 def cutoff_table(selection, *, scroll_label=None):
-    return table(
+    """Tabulate the calibration candidates with the test each had to pass."""
+    if selection["rule"] == "empirical":
+        test = "its calibration error is at or below the target"
+    elif level := selection.get("per_candidate_level"):
+        test = f"its p-value is at or below {level:.3g}"
+    else:
+        test = (
+            "its p-value passes the step-down test at a "
+            f"{percent(selection['failure_rate'])} failure rate"
+        )
+    note = (
+        f"<p>Counts are from the calibration rows. A candidate passes when {test}. "
+        "A strict cutoff that accepts few rows can fail while a looser one passes.</p>"
+    )
+    return note + table(
         (
             "Cutoff",
             "Accepted",
             "Coverage",
-            *selection["graders"],
+            *(f"Errors ({name})" for name in selection["graders"]),
             "p-value",
             "Decision",
         ),

@@ -14,7 +14,7 @@ summaries that state why a result holds.
 | Score | A tunable confidence scorer that combines signals for a user's task, compared against single signals on held-out data. Model integration for collecting those signals. |
 | Calibrate | Calibration references and fixtures for score types proposed by users. |
 | Evaluate | More standard LLM evaluation sets beyond IFEval, MMLU-Pro, and TriviaQA. |
-| Use | Label columns in the TOML workflow. A queue file without the empty group column. `caat route` naming the rows that chose the cutoff. Recheck proportional grader shifts on held-out WildBench archives. |
+| Use | A split that depends less on the seed, since one seed can fall outside the range of twenty others. Label columns in the TOML workflow and in `caat calibrate fit`. A queue file without the empty group column. `caat route` naming the rows that chose the cutoff. Recheck proportional grader shifts on held-out WildBench archives. |
 | Reports | Extend the offline report when a replay needs additional fields. |
 
 Start with a saved input, an independent check or hand-calculated

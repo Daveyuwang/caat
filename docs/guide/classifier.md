@@ -22,19 +22,17 @@ caat scores examples/digit_classifier.jsonl --id-column image_id --score-column 
 
 ```text
 Compared scores on 432 held-out rows. Baseline score: top_prob.
-Design-only recommendation: margin, chosen by AURC gain on 215 design rows.
+The 215 design rows favor margin by AURC gain, but it is tied with top_prob on the held-out rows. Use either, and prefer the one that is cheaper to compute.
 actual:
   control random. AUROC 0.500. 25% coverage: 6.02% error, 50% coverage: 6.02% error, 75% coverage: 6.02% error.
   top_prob. AUROC 0.954. 25% coverage: 0% error, 50% coverage: 0% error, 75% coverage: 0.309% error.
   margin. AUROC 0.949. 25% coverage: 0% error, 50% coverage: 0% error, 75% coverage: 0.309% error. Tied with top_prob: every 95% interval for the difference includes zero.
-margin and top_prob are tied on the held-out rows. Use either, and prefer the one that is cheaper to compute.
 ```
 
 The classifier is wrong on 6.02% of the held-out rows. Accepting the most
-confident 75% by either score brings that to 0.309%. The recommendation
-comes from the 215 design rows alone. On the held-out rows the two scores
-are tied, so the last line says to use either. The rest of this page uses
-`top_prob`. An AUROC well below 0.5 means the score points the wrong way,
+confident 75% by either score brings that to 0.309%. The design rows
+lean toward `margin`, but on the held-out rows the two scores are tied, so
+the second line says to use either. The rest of this page uses `top_prob`. An AUROC well below 0.5 means the score points the wrong way,
 and the output says so.
 [Terms](glossary.md#comparing-scores) · [Score comparison guide](scores.md)
 
@@ -54,10 +52,10 @@ Held-out raw probabilities under actual. Brier 0.0557. ECE 11.9%. ACE 11.7%. Mea
 Held-out calibrated probabilities under actual. Brier 0.0429. ECE 2.98%. ACE 3.31%. Mean probability 91% against 94% correct: underconfident.
 Selected threshold 0.769127 for a 2% risk target under actual (ltt-bonferroni).
 The rule keeps accepted error at or below 2% with 95% confidence on new rows like the calibration rows.
-The next looser candidate (threshold 0.649585, 84% of calibration rows) had 0.275% calibration error, under the target but not by enough: its p-value 0.00549 had to reach 0.005, the 5% failure rate shared by 10 candidates.
+The next looser candidate (threshold 0.649585, 84% of calibration rows) had 0.275% calibration error, under the target but not by enough: its p-value 0.00549 had to be at or below 0.005, the 5% failure rate shared by 10 candidates.
 Held-out rows under actual: accepted 321 of 432 with 1 errors (0.312%, 95% upper bound 1.47%). The observed rate meets the target.
 Applied to all 1079 rows, the cutoff accepts 795 (73.7%). 647 of the 1079 rows were used to choose the cutoff, so only the held-out rows give the error estimate.
-Split check: 19 of 20 other seeds selected a cutoff, accepting 651 to 903 of the 1079 rows (median 754). The count depends on which rows fall in calibration. Fix the seed before looking, and report that run.
+Split check: 19 of 20 other seeds selected a cutoff and 1 selected none. Those cutoffs accept 651 to 903 of the 1079 rows (median 754). The count depends on which rows fall in calibration. Fix the seed before looking, and report that run.
 The held-out rows confirm the policy.
 ```
 

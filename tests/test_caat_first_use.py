@@ -309,8 +309,8 @@ class FirstUseTests(unittest.TestCase):
         )
         # Every split puts the 50 right rows above the 0.9 cutoff.
         self.assertIn(
-            "Split check: 20 of 20 other seeds selected a cutoff, accepting 50 to 50 "
-            "of the 100 rows (median 50).",
+            "Split check: 20 of 20 other seeds selected a cutoff. Those cutoffs "
+            "accept 50 to 50 of the 100 rows (median 50).",
             summary,
         )
         _, report, _ = run(*base, "--split-checks", "3", "--json")

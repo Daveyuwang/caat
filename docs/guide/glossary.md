@@ -101,7 +101,10 @@ or a thousand rows. Decide them before looking at results.
 **Split check.** `caat policy` refits on the next 20 seeds and reports how
 many selected a cutoff and the range of rows they would accept in the whole
 file. A wide range means the file is small for the target. The check is a
-description of spread and takes no part in the result. Use
+description of spread and takes no part in the result. When this run falls
+outside the range, the summary says so. A cutoff chosen any other way is
+still usable once fresh labels confirm it: `caat plan` gives the number of
+labels and `caat evaluate --holdout-confidence 0.95` runs the check. Use
 `--split-checks 0` to skip it.
 
 **Trying several settings.** The guarantee covers one run whose settings

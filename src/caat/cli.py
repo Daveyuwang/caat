@@ -460,6 +460,11 @@ def run_inspect(args):
             **external_score_settings(args),
         )
     print(f"Wrote {count} rows to {args.output}.")
+    if args.inspect_command == "join" and args.scores_id_column is not None:
+        print(
+            f"Scores were matched on {args.scores_id_column} alone. The output hash "
+            "was not checked against the completions in the log."
+        )
     return 0
 
 

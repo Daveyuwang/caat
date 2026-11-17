@@ -62,7 +62,7 @@ The join matches each score to the sample with that ID in the selected
 epoch and writes the same table as the hash-checked join. Every sample
 needs one score, unless you add `--review-missing-scores`. Without the
 output hash, CAAT cannot check that the scores were computed for the
-completions in this log. Use the export when the log may have been rerun
+completions in this log, and the command says so. Use the export when the log may have been rerun
 since you scored it.
 
 ## Compare several score files

@@ -55,7 +55,7 @@ The rule keeps accepted error at or below 5% with 95% confidence on new rows lik
 The next looser candidate (threshold 0.12626995645863573, 100% of calibration rows) had 23.3% calibration error, above the target.
 Held-out rows under gold_label: accepted 828 of 1200 with 4 errors (0.483%, 95% upper bound 1.1%). The observed rate meets the target.
 Applied to all 3000 rows, the cutoff accepts 2066 (68.9%). 1800 of the 3000 rows were used to choose the cutoff, so only the held-out rows give the error estimate.
-Split check: 20 of 20 other seeds selected a cutoff, accepting 2016 to 2321 of the 3000 rows (median 2178). The count depends on which rows fall in calibration. Fix the seed before looking, and report that run.
+Split check: 20 of 20 other seeds selected a cutoff. Those cutoffs accept 2016 to 2321 of the 3000 rows (median 2178). The count depends on which rows fall in calibration. Fix the seed before looking, and report that run.
 The held-out rows confirm the policy.
 ```
 
@@ -127,11 +127,14 @@ cutoff.
 A score must rise with the chance that the model's label is right. A
 classifier's probability of one fixed class does not: it is high for that
 class and low for the other, whichever label the model gave. `caat scores`
-reports an AUROC well below 0.5 for such a column. Convert it to the
+reports an AUROC well below 0.5 for such a column. Reversing the column
+with `--lower-is-better` is the wrong fix here. Convert it to the
 probability of the label the model chose before using it. For a binary
 task with `p_toxic` and a 0/1 `model_label`:
 
 ```python
 score = p_toxic if model_label == 1 else 1 - p_toxic
-``` [Score definitions](features.md) ·
+```
+
+[Score definitions](features.md) ·
 [Where the trained scorer comes from](../research/method.md)
