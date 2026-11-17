@@ -1,5 +1,117 @@
 # Changelog
 
+## Unreleased
+
+- Build release wheels from normalized source archives with a fixed timestamp and pinned build backend.
+- Export saved Inspect completions and align external confidence scores by sample identity and output hash.
+- Restore retained Inspect prompt attachments in scoring exports and write JSONL when requested.
+- Read indexed Inspect archives in batches and retain samples added during evaluation.
+- Read updated grades and runtime samples from Inspect JSON logs, including when a log is replaced at the same path.
+- Read only the requested sample records when exporting grades from an indexed Inspect archive.
+- Join several named score columns from separate CSV or JSONL files for an Inspect evaluation.
+- Extract aligned grader exports from original and rescored Inspect logs with `caat inspect grades`.
+- Check a frozen policy on an independent holdout with a one-sided exact binomial bound in `evaluate`, `policy`, and `audit`.
+- Track the outputs used to choose a cutoff and reject reuse in later statistical holdout checks and monitoring.
+- Read arriving monitor labels from a separate table and report coverage on the complete scored stream.
+- Export the exact policy holdout and its input columns with `caat policy --holdout-output`.
+- Save the cutoff report and exact holdout from the same TOML workflow with `json_output` and `holdout_output`.
+- Reuse a cutoff from a saved `select`, `policy`, or `run` JSON report in `evaluate`, `audit`, and `monitor`.
+- Write per-prediction `accept` and `review` decisions at a frozen cutoff with `caat route`.
+- Export a seeded label sample from a routed cohort with its output keys.
+- Speed up paired score comparisons on large saved datasets.
+- Batch local model collection with `--batch-size` and keep primary answer decoding per prompt with `--serial-greedy`. Report per-prompt evaluations and model invocations separately.
+- Plan independent holdout label budgets and certifiable error targets with `caat plan`.
+- Import multiple-choice likelihoods and align external scores to saved lm-eval generations with `caat lm-eval`.
+- Run score choice, probability calibration, cutoff selection, holdout checks, and review queue generation from one TOML file with `caat run`.
+- Reuse existing design, calibration, and holdout files in a TOML workflow, with alternate grades supplied on the holdout.
+- Align external confidence scores to graded Every Eval Ever sample files with `caat eee`.
+- Collect responses and confidence from OpenAI-compatible endpoints with `caat collect --base-url`. Keep text-based signals when probability fields are unavailable.
+- Add an executable IFEval tutorial notebook for cutoff selection, held-out grader checks, and review queues.
+- Replay score comparisons across Qwen2.5, Phi-4-mini, and SmolLM2 on shared TriviaQA and MMLU-Pro questions.
+- Build searchable documentation with the bundled examples and benchmark tables in CI.
+- Run `caat audit` as a reusable GitHub Action with a numeric cutoff or saved cutoff report. A missed risk target fails the check.
+- Export grader disagreements for review with the sample ID, output key, score, cutoff decision, and grades. The audit action can publish the CSV path.
+- Document how to fit and compare a combined confidence score, with held-out replays on TriviaQA and MMLU-Pro.
+- Read token confidence and grader outcomes from saved HELM run directories with `caat helm`.
+- Accept JSONL prediction tables, grader files, and external confidence scores alongside CSV.
+- Reject malformed CSV records before aligning scores or grades and report their file and line number.
+- Monitor the accepted risk of a frozen policy as labels arrive, with an anytime-valid alert and a chronological benchmark replay.
+- Ship type hints for the public Python API and check ranking, calibration, and binomial calculations with property-based tests.
+- Replay a WildBench 7B/72B cascade against large-only and random routing at matched modeled cost.
+- Compare zero, two, five, and ten additional generations on the frozen three-family benchmark.
+- Check native Inspect logs in CI with the minimum and latest compatible SDK versions.
+- Resolve the Inspect extra's dependencies on Python 3.10 and use SDK versions that close log file streams.
+- Compare fitted CAAT and CalibRoute cutoffs on five HELM archives with independent holdout and paired grader checks.
+- Verify Bonferroni and Holm threshold selection against MAPIE on shared candidate cutoffs.
+- Measure the effects of the candidate grid and multiple-testing correction in the CalibRoute comparison.
+- Set the number of design quantiles for `caat select`, `caat policy`, and the TOML workflow.
+- Prepare related report files together and restore previous outputs if a replacement fails.
+- Plan and check labels sampled without replacement from a fixed batch of accepted predictions.
+- Check a sampled fixed batch in CI with the audit action's `accepted-population` input.
+- Read the accepted population from `--batch-decisions` and verify labeled samples against the routed outputs.
+- Filter a mixed prediction export by column value in `caat evaluate` and `caat route`.
+- Replay cutoff fitting with primary, per-grader, and either-grader errors on six archives.
+- Compare design score choice and jointly tested score-cutoff pairs at fixed risk targets.
+- Enable joint score and cutoff fitting in TOML with `score_selection = "joint-calibration"` and one Bonferroni correction.
+- Preserve carriage returns in queue CSV fields and restore previous queues if either output fails.
+- Verify a fixed-batch label sample against the seeded random queue in `evaluate`, `audit`, and the audit action.
+- Filter mixed prediction exports before score comparison, cutoff fitting, and TOML workflows.
+- Plan labels from a saved cutoff report and check routed batch decisions against that cutoff.
+- Add higher-is-better copies of external uncertainty scores when joining Inspect, lm-eval, and Every Eval Ever logs.
+- Join several named score files to the same lm-eval or Every Eval Ever samples in one command.
+- Use a saved label plan to check the sample size and risk settings in `evaluate`, `audit`, and the audit action.
+- Reuse seeded audit bootstrap draws for all graders and aggregate repeated outcomes.
+- Match the accepted outputs in a decision file against the saved label plan, including outputs outside the sample.
+- Add `caat orient` to prepare lower-is-better columns in prediction tables for comparison, fitting, and routing.
+- Apply probability maps directly from saved `policy` and `run` reports with `caat calibrate apply`.
+- Stream `calibrate apply` output and replace the destination after a complete write.
+- Export a seeded label sample with `caat plan --sample-output` and verify its draw from the saved plan during audits.
+- Stream `route` decisions to reduce memory use on large batches.
+- Include fields from the original outputs in a planned label sample by matching IDs and output keys.
+- Audit selected outputs against full grader exports and read grader keys from a separate column name.
+- Set `lower_is_better` in a TOML workflow and reuse its saved score direction with raw input scores.
+- Use `ltt-holm` for joint score and cutoff selection and report decisions for the full candidate family.
+- Compare lower-is-better scores in `scores` and fit reusable cutoffs on their original values in `select` and `policy`.
+- Monitor selected predictions with full grader exports, matching arriving labels by ID and output key.
+- Read separate grader exports for holdout checks in TOML workflows and include the joined labels in the holdout CSV.
+- Reuse a saved cutoff's output key column for routing, holdout checks, monitoring, and label sample sources.
+- Export exact response hashes with `caat features` and fit cutoffs from separate grader files in `select` and `policy`.
+- Route predictions with missing scores to review on request and keep them in the coverage denominator.
+- Monitor keyed routing decisions in their original order as labels arrive, including review rows without scores.
+- Compare scores with missing values at shared coverage budgets and report how many paired bootstrap draws reach each budget.
+- Fit and check acceptance policies that send unscored outputs to review, and reuse that rule from saved cutoff reports.
+- Extend missing-score review to TOML workflows and queues, and preserve unscored rows when applying a probability map.
+- Keep unscored answers in partial external score joins for Inspect, lm-eval, and Every Eval Ever.
+- Alert on low acceptance in rolling coverage windows, including while monitor labels are pending.
+- Monitor coverage windows directly from unlabeled scores or routing decisions.
+- Allow partially scored inputs in GitHub Action audits with numeric cutoffs.
+- Preserve blank scores when `caat orient` exports lower-is-better columns for partial inputs.
+- Fit standalone probability maps on scored calibration rows and carry the missing-score rule into application.
+- Use exact decimal row budgets for score comparisons and their paired bootstrap.
+- Fit and apply probability maps to selected tiers in combined prediction exports.
+- Fit standalone maps directly on lower-is-better scores and reuse their saved direction on new batches.
+- Read separate grader ID headers when fitting, auditing, and monitoring, including in TOML workflows and the audit action.
+- Check for reused sample IDs or output identities when reading a separate cutoff design table.
+- Read renamed raw scores with the saved direction when reusing cutoffs and probability maps.
+- Fit a standalone probability map from saved scores and a separate grader export matched by ID and output key.
+- Evaluate saved scores against one separate grader export, including holdout risk and probability calibration metrics.
+- Compare multiple confidence scores against separate grader exports matched by ID and output key.
+- Run a TOML workflow with separate keyed grader exports for score comparison, fitting, and holdout checks.
+- Track the outputs used to fit a calibration map and check for reuse when applying it to a holdout.
+- Report the latest coverage window alongside a monitor's first coverage alert.
+- Read the columns of a planned label sample directly in `evaluate` and `audit`, including scores already oriented by routing.
+- Match the score scale of copied label samples against their batch decisions when the original and routed scores share a header.
+- Find minimum label budgets for large fixed batches faster by carrying exact sample counts between budgets.
+- Speed up fixed-budget planning and fixed-batch audits with bounded integer comparisons of hypergeometric tails.
+- Rule out infeasible ranges of fixed-batch label budgets using a power bound, then check the remaining budgets in order.
+- Use exact binomial comparisons and power bounds when planning label budgets for independent samples.
+- Invert the exact binomial tail for independent holdout bounds and fixed-budget label plans, including equality at the risk target.
+- Reduce binomial tail evaluations when computing independent holdout bounds.
+- Compare exact binomial tails at the Bonferroni, fixed-sequence, and Holm test levels.
+- Compare fixed-batch error counts with decimal targets using exact ratios and round reported risk bounds up.
+- Compare observed error ratios exactly in empirical selection and evaluation.
+- Resolve sequential monitor alerts and p-value rounding with exact mixture comparisons.
+
 ## 0.2.0
 
 - Fit and apply temperature, Platt, isotonic, and histogram probability maps.

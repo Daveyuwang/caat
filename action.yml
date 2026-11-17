@@ -1,0 +1,93 @@
+name: CAAT grader audit
+description: Check a fixed acceptance threshold against paired grader outcomes
+
+inputs:
+  predictions:
+    description: Path to the saved prediction CSV or JSONL in the caller's checkout
+    required: true
+  threshold:
+    description: Frozen score threshold for accepting predictions. Provide this or threshold-report.
+  threshold-report:
+    description: Path to a select, policy, or run JSON report in the caller's checkout
+  risk-target:
+    description: Maximum accepted-set error rate between 0 and 1. Required with a numeric threshold unless plan-report supplies it.
+  grader-files:
+    description: One NAME=FILE per line for CSV or JSONL grades, with the reference grader first
+  grader-id-column:
+    description: ID column in grader files when it differs from the prediction ID column
+  grader-output-key-column:
+    description: Key column in grader files when it differs from the prediction key column
+  allow-extra-grades:
+    description: Set to true to match the selected IDs and output keys in full grader exports
+    default: "false"
+  correct-columns:
+    description: One correctness column per line for a CSV with inline grades, reference first
+  id-column:
+    description: Prediction ID column override. CAAT can read the header from a planned sample or reuse the threshold report setting.
+  score-column:
+    description: Prediction score column override. CAAT can use an oriented score from a planned sample or reuse the threshold report setting.
+  raw-score-column:
+    description: Prediction score column to read using the saved score direction. Requires threshold-report.
+  output-key-column:
+    description: Saved output key column override. CAAT can use the key header from a planned sample or a saved report. Separate grader exports default to output_sha256.
+  group-column:
+    description: Optional group column for reporting group-level results
+  prediction-filter:
+    description: Select prediction rows with one COLUMN=VALUE filter
+  review-missing-scores:
+    description: Set to true to send blank scores to review and keep them in the coverage denominator
+    default: "false"
+  holdout-confidence:
+    description: Confidence level for a one-sided upper bound on accepted-set error
+  accepted-population:
+    description: Total accepted rows in the fixed batch sampled uniformly without replacement
+  batch-decisions:
+    description: Complete route decision table for the fixed batch. Provide this or accepted-population.
+  plan-report:
+    description: Saved caat plan JSON report with the required accepted label count and risk settings
+  sample-seed:
+    description: Seed of the random queue draw to verify against batch-decisions. The action uses the saved seed when plan-report contains one.
+  bootstrap:
+    description: Number of paired bootstrap replicates for grader comparisons
+  seed:
+    description: Bootstrap seed, default 42
+  report-path:
+    description: Path to write the JSON audit report in the caller's checkout
+    default: caat-audit.json
+  disagreements-path:
+    description: Optional CSV path for outputs whose grades differ
+
+outputs:
+  status:
+    description: CAAT exit code, 0 for pass, 1 for a target miss, 2 for an input error
+    value: ${{ steps.audit.outputs.status }}
+  report-path:
+    description: Path to the report from a completed audit, including a target miss
+    value: ${{ steps.audit.outputs.report-path }}
+  disagreements-path:
+    description: Path to the disagreements CSV from a completed audit, if requested
+    value: ${{ steps.audit.outputs.disagreements-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python for CAAT
+      id: python
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.12"
+        update-environment: false
+    - name: Run CAAT audit
+      id: audit
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        CAAT_ACTION_ROOT: ${{ github.action_path }}
+        CAAT_ACTION_PYTHON: ${{ steps.python.outputs.python-path }}
+        CAAT_ACTION_INPUTS: ${{ toJSON(inputs) }}
+      run: '"$CAAT_ACTION_PYTHON" -I -X utf8 "$CAAT_ACTION_ROOT/scripts/audit_action.py"'
+    - name: Enforce the risk target
+      shell: bash
+      env:
+        CAAT_AUDIT_STATUS: ${{ steps.audit.outputs.status }}
+      run: exit "$CAAT_AUDIT_STATUS"

@@ -78,4 +78,4 @@ The course scorer uses logistic regression with isotonic calibration on Qwen
 confidence, DeBERTa predictions, and text features. [Datasets](course-datasets.md) · [Model results and training commands](course-results.md)
 
 The course dashboard shows the saved results for research use. The hosted
-dashboard omits example text. [Dashboard](https://one684proj.onrender.com/) · [Local setup](course-results.md#course-dashboard)
+copy is retired. [Local setup](course-results.md#course-dashboard)
