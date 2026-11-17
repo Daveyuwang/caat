@@ -15,7 +15,7 @@ from .audit import percentile_interval
 from .features import FEATURES
 from .metrics import ranking_metrics, risk_at_count, threshold_points
 from .policy import split_rows
-from .table import open_selected_predictions, parse_correct, parse_score
+from .table import exact_match, open_selected_predictions, parse_correct, parse_score
 
 
 DEFAULT_COVERAGES = (0.25, 0.5, 0.75)
@@ -43,12 +43,17 @@ def read_score_rows(
     source_rows=None,
     negated_scores=None,
     review_missing_scores=False,
+    label_columns=None,
 ):
+    """Read score columns with 0/1 grader columns or one exact label match.
+
+    label_columns is a (prediction, reference) pair that replaces graders.
+    """
     negated_scores = negated_scores or {}
     columns = tuple(
         (negated_scores.get(name, name), name in negated_scores) for name in names
     )
-    needed = {id_column, *graders}
+    needed = {id_column, *graders, *(label_columns or ())}
     needed.update(column for column, _ in columns)
     needed.update(
         column for column in (length_column, output_key_column) if column is not None
@@ -69,7 +74,9 @@ def read_score_rows(
                         else parse_score(row[column], reader.line_num, negate=negate)
                         for column, negate in columns
                     ),
-                    tuple(
+                    (exact_match(row[id_column], *(row[c] for c in label_columns)),)
+                    if label_columns
+                    else tuple(
                         parse_correct(row[name], reader.line_num) for name in graders
                     ),
                     parse_score(row[length_column], reader.line_num)

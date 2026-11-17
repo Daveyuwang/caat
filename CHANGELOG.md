@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Grade by exact match between `--prediction-column` and `--reference-column` in `policy`, `select`, and `scores`, as `evaluate` already does.
+- Report the accepted count for the whole input next to the held-out check in `caat policy`.
+- When no cutoff qualifies, report the lowest calibration error the candidates reached and its coverage.
+- Copy input columns into routed decisions with `caat route --keep-column`, and omit the `group` column when the input has none.
 - Build release wheels from normalized source archives with a fixed timestamp and pinned build backend.
 - Export saved Inspect completions and align external confidence scores by sample identity and output hash.
 - Restore retained Inspect prompt attachments in scoring exports and write JSONL when requested.

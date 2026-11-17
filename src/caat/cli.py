@@ -146,7 +146,7 @@ def score_direction_option(parser):
 def selection_options(parser):
     prediction_filter_option(parser)
     score_direction_option(parser)
-    grader_source_options(parser)
+    grader_source_options(parser, labels=True)
     parser.add_argument("--risk-target", type=float, required=True)
     parser.add_argument("--failure-rate", type=float, default=0.05)
     parser.add_argument("--rule", choices=RULES, default="ltt-bonferroni")
@@ -987,9 +987,18 @@ def run_plan(args):
     return int(budget is None)
 
 
-def grader_source_options(parser, *, multiple=True):
-    grades = parser.add_mutually_exclusive_group(required=True)
+def grader_source_options(parser, *, multiple=True, labels=False):
+    """Add grade inputs. With labels, an exact prediction-reference match also works."""
+    grades = parser.add_mutually_exclusive_group(required=not labels)
     action = "append" if multiple else "store"
+    if labels:
+        parser.add_argument(
+            "--prediction-column",
+            help="Grade by exact match with the reference column. Defaults to 'prediction' without 0/1 grades.",
+        )
+        parser.add_argument(
+            "--reference-column", help="Defaults to 'reference' for exact matching."
+        )
     grades.add_argument(
         "--correct-column",
         action=action,
@@ -1391,6 +1400,12 @@ def route_options(parser):
     review_missing_scores_option(parser)
     parser.add_argument("--output", type=Path, metavar="CSV", required=True)
     parser.add_argument(
+        "--keep-column",
+        action="append",
+        metavar="COLUMN",
+        help="Copy this input column to the decisions file. Repeat for more.",
+    )
+    parser.add_argument(
         "--json", action="store_true", help="Print the routing summary."
     )
 
@@ -1411,6 +1426,7 @@ def run_route(args):
         selection=args.prediction_filter,
         negate_score=args.negated_score_source is not None,
         review_missing_scores=args.review_missing_scores,
+        keep_columns=args.keep_column or (),
     )
     meta = {
         "path": str(args.predictions),
@@ -1419,6 +1435,8 @@ def run_route(args):
         "group_column": group,
         "output_key_column": key_column,
     }
+    if args.keep_column:
+        meta["keep_columns"] = list(args.keep_column)
     if args.negated_score_source is not None:
         meta["negated_score_source"] = args.negated_score_source
     if args.review_missing_scores:
@@ -1591,7 +1609,7 @@ def scores_options(parser):
     parser.add_argument(
         "--output-key-column", help="Column identifying the saved output."
     )
-    grader_source_options(parser)
+    grader_source_options(parser, labels=True)
     prediction_filter_option(parser)
     review_missing_scores_option(parser)
     parser.add_argument("--baseline", help="Default is the first score column.")
@@ -1635,7 +1653,17 @@ def run_scores(args, *, auto_workers=False):
             "grader column options and --allow-extra-grades require --grader-file"
         )
     key = args.output_key_column or ("output_sha256" if files else None)
+    labels = None
+    if not files and not args.correct_column:
+        labels = (
+            args.prediction_column or "prediction",
+            args.reference_column or "reference",
+        )
+    elif args.prediction_column is not None:
+        raise ValueError("--prediction-column applies to exact-match grading")
     graders = [name for name, _ in files] if files else args.correct_column
+    if labels:
+        graders = [labels[1]]
     costs = dict(args.score_cost or ())
     if len(costs) != len(args.score_cost or ()):
         raise ValueError("give at most one cost for each score column")
@@ -1654,6 +1682,7 @@ def run_scores(args, *, auto_workers=False):
         selection=args.prediction_filter,
         negated_scores={name: name for name in lower},
         review_missing_scores=args.review_missing_scores,
+        label_columns=labels,
     )
     if files:
         output_keys = {row.id: row.output_key for row in rows}
@@ -1698,6 +1727,8 @@ def run_scores(args, *, auto_workers=False):
         "length_column": args.length_column,
         "correct_columns": args.correct_column or [],
     }
+    if labels:
+        meta["prediction_column"], meta["reference_column"] = labels
     if key is not None:
         meta["output_key_column"] = key
     if files:
@@ -1758,23 +1789,36 @@ def load_inputs(args, *, source_rows=None):
         )
     prediction = getattr(args, "prediction_column", None)
     reference = getattr(args, "reference_column", None)
+    unnamed_labels = False
     if args.command == "evaluate":
         if len(columns) > 1:
             raise ValueError(
                 "evaluate needs one correctness column; use audit to compare graders"
             )
+        if len(files or ()) > 1:
+            raise ValueError(
+                "evaluate needs one grader file; use audit to compare graders"
+            )
+    if args.command in {"evaluate", "select", "policy"}:
         if files:
-            if len(files) > 1:
-                raise ValueError(
-                    "evaluate needs one grader file; use audit to compare graders"
-                )
             if prediction is not None:
                 raise ValueError(
                     "--prediction-column applies to exact-match evaluation"
                 )
-        elif not columns:
+        elif columns:
+            if prediction is not None and args.command != "evaluate":
+                raise ValueError(
+                    "use --correct-column for 0/1 grades or --prediction-column for label matching"
+                )
+        else:
+            if checks:
+                raise ValueError(
+                    "--check-column needs --correct-column or --grader-file"
+                )
+            unnamed_labels = prediction is None and reference is None
             prediction, reference = prediction or "prediction", reference or "reference"
-        meta.update(prediction_column=prediction, reference_column=reference)
+        if args.command == "evaluate" or not (files or columns):
+            meta.update(prediction_column=prediction, reference_column=reference)
     if files:
         if args.adapter is not None:
             raise ValueError("separate grader files use the built-in table join")
@@ -1816,7 +1860,15 @@ def load_inputs(args, *, source_rows=None):
                 raise ValueError("--holdout-output uses the built-in prediction reader")
             options["source_rows"] = source_rows
         if args.adapter is None:
-            rows, group = read_table_rows(args.predictions, **options)
+            try:
+                rows, group = read_table_rows(args.predictions, **options)
+            except ValueError as exc:
+                if unnamed_labels and " columns: " in str(exc):
+                    raise ValueError(
+                        f"{exc}. Name a 0/1 grade column with --correct-column, or label "
+                        "columns with --prediction-column and --reference-column"
+                    ) from exc
+                raise
         else:
             rows = list(ADAPTERS[args.adapter].read(args.predictions, options))
             group = args.group_column or (
@@ -1927,6 +1979,9 @@ def run(args, *, staged, fit_outputs=None, label_plan=None):
         if grader_files
         else tuple(args.correct_column or ())
     )
+    if not graders and args.command in {"select", "policy"}:
+        # Exact label matching has one grader, named after the reference column.
+        graders = (meta["reference_column"],)
     curve = None
     exit_code = 0
     html = getattr(args, "html", None) is not None or args.render == "html"

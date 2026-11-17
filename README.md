@@ -27,9 +27,11 @@ counts 33 errors among accepted responses (22.9%), and HELM counts 45
 
 Use CSV or JSONL with one unique `id` and a finite `score` per row.
 Larger scores indicate greater confidence. Use `--correct-column NAME`
-for a grader's 0/1 outcome. `caat evaluate` can also match `prediction`
-and `reference` labels directly. Map different column names with the flags
-above. An optional `group` column gives per-group metrics.
+for a grader's 0/1 outcome. If the file has a predicted label and a true
+label instead, name them with `--prediction-column` and `--reference-column`
+in `evaluate`, `policy`, `select`, or `scores`, and CAAT grades by exact
+match. Map different column names with the flags above. An optional `group`
+column gives per-group metrics.
 
 Add `--json` for machine-readable stdout or `--output FILE` to save the
 report. [Prediction tables](https://github.com/Daveyuwang/caat/blob/main/docs/guide/csv-format.md) · [Report fields](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md)

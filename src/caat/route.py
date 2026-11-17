@@ -156,11 +156,22 @@ def route_batch(
     selection,
     negate_score,
     review_missing_scores,
+    keep_columns=(),
 ):
-    """Stream predictions through a cutoff and write all batch decisions."""
+    """Stream predictions through a cutoff and write all batch decisions.
+
+    keep_columns are copied from the input after the decision columns.
+    """
     if not isfinite(threshold):
         raise ValueError("threshold must be finite")
-    required = {id_column, score_column}
+    keep_columns = tuple(keep_columns)
+    reserved = {"id", "score", "decision", "group", "output_key"}
+    if len(set(keep_columns)) != len(keep_columns) or reserved & set(keep_columns):
+        raise ValueError(
+            "--keep-column names must be distinct and differ from "
+            "id, score, decision, group, and output_key"
+        )
+    required = {id_column, score_column, *keep_columns}
     if output_key_column is not None:
         required.add(output_key_column)
     accepted = missing_scores = 0
@@ -174,9 +185,12 @@ def route_batch(
             and fallback_output_key_column in reader.fieldnames
         ):
             output_key_column = fallback_output_key_column
-        columns = ["id", "score", "decision", "group"]
+        columns = ["id", "score", "decision"]
+        if group_column is not None:
+            columns.append("group")
         if output_key_column is not None:
             columns.append("output_key")
+        columns.extend(keep_columns)
 
         def decisions():
             nonlocal accepted, missing_scores
@@ -196,13 +210,15 @@ def route_batch(
                         raise ValueError(f"score for id {item_id!r} must be finite")
                 meets_cutoff = score is not None and score >= threshold
                 accepted += meets_cutoff
-                group = row[group_column] if group_column is not None else None
-                fields = [item_id, score, "accept" if meets_cutoff else "review", group]
+                fields = [item_id, score, "accept" if meets_cutoff else "review"]
+                if group_column is not None:
+                    fields.append(row[group_column])
                 if output_key_column is not None:
                     key = row[output_key_column]
                     if not key:
                         raise ValueError(f"{path}: missing output key for {item_id!r}")
                     fields.append(key)
+                fields.extend(row[name] for name in keep_columns)
                 yield fields
             if not seen:
                 raise ValueError("at least one prediction is required")

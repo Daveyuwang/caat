@@ -56,9 +56,14 @@ option when comparing or fitting with those columns.
 ## Grades in the prediction file
 
 Provide a 0/1 outcome for each grader. Repeat `--correct-column` in the
-order you want CAAT to use. `evaluate` uses one grader. Its exact-match
-mode uses `prediction` and `reference` labels. Supply `--reference-column`
-with an explicit outcome column to group results by reference label.
+order you want CAAT to use. `evaluate` uses one grader.
+
+Without a 0/1 column, `evaluate`, `policy`, `select`, and `scores` grade by
+exact match between `--prediction-column` and `--reference-column`, which
+default to `prediction` and `reference`. The match is one grader, named
+after the reference column in reports. In `evaluate`, supply
+`--reference-column` with an explicit outcome column to group results by
+reference label.
 `policy --check-column` adds graders for the held-out comparison.
 
 `--group-column` identifies groups for reporting. CAAT automatically

@@ -399,6 +399,8 @@ that column for selection and validation.
 | `heldout.graders.*.meets_target` | Whether a grader meets the target on the holdout. Each grader also has held-out counts and rates. |
 | `heldout.graders.*.risk_upper_bound` | One-sided exact binomial upper bound on accepted error, present with `--holdout-confidence`. |
 | `heldout.accepted_comparisons` | Directional shifts when two or more graders are listed. |
+| `all_rows.accepted` | Rows at or above the selected cutoff in the whole input, with `total` and `coverage`. Present when a cutoff is selected. |
+| `all_rows.fitting` | Design and calibration rows. They chose the cutoff, so the held-out rows give the error estimate. |
 | `confirmed` | True if a cutoff is selected and all graders meet the selected holdout check. |
 
 `heldout` is null when selection finds no cutoff.

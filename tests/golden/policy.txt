@@ -4,4 +4,5 @@ Score ranking under helm_strict_pass: AUROC 0.614.
 Selected threshold -0.43964836263206303 for a 40% risk target under strict_pass (ltt-bonferroni).
 Held-out rows under strict_pass: accepted 144 of 217 with 33 errors (22.9%), which meets the target.
 Held-out rows under helm_strict_pass (check only): accepted 144 of 217 with 45 errors (31.2%), which meets the target.
+Applied to all 541 rows, the cutoff accepts 367 (67.8%). 324 of the 541 rows were used to choose the cutoff, so only the held-out rows give the error estimate.
 The held-out rows confirm the policy.

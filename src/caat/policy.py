@@ -173,6 +173,17 @@ def _policy_for_splits(
         "confirmed": check is not None
         and all(result["meets_target"] is True for result in check["graders"].values()),
     }
+    if threshold is not None:
+        # The whole-table count answers "how many of my rows"; only the
+        # held-out rows estimate the error, because the rest chose the cutoff.
+        everything = (*design, *calibration, *heldout)
+        accepted_everywhere = sum(accepted_at(row, threshold) for row in everything)
+        report["all_rows"] = {
+            "total": len(everything),
+            "accepted": accepted_everywhere,
+            "coverage": accepted_everywhere / len(everything),
+            "fitting": len(design) + len(calibration),
+        }
     if holdout_confidence is not None:
         report["holdout_confidence"] = holdout_confidence
     if review_missing_scores:
