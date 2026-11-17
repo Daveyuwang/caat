@@ -1,7 +1,7 @@
 import csv
 import json
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from importlib.util import find_spec
 from io import StringIO
 from pathlib import Path
@@ -12,6 +12,93 @@ from caat.policy import split_rows
 from caat.scorer import LinearScorer, fit_scorer
 from caat.scores import ScoredRow
 from caat.workflow import run_workflow
+
+
+class SavedPolicyTests(unittest.TestCase):
+    def test_same_decisions_from_features_and_precomputed_scores(self):
+        scorer = LinearScorer(
+            ("margin", "loss"), (1, -1), (0, 0), (1, 1), (1, 1), 0, 1, 10, "f" * 64
+        )
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = root / "policy.json"
+            report.write_text(
+                json.dumps(
+                    {
+                        "command": "run",
+                        "input": {"id_column": "item", "review_missing_scores": True},
+                        "selected_score": "fitted_score",
+                        "scorer": scorer.to_dict(),
+                        "policy": {
+                            "confirmed": True,
+                            "selection": {
+                                "selected_threshold": 0.5,
+                                "risk_target": 0.4,
+                            },
+                        },
+                    }
+                )
+            )
+            raw = root / "predictions.csv"
+            raw.write_text(
+                "loss,item,margin,fitted_score,correct,other,output_sha256\n"
+                "0.25,a,0.75,-99,1,1,ka\n0.5,b,0.4,99,0,0,kb\n0,c,,99,0,0,kc\n"
+            )
+            labels = root / "labels.csv"
+            labels.write_text("item,output_sha256,correct\na,ka,1\nb,kb,0\nc,kc,0\n")
+            for extra, accepted in (([], 1), (["--score-column", "fitted_score"], 2)):
+                for cmd, flags in (
+                    ("route", ["--output", str(root / "decisions.csv")]),
+                    ("evaluate", ["--correct-column", "correct"]),
+                    ("evaluate", ["--grader-file", f"first={labels}"]),
+                    (
+                        "audit",
+                        ["--correct-column", "correct", "--correct-column", "other"],
+                    ),
+                    ("monitor", ["--grader-file", f"first={labels}"]),
+                ):
+                    with (
+                        self.subTest(cmd=cmd, flags=flags, extra=extra),
+                        redirect_stdout(StringIO()) as out,
+                    ):
+                        main(
+                            [
+                                cmd,
+                                str(raw),
+                                "--threshold-report",
+                                str(report),
+                                "--json",
+                                *flags,
+                                *extra,
+                            ]
+                        )
+                        result = json.loads(out.getvalue())
+                        if cmd == "audit":
+                            counts = result["graders"]["correct"]
+                        else:
+                            counts = result["overall"]
+                        self.assertEqual(counts["accepted"], accepted)
+                        if cmd == "route":
+                            with (root / "decisions.csv").open() as handle:
+                                ids = [
+                                    r["id"]
+                                    for r in csv.DictReader(handle)
+                                    if r["decision"] == "accept"
+                                ]
+                            self.assertEqual(ids, ["a"] if not extra else ["b", "c"])
+            raw.write_text("item,fitted_score,correct\na,1,1\n")
+            with redirect_stderr(StringIO()) as err, self.assertRaises(SystemExit):
+                main(
+                    [
+                        "evaluate",
+                        str(raw),
+                        "--correct-column",
+                        "correct",
+                        "--threshold-report",
+                        str(report),
+                    ]
+                )
+            self.assertIn("--score-column", err.getvalue())
 
 
 @unittest.skipUnless(find_spec("sklearn"), "requires the scorer extra")

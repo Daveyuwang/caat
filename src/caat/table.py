@@ -453,6 +453,52 @@ def open_selected_predictions(path, required, group_column, selection):
         yield rows, reader, group_column
 
 
+@contextmanager
+def open_scored_predictions(
+    path,
+    required,
+    group_column,
+    selection,
+    *,
+    score_column,
+    negate_score,
+    review_missing_scores,
+    scorer,
+):
+    if scorer is None:
+        required = required | {score_column}
+    with open_selected_predictions(path, required, group_column, selection) as (
+        source,
+        reader,
+        group,
+    ):
+        if scorer is None:
+            rows = (
+                (
+                    row,
+                    parse_score(
+                        row[score_column],
+                        reader.line_num,
+                        negate=negate_score,
+                        review_missing_scores=review_missing_scores,
+                    ),
+                )
+                for row in source
+            )
+        else:
+            missing = set(scorer.columns).difference(reader.fieldnames)
+            if missing:
+                raise ValueError(
+                    f"missing fitted scorer features: {', '.join(sorted(missing))}. "
+                    "Supply the original features or use --score-column for a precomputed score."
+                )
+            rows = (
+                (row, scorer.score_row(row, reader.line_num, review_missing_scores))
+                for row in source
+            )
+        yield rows, reader, group
+
+
 def orient_score_table(
     source, output, requested, *, selection=None, review_missing_scores=False
 ):
@@ -513,12 +559,13 @@ def open_table_rows(
     source_rows=None,
     negate_score=False,
     review_missing_scores=False,
+    scorer=None,
 ):
     """Yield parsed rows and the resolved group column while the input is open."""
     if not correct_columns and require_labels:
         prediction_column = prediction_column or "prediction"
         reference_column = reference_column or "reference"
-    required = {id_column, score_column, *correct_columns}
+    required = {id_column, *correct_columns}
     required.update(
         column
         for column in (prediction_column, reference_column, output_key_column)
@@ -526,21 +573,20 @@ def open_table_rows(
     )
     path = Path(path)
     make_row = graded_row if review_missing_scores else GradedRow
-    with open_selected_predictions(path, required, group_column, selection) as (
-        source,
-        reader,
+    with open_scored_predictions(
+        path,
+        required,
         group_column,
-    ):
+        selection,
+        score_column=score_column,
+        negate_score=negate_score,
+        review_missing_scores=review_missing_scores,
+        scorer=scorer,
+    ) as (source, reader, group_column):
 
         def rows():
-            for row in source:
+            for row, score in source:
                 item_id = row[id_column]
-                score = parse_score(
-                    row[score_column],
-                    reader.line_num,
-                    negate=negate_score,
-                    review_missing_scores=review_missing_scores,
-                )
                 reference = (
                     row[reference_column] if reference_column is not None else None
                 )
@@ -707,29 +753,30 @@ def join_grader_files(
     source_rows=None,
     review_missing_scores=False,
     negate_score=False,
+    scorer=None,
 ):
-    required = {id_column, score_column, output_key_column, *check_columns}
+    required = {id_column, output_key_column, *check_columns}
     if reference_column is not None:
         required.add(reference_column)
-    with open_selected_predictions(path, required, group_column, selection) as (
-        rows,
-        reader,
+    with open_scored_predictions(
+        path,
+        required,
         group_column,
-    ):
+        selection,
+        score_column=score_column,
+        negate_score=negate_score,
+        review_missing_scores=review_missing_scores,
+        scorer=scorer,
+    ) as (rows, reader, group_column):
         predictions = {}
-        for row in rows:
+        for row, score in rows:
             item_id, key = row[id_column], row[output_key_column]
             if not item_id or item_id in predictions:
                 raise ValueError(f"{path}: empty or duplicate id: {item_id!r}")
             if not key:
                 raise ValueError(f"{path}: missing output key for {item_id!r}")
             predictions[item_id] = (
-                parse_score(
-                    row[score_column],
-                    reader.line_num,
-                    negate=negate_score,
-                    review_missing_scores=review_missing_scores,
-                ),
+                score,
                 key,
                 (row[group_column] or None) if group_column is not None else None,
                 tuple(

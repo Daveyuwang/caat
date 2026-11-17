@@ -281,4 +281,4 @@ caat scorer fit design.csv --score-column top_prob --score-column margin --corre
 caat scorer apply new-digits.csv --scorer scorer.json --output scored.csv
 ```
 
-The Python equivalents are `fit_scorer`, `read_scorer` and `apply_scorer` in `caat.scorer`. Standalone apply also accepts a workflow JSON and writes a CSV with the extra `fitted_score` column. For batch routing from the original features, supply the confirmed workflow report. For a batch you already scored using that scorer, add `--score-column fitted_score`. [Scorer benchmark](../research/routing-stability.md)
+The Python equivalents are `fit_scorer`, `read_scorer` and `apply_scorer` in `caat.scorer`. Standalone apply also accepts a workflow JSON and writes a CSV with the extra `fitted_score` column. With the workflow report, `route`, `evaluate`, `audit` and `monitor` compute the same fitted score from the original features, including when the table contains a stale derived column. Routing requires a confirmed report. To use previously computed scores, pass `--score-column fitted_score`, or `--id-column id --score-column score` on a routed export. [Scorer benchmark](../research/routing-stability.md)

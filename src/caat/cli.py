@@ -218,7 +218,12 @@ def use_plan_sample_columns(args, saved, sample_path):
     )
     if raw_key is None and "output_key" in fields:
         raw_key = saved.get("output_key_column") or "output_sha256"
-    original_columns = {raw_id, raw_score, raw_key} - {None}
+    features = (
+        LinearScorer.from_dict(saved["scorer"]).columns
+        if args.score_column is None and "scorer" in saved
+        else ()
+    )
+    original_columns = {raw_id, raw_key, *(features or (raw_score,))} - {None}
     if (
         args.predictions.resolve() != Path(sample_path).resolve()
         and original_columns <= fields
@@ -253,6 +258,11 @@ def load_threshold_options(args, *, require_confirmed=False, label_plan=None):
             args, saved, sample_path
         )
     use_report_score = args.score_column is None
+    args.scorer = (
+        LinearScorer.from_dict(saved["scorer"])
+        if use_report_score and "scorer" in saved
+        else None
+    )
     options = vars(args)
     for name in (
         "threshold",
@@ -756,6 +766,7 @@ def run_monitor(args):
             require_labels=bool(columns),
             negate_score=args.negated_score_source is not None,
             review_missing_scores=bool(args.review_missing_scores),
+            scorer=args.scorer,
         )
     if fit_outputs is not None:
         check_fit_overlap(rows, fit_outputs, cohort="monitoring stream")
@@ -1452,13 +1463,7 @@ def route_options(parser):
 
 
 def run_route(args):
-    use_embedded = args.score_column is None and args.raw_score_column is None
     saved = load_threshold_options(args, require_confirmed=True)
-    scorer = (
-        LinearScorer.from_dict(saved["scorer"])
-        if use_embedded and "scorer" in saved
-        else None
-    )
     if args.output.resolve() in threshold_input_paths(args):
         raise ValueError("output would overwrite an input file")
     overall, group, key_column = route_batch(
@@ -1474,7 +1479,7 @@ def run_route(args):
         negate_score=args.negated_score_source is not None,
         review_missing_scores=args.review_missing_scores,
         keep_columns=args.keep_column or (),
-        scorer=scorer,
+        scorer=args.scorer,
     )
     meta = {
         "path": str(args.predictions),
@@ -1812,6 +1817,12 @@ def load_inputs(args, *, source_rows=None):
         "correct_columns": list(columns),
         "output_key_column": args.output_key_column,
     }
+    if getattr(args, "scorer", None) is not None:
+        if args.adapter not in (None, "csv"):
+            raise ValueError(
+                "use --score-column with a precomputed score for a custom adapter"
+            )
+        common["scorer"] = args.scorer
     if args.review_missing_scores:
         common["review_missing_scores"] = True
         meta["review_missing_scores"] = True

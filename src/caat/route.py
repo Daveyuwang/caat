@@ -9,7 +9,7 @@ from .queue import shuffled_by_id
 from .table import (
     GradedRow,
     open_prediction_table,
-    open_selected_predictions,
+    open_scored_predictions,
     parse_score,
     write_rows,
 )
@@ -172,15 +172,20 @@ def route_batch(
             "--keep-column names must be distinct and differ from "
             "id, score, decision, group, and output_key"
         )
-    required = {
-        id_column,
-        *keep_columns,
-        *(scorer.columns if scorer else (score_column,)),
-    }
+    required = {id_column, *keep_columns}
     if output_key_column is not None:
         required.add(output_key_column)
     accepted = missing_scores = 0
-    with open_selected_predictions(path, required, group_column, selection) as (
+    with open_scored_predictions(
+        path,
+        required,
+        group_column,
+        selection,
+        score_column=score_column,
+        negate_score=negate_score,
+        review_missing_scores=review_missing_scores,
+        scorer=scorer,
+    ) as (
         rows,
         reader,
         group_column,
@@ -200,22 +205,11 @@ def route_batch(
         def decisions():
             nonlocal accepted, missing_scores
             seen = set()
-            for row in rows:
+            for row, score in rows:
                 item_id = row[id_column]
                 if not item_id or item_id in seen:
                     raise ValueError(f"empty or duplicate id: {item_id!r}")
                 seen.add(item_id)
-                if scorer is None:
-                    score = parse_score(
-                        row[score_column],
-                        reader.line_num,
-                        negate=negate_score,
-                        review_missing_scores=review_missing_scores,
-                    )
-                else:
-                    score = scorer.score_row(
-                        row, reader.line_num, review_missing_scores
-                    )
                 if score is None:
                     missing_scores += 1
                 elif not isfinite(score):
