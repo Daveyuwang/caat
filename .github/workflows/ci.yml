@@ -376,6 +376,8 @@ jobs:
           python -m pip install build==1.6.1 twine==7.0.0
           python -m build
           python -m twine check --strict dist/*
+      - name: Verify the fitted policy across clean training and base installs
+        run: python scripts/check_policy_wheel.py dist/*.whl
       - name: Install the wheel outside the checkout
         run: |
           python -m venv "$RUNNER_TEMP/wheel"

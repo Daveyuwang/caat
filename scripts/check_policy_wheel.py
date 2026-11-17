@@ -5,6 +5,7 @@ import csv
 import json
 import os
 from pathlib import Path
+import shlex
 from shutil import copyfile
 from subprocess import run
 from tempfile import TemporaryDirectory
@@ -16,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def install(directory, wheel, extras):
-    EnvBuilder(with_pip=True).create(directory)
+    EnvBuilder(with_pip=True, symlinks=os.name != "nt").create(directory)
     binaries = directory / ("Scripts" if os.name == "nt" else "bin")
     python = binaries / ("python.exe" if os.name == "nt" else "python")
     cli = binaries / ("caat.exe" if os.name == "nt" else "caat")
@@ -45,6 +46,15 @@ def command(cli, cwd, *args, status=0):
 
 
 def verify(wheel):
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    section = readme.split(
+        "## Reuse one fitted policy from routing through audit\n", 1
+    )[1]
+    commands = {}
+    for line in section.split("\n## ", 1)[0].splitlines():
+        if line.startswith("caat "):
+            _, name, *arguments = shlex.split(line)
+            commands[name] = arguments
     start = perf_counter()
     with TemporaryDirectory(prefix="caat-first-use-") as temp:
         root = Path(temp)
@@ -53,7 +63,7 @@ def verify(wheel):
         for name in ("digit_classifier.jsonl", "fitted_classifier.toml"):
             copyfile(ROOT / "examples" / name, examples / name)
         _, train = install(root / "training", wheel, "[scorer,workflow]")
-        command(train, root, "run", "examples/fitted_classifier.toml")
+        command(train, root, "run", *commands["run"])
         report = root / "replay/fitted-classifier/workflow.json"
         training_seconds = perf_counter() - start
         phase = perf_counter()
@@ -68,33 +78,20 @@ def verify(wheel):
             check=True,
         )
         handoff = root / "handoff"
-        handoff.mkdir()
+        (handoff / "examples").mkdir(parents=True)
         for name in ("fitted_batch.csv", "fitted_batch_graded.csv"):
-            copyfile(ROOT / "examples" / name, handoff / name)
-        copyfile(report, handoff / "policy.json")
-        policy = ["--threshold-report", "policy.json"]
-        command(
-            base,
-            handoff,
-            "route",
-            "fitted_batch.csv",
-            *policy,
-            "--output",
-            "decisions.csv",
-        )
-        with (handoff / "decisions.csv").open(encoding="utf8", newline="") as source:
+            copyfile(ROOT / "examples" / name, handoff / "examples" / name)
+        copied_report = handoff / report.relative_to(root)
+        copied_report.parent.mkdir(parents=True)
+        copyfile(report, copied_report)
+        command(base, handoff, "route", *commands["route"])
+        with (handoff / "replay/decisions.csv").open(
+            encoding="utf8", newline=""
+        ) as source:
             decisions = {r["id"]: r["decision"] for r in csv.DictReader(source)}
         if decisions != {"new-a": "accept", "new-b": "review"}:
             raise ValueError(f"unexpected routed IDs: {decisions}")
-        for cmd, status, grades in (
-            ("evaluate", 1, ["--correct-column", "correct"]),
-            (
-                "audit",
-                1,
-                ["--correct-column", "correct", "--correct-column", "second_grade"],
-            ),
-            ("monitor", 0, ["--correct-column", "correct"]),
-        ):
+        for cmd, status in (("evaluate", 1), ("audit", 1), ("monitor", 0)):
             # Check the aggregate verdict and each ID so opposite mistakes cannot cancel.
             for item, expected in ((None, 1), ("new-a", 1), ("new-b", 0)):
                 filt = ["--prediction-filter", f"image_id={item}"] if item else []
@@ -103,9 +100,7 @@ def verify(wheel):
                         base,
                         handoff,
                         cmd,
-                        "fitted_batch_graded.csv",
-                        *policy,
-                        *grades,
+                        *commands[cmd],
                         *filt,
                         "--json",
                         status=status,

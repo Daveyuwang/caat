@@ -17,8 +17,14 @@ CLI = [sys.executable, "-c", "from caat.cli import main; raise SystemExit(main()
 
 def readme_commands():
     examples = {}
+    fitted_walkthrough = False
     for line in (ROOT / "README.md").read_text(encoding="utf-8").splitlines():
-        if line.startswith("caat "):
+        if line.startswith("## "):
+            # The release wheel check exercises this multi-command walkthrough.
+            fitted_walkthrough = (
+                line == "## Reuse one fitted policy from routing through audit"
+            )
+        if line.startswith("caat ") and not fitted_walkthrough:
             _, command, *arguments = shlex.split(line)
             if command in examples:
                 raise ValueError(f"Multiple README examples for {command}")
