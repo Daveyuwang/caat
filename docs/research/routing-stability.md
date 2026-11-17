@@ -15,6 +15,7 @@ Use the archived design/calibration assignment for the primary held-out audit. F
 The protocol below was set before reading ARC test outcomes.
 
 Freeze a 20% error target, the same three cutoff procedures, C = 0.1, and two score columns, raw winning-option log likelihood and its margin over the runner-up. Collect zero-shot lm-eval samples from Qwen2.5-7B-Instruct revision `a09a35458c702b33eeacc393d103063234e8bc28`, using the ARC-Challenge prompt, native raw `acc` grader and dataset revision `210d026faf9955653af8916fad021475a3f00453`. Use one third of the shuffled official training questions for design and the remainder for calibration (seed 42). Keep the official test split intact and check question IDs and prompt hashes before auditing. All methods share the same option likelihoods. [ARC data](https://huggingface.co/datasets/allenai/ai2_arc/tree/210d026faf9955653af8916fad021475a3f00453/ARC-Challenge)
+
 ## Archive results
 
 | Case | Grid | Decisions changed | Mean coverage | Refits without a cutoff |
@@ -31,7 +32,46 @@ The Inspect fixture uses the saved sample IDs, scores and alias grades from Insp
 From a checkout with Python 3.12, run the following commands. Each case saves the ordered holdout IDs, design and calibration IDs for each fit, and a decision bit per holdout ID (1 means accept). Seed −1 denotes the original assignment.
 
 ```bash
-python -m pip install . scikit-learn==1.7.2 numpy scipy
+python -m pip install . scikit-learn==1.9.1 numpy==2.5.5 scipy==1.18.1
 python scripts/study_routing_stability.py
 python scripts/study_routing_stability.py --fit-fraction 0.8 --output replay/routing-subsamples
+```
+
+On the original split, each model/task cell used 400 held-out answers. The counts below sum over the three model families. Every qualifying cutoff also met the one-sided 95% holdout check at the 40% target.
+
+| Score | Cutoff grid | TriviaQA accepted / errors | MMLU-Pro accepted / errors |
+| --- | --- | ---: | ---: |
+| Single | Ten quantiles | 302 / 75 | 63 / 12 |
+| Fitted | Ten quantiles | 299 / 72 | 63 / 12 |
+| Single | Shortlist | 0 / 0 | 0 / 0 |
+| Fitted | Shortlist | 0 / 0 | 0 / 0 |
+
+## What moved the cutoff
+
+On the Inspect case, varying design subsamples with calibration fixed changed 2.4% of decisions for the ten-quantile grid. Varying calibration subsamples with design fixed changed 12.1%. The corresponding IFEval rates were 4.6% and 34.8%. Both checks sampled 80% of each original partition. A reduced shortlist can remove every candidate that calibration has enough observations to certify.
+
+As a follow-up, we tried ten fixed thresholds, 0.05 through 0.95 in steps of 0.10 on the probability scale. For IFEval we took their logarithms to match the log score. Both raw scorers were already fixed, so each fit could use its entire label budget for calibration. On the same 80% subsamples and evaluation IDs, decision changes fell from 14.3% to 6.4% on Inspect and from 36.2% to 17.2% on IFEval. Mean coverage rose from 26.3% to 35.6% and from 65.6% to 87.6%. These are exploratory results on the two cases that motivated the follow-up. A user with a prespecified score scale can use this approach with `caat select --thresholds` and a separate holdout. A learned score still needs separate design data. [Diagnostic results](../../results/routing_stability/diagnosis.csv)
+
+## ARC-Challenge results and replay
+
+The RTX 5080 scored 9,163 option likelihoods for 1,119 training and 1,172 test questions in 219.5 seconds of lm-eval evaluation time. The run used lm-eval 0.4.13, BF16, batch size 16 and a 12 GiB GPU weight cap. CAAT reconstructed the native raw-likelihood winners and grades. Six training prompts also occurred in the test set and one further training prompt repeated. Removing those rows before fitting left 370 design and 742 calibration questions. The complete test set contains 1,170 distinct prompt hashes. The paired intervals resample question IDs.
+
+At the locked 20% target, every original-split cell sent all 1,172 answers to review. At 75% coverage the design-selected single margin accepted 879 answers at 40.16% error. The fitted score had 41.87% error at the same budget. The paired difference was +1.71 percentage points (95% interval −0.16 to +3.33). The scorer ships as an opt-in choice. [ARC audits](../../results/routing_stability/arc_audits.csv) · [Refits](../../results/routing_stability/arc_stability.csv) · [Score comparison](../../results/routing_stability/arc_quality.csv)
+
+Using 80% of the fitting rows gave the same pattern. The single score found no cutoff in 200 refits with either grid. The fitted score found a cutoff in one refit per grid. Each averaged under 0.05% coverage. [Matched ARC refits](../../results/routing_stability/arc_stability_80pct.csv)
+
+Replay the verified feature table on CPU. The diagnosis script also verifies 232 candidate decisions against independent SciPy binomial tails and MAPIE's Bonferroni correction.
+
+```bash
+python scripts/study_routing_stability.py --arc results/routing_stability/arc_scores.csv --output replay/arc04/replay
+python scripts/study_routing_stability.py --arc results/routing_stability/arc_scores.csv --fit-fraction 0.8 --output replay/arc04/matched
+python -m pip install mapie==1.6.0
+python scripts/study_routing_diagnosis.py
+```
+
+To regenerate the input with lm-eval 0.4.13 and its Hugging Face backend, run the pinned tasks below. Supply the resulting training and test sample log paths to the preparation script. It checks the native answer keys, prompt hashes, option strings and question IDs before assigning splits. [Prepared feature table](../../results/routing_stability/arc_scores.csv)
+
+```bash
+lm-eval run --model hf --model_args pretrained=Qwen/Qwen2.5-7B-Instruct,revision=a09a35458c702b33eeacc393d103063234e8bc28,dtype=bfloat16,parallelize=True,max_memory_per_gpu=12GiB,max_cpu_memory=40GiB --include_path scripts/arc_challenge --tasks caat_arc_train,caat_arc_test --num_fewshot 0 --batch_size 16 --device cuda --log_samples --output_path replay/arc04/logs
+python scripts/prepare_arc_routing.py TRAIN_SAMPLES.jsonl TEST_SAMPLES.jsonl --output replay/arc04/arc_scores.csv
 ```
