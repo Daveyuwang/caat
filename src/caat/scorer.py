@@ -29,13 +29,30 @@ class LinearScorer:
     regularization: float
     fit_rows: int
     fit_ids_sha256: str
+    class_column: str | None = None
+    categories: tuple = ()
+
+    @property
+    def input_columns(self):
+        return (*self.columns, self.class_column) if self.class_column else self.columns
 
     def __post_init__(self):
-        n = len(self.columns)
+        n = len(self.columns) + len(self.categories)
         if (
-            not n
+            not self.columns
+            or bool(self.categories) != (self.class_column is not None)
+            or (
+                self.class_column is not None
+                and (
+                    not isinstance(self.class_column, str)
+                    or not self.class_column.strip()
+                    or self.class_column in self.columns
+                )
+            )
+            or any(not isinstance(v, str) or not v for v in self.categories)
+            or len(set(self.categories)) != len(self.categories)
             or any(not isinstance(v, str) or not v.strip() for v in self.columns)
-            or len(set(self.columns)) != n
+            or len(set(self.columns)) != len(self.columns)
             or any(
                 len(v) != n for v in (self.signs, self.means, self.scales, self.weights)
             )
@@ -53,12 +70,22 @@ class LinearScorer:
         ):
             raise ValueError("invalid linear scorer parameters")
 
-    def score(self, values):
+    def score(self, values, *, predicted_class=None, review_missing_scores=False):
         values = tuple(values)
         if len(values) != len(self.columns) or any(
             v is not None and not isfinite(v) for v in values
         ):
             raise ValueError("expected one finite or missing value per scorer feature")
+        if self.class_column is not None:
+            if predicted_class not in self.categories:
+                if review_missing_scores:
+                    return None
+                raise ValueError(
+                    f"missing or unseen {self.class_column} value {predicted_class!r}. Use --review-missing-scores to send this row to review"
+                )
+            values += tuple(
+                float(predicted_class == level) for level in self.categories
+            )
         if any(v is None for v in values):
             return None
         result = self.intercept + sum(
@@ -78,24 +105,49 @@ class LinearScorer:
         ]
         if any(v is not None and not isfinite(v) for v in values):
             raise ValueError(f"nonfinite feature at input line {line}")
-        return self.score(values)
+        return self.score(
+            values,
+            predicted_class=row.get(self.class_column),
+            review_missing_scores=review_missing_scores,
+        )
 
     def to_dict(self):
-        return {"version": 1, "method": "standardized-logistic", **asdict(self)}
+        data = asdict(self)
+        if self.class_column is None:
+            del data["class_column"], data["categories"]
+        return {
+            "version": 2 if self.class_column else 1,
+            "method": "standardized-logistic",
+            **data,
+        }
 
     @classmethod
     def from_dict(cls, payload):
         if (
             not isinstance(payload, dict)
             or type(payload.get("version")) is not int
-            or payload.get("version") != 1
+            or payload.get("version") not in (1, 2)
             or payload.get("method") != "standardized-logistic"
         ):
             raise ValueError("unsupported saved confidence scorer")
         fields = dict(payload)
-        del fields["version"], fields["method"]
+        version = fields.pop("version")
+        del fields["method"]
+        extras = {"class_column", "categories"} & fields.keys()
+        if (
+            version == 1
+            and extras
+            or version == 2
+            and (
+                len(extras) != 2
+                or not fields["class_column"]
+                or not fields["categories"]
+            )
+        ):
+            raise ValueError("invalid saved scorer category metadata")
         try:
-            for key in ("columns", "signs", "means", "scales", "weights"):
+            arrays = ("columns", "signs", "means", "scales", "weights")
+            for key in (*arrays, "categories") if version == 2 else arrays:
                 if not isinstance(fields[key], (tuple, list)):
                     raise ValueError("expected arrays in saved confidence scorer")
                 fields[key] = tuple(fields[key])
@@ -132,7 +184,15 @@ def _choose_regularization(features, labels):
     return max((0.01, 0.1, 1.0), key=gain)
 
 
-def fit_scorer(columns, rows, *, lower_is_better=(), regularization=0.1):
+def fit_scorer(
+    columns,
+    rows,
+    *,
+    lower_is_better=(),
+    regularization=0.1,
+    class_column=None,
+    review_missing_scores=False,
+):
     """Fit on design ScoredRows with raw features and binary correctness in outcome 0.
 
     Incomplete rows are omitted. A single-class design yields a constant ranking.
@@ -158,12 +218,38 @@ def fit_scorer(columns, rows, *, lower_is_better=(), regularization=0.1):
         {r.id for r in rows}
     ) != len(rows):
         raise ValueError("design needs unique nonempty IDs and binary grades")
-    complete = sorted((r for r in rows if None not in r.scores), key=lambda r: r.id)
+    if (
+        class_column is not None
+        and not review_missing_scores
+        and any(not r.predicted_class for r in rows)
+    ):
+        raise ValueError(
+            f"missing {class_column} in design data. Use --review-missing-scores to skip incomplete design rows"
+        )
+    complete = sorted(
+        (
+            r
+            for r in rows
+            if None not in r.scores and (class_column is None or r.predicted_class)
+        ),
+        key=lambda r: r.id,
+    )
     if not complete:
         raise ValueError("no complete design rows to fit a scorer")
     x = np.asarray([r.scores for r in complete], dtype=float)
     if x.shape != (len(complete), len(columns)) or not np.isfinite(x).all():
         raise ValueError("design needs one finite value per feature")
+    categories = (
+        tuple(sorted({r.predicted_class for r in complete}))
+        if class_column is not None
+        else ()
+    )
+    if categories:
+        indicators = [
+            [r.predicted_class == category for category in categories] for r in complete
+        ]
+        x = np.column_stack((x, indicators))
+        signs += (1,) * len(categories)
     scaler = StandardScaler()
     standardized = scaler.fit_transform(x * signs)
     labels = [r.outcomes[0] for r in complete]
@@ -171,7 +257,7 @@ def fit_scorer(columns, rows, *, lower_is_better=(), regularization=0.1):
         raise ValueError("expected binary design grades")
     if regularization == "auto":
         regularization = _choose_regularization(x * signs, np.asarray(labels))
-    weights, intercept = (0.0,) * len(columns), 0.0
+    weights, intercept = (0.0,) * len(signs), 0.0
     if len(set(labels)) > 1:
         model = LogisticRegression(C=regularization, max_iter=1000).fit(
             standardized, labels
@@ -193,6 +279,8 @@ def fit_scorer(columns, rows, *, lower_is_better=(), regularization=0.1):
         regularization,
         len(complete),
         digest,
+        class_column,
+        categories,
     )
 
 
@@ -209,7 +297,7 @@ def apply_scorer(
 ):
     if output.resolve() == path.resolve():
         raise ValueError("output would overwrite the feature input")
-    with open_prediction_table(path, set(scorer.columns), None) as (reader, _):
+    with open_prediction_table(path, set(scorer.input_columns), None) as (reader, _):
         if not column or column in reader.fieldnames:
             raise ValueError(f"score column already exists: {column}")
         fields = tuple(reader.fieldnames)
@@ -234,6 +322,9 @@ def configure_scorer(parser):
     fit.add_argument("predictions", type=Path)
     fit.add_argument("--id-column", default="id")
     fit.add_argument("--score-column", action="append", required=True)
+    fit.add_argument(
+        "--class-column", help="Optional categorical prediction available at inference."
+    )
     fit.add_argument("--lower-is-better", action="append", default=[])
     fit.add_argument(
         "--regularization",
@@ -287,18 +378,30 @@ def run_scorer(args):
         grades = [args.correct_column] if args.correct_column else []
         if set(args.score_column) & {args.id_column, *grades, *(labels or ())}:
             raise ValueError("feature names must differ from ID and label columns")
+        if args.class_column is not None and args.class_column in {
+            args.id_column,
+            *grades,
+            *args.score_column,
+            *(labels[1:] if labels else []),
+        }:
+            raise ValueError(
+                "class column must differ from numeric features, ID and reference grades"
+            )
         rows = read_score_rows(
             args.predictions,
             args.score_column,
             grades,
             id_column=args.id_column,
             label_columns=labels,
+            class_column=args.class_column,
             review_missing_scores=args.review_missing_scores,
         )
         scorer = fit_scorer(
             args.score_column,
             rows,
             lower_is_better=args.lower_is_better,
+            class_column=args.class_column,
+            review_missing_scores=args.review_missing_scores,
             regularization=(
                 "auto" if args.regularization == "auto" else float(args.regularization)
             ),
@@ -307,6 +410,6 @@ def run_scorer(args):
             json.dump(scorer.to_dict(), handle, indent=2, allow_nan=False)
             handle.write("\n")
         print(
-            f"Fitted {len(scorer.columns)} features on {scorer.fit_rows} design rows and wrote {args.output}."
+            f"Fitted {len(scorer.input_columns)} features on {scorer.fit_rows} design rows and wrote {args.output}."
         )
     return 0

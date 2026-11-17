@@ -486,7 +486,7 @@ def open_scored_predictions(
                 for row in source
             )
         else:
-            missing = set(scorer.columns).difference(reader.fieldnames)
+            missing = set(scorer.input_columns).difference(reader.fieldnames)
             if missing:
                 raise ValueError(
                     f"missing fitted scorer features: {', '.join(sorted(missing))}. "

@@ -79,6 +79,18 @@ those draws. Risk differences and intervals require both scores to
 reach the budget in the reported cohort.
 [Route a batch with missing scores](queue.md#route-a-scored-batch)
 
+### See which predictions go to review
+
+Add `--class-column` to count decisions by predicted label at each global budget. The same option works with inline grades, external graders and predicted/reference label grading.
+
+```bash
+caat scores results/boolq/scores.csv --score-column gap --correct-column correct --prediction-filter role=holdout --class-column answer --split all --coverage 0.75 --bootstrap 0
+```
+
+Each budget's `by_predicted_class` includes the population and scored count, expected accepted rows and errors, expected reviewed rows, class coverage and accepted error rate. Class coverage uses the entire class as its denominator. The risk divides expected errors by expected accepts. Rows tied at the global boundary receive the same fractional weight. An unscored row stays in the review population. A class with zero accepts has an undefined error rate. An unreachable global budget has null decision quantities for every class. An empty label appears under the empty string. A class present only in the design or calibration split has a reported population of zero and undefined class coverage. In a fixed-cutoff evaluation, use `caat evaluate --group-column` for integer decisions.
+
+On the BoolQ holdout the answer-aware native score accepts 1,454 of 1,504 predicted Yes answers and 750 of 1,434 predicted No answers at the same budget. Reproduce the fit with `python scripts/replay_boolq_classes.py` and the scorer extra.
+
 To combine several score columns, fit the weights on design rows and
 export one score for each held-out row. Compare it as another
 `--score-column`. [Combination recipe and replay](../research/combined-scores.md)

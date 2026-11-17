@@ -52,6 +52,8 @@ nav:
       - Combine confidence scores: docs/research/combined-scores.md
       - Routing stability: docs/research/routing-stability.md
       - Frozen score comparison: docs/research/frozen-score-comparison.md
+      - ANLI results: docs/research/anli-results.md
+      - ANLI protocol: docs/research/anli-protocol.md
       - BoolQ protocol: docs/research/boolq-protocol.md
       - BoolQ results: docs/research/boolq-results.md
       - Sampling budgets: docs/research/sample-budget.md
