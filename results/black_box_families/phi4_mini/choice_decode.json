@@ -1,0 +1,12 @@
+{
+  "model": "microsoft/Phi-4-mini-instruct",
+  "revision": "cfbefacb99257ffa30c83adab238a50856ac3083",
+  "device": "NVIDIA GeForce RTX 5080",
+  "seed": 42,
+  "torch": "2.11.0+cu130",
+  "transformers": "5.16.0.dev0",
+  "prompts": 1000,
+  "batch_size": 16,
+  "batches": 63,
+  "seconds": 32.65393860000768
+}

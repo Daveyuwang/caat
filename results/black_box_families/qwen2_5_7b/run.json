@@ -1,0 +1,146 @@
+{
+  "triviaqa": {
+    "dataset_source": "https://huggingface.co/datasets/mandarjoshi/trivia_qa/resolve/0f7faf33a3908546c6fd5b73a660e0f8ff173c2f/rc.web.nocontext/validation-00000-of-00001.parquet",
+    "split": "web validation",
+    "greedy_correct": 434,
+    "decoding": {
+      "batch_size": 64,
+      "sample_temperature": 0.7,
+      "sample_top_p": 0.9,
+      "sample_top_k": 0,
+      "seed": 42
+    },
+    "collection": {
+      "model": "Qwen/Qwen2.5-7B-Instruct",
+      "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+      "device": "NVIDIA GeForce RTX 5080",
+      "seed": 42,
+      "torch": "2.11.0+cu130",
+      "transformers": "5.16.0.dev0",
+      "cuda": "13.0",
+      "dtype": "torch.bfloat16",
+      "weight_memory_cap": "13GiB",
+      "offloaded_modules": [
+        "model.layers.25",
+        "model.layers.26",
+        "model.layers.27",
+        "model.norm",
+        "model.rotary_emb",
+        "lm_head"
+      ],
+      "model_load_seconds": 8.32144500000868,
+      "warmup_seconds": 2.707894999999553,
+      "prompt_count": 1000,
+      "max_new_tokens": 16,
+      "samples_per_prompt": 10,
+      "batch_size": 64,
+      "serial_greedy": false,
+      "peak_gpu_reserved_bytes": 15875440640,
+      "collection_seconds": 572.2536470999767,
+      "methods": {
+        "greedy": {
+          "calls": 1000,
+          "batches": 16,
+          "seconds": 58.219359500013525
+        },
+        "p_true": {
+          "calls": 1000,
+          "batches": 16,
+          "seconds": 20.020507500041276
+        },
+        "verbalized_confidence": {
+          "calls": 1000,
+          "batches": 16,
+          "seconds": 33.668404299998656
+        },
+        "sample": {
+          "calls": 10000,
+          "batches": 157,
+          "seconds": 460.33965120007633
+        }
+      }
+    },
+    "clustering": {
+      "method": "bidirectional_nli",
+      "model": "cross-encoder/nli-deberta-v3-small",
+      "revision": "fa2804872c3b4bd748f38c0185cc85775361e735",
+      "cpu_threads": 8,
+      "nli_load_seconds": 0.9152363000030164,
+      "nli_forward_calls": 497,
+      "nli_directional_pairs": 9338,
+      "clustering_seconds": 112.53537270001834
+    }
+  },
+  "mmlu_pro": {
+    "dataset_source": "https://huggingface.co/datasets/TIGER-Lab/MMLU-Pro/resolve/3373e0b32277875b8db2aa555a333b78a08477ea/data/test-00000-of-00001.parquet",
+    "split": "test",
+    "greedy_correct": 410,
+    "decoding": {
+      "batch_size": 16,
+      "sample_temperature": 0.7,
+      "sample_top_p": 0.9,
+      "sample_top_k": 0,
+      "seed": 42
+    },
+    "collection": {
+      "model": "Qwen/Qwen2.5-7B-Instruct",
+      "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+      "device": "NVIDIA GeForce RTX 5080",
+      "seed": 42,
+      "torch": "2.11.0+cu130",
+      "transformers": "5.16.0.dev0",
+      "cuda": "13.0",
+      "dtype": "torch.bfloat16",
+      "weight_memory_cap": "13GiB",
+      "offloaded_modules": [
+        "model.layers.25",
+        "model.layers.26",
+        "model.layers.27",
+        "model.norm",
+        "model.rotary_emb",
+        "lm_head"
+      ],
+      "model_load_seconds": 8.48446549999062,
+      "warmup_seconds": 2.683464699977776,
+      "prompt_count": 1000,
+      "max_new_tokens": 4,
+      "samples_per_prompt": 10,
+      "batch_size": 16,
+      "serial_greedy": false,
+      "peak_gpu_reserved_bytes": 16110321664,
+      "collection_seconds": 914.6876268000051,
+      "methods": {
+        "greedy": {
+          "calls": 1000,
+          "batches": 63,
+          "seconds": 85.25154190004105
+        },
+        "p_true": {
+          "calls": 1000,
+          "batches": 63,
+          "seconds": 78.99460309994174
+        },
+        "verbalized_confidence": {
+          "calls": 1000,
+          "batches": 63,
+          "seconds": 124.81150219985284
+        },
+        "sample": {
+          "calls": 10000,
+          "batches": 625,
+          "seconds": 625.6153213004873
+        }
+      }
+    },
+    "clustering": {
+      "method": "choice_identity",
+      "model": null,
+      "revision": null,
+      "cpu_threads": 8,
+      "nli_load_seconds": null,
+      "nli_forward_calls": 0,
+      "nli_directional_pairs": 0,
+      "clustering_seconds": 0.004270900011761114
+    }
+  }
+}

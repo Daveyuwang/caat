@@ -1,4 +1,4 @@
-"""Collect and replay the Qwen confidence benchmark on TriviaQA and MMLU-Pro."""
+"""Collect and replay confidence benchmarks on TriviaQA and MMLU-Pro."""
 
 import argparse
 import json
@@ -162,11 +162,23 @@ def prepare(output, size):
         print(f"Prepared {len(rows)} {name} prompts", flush=True)
 
 
-def collect(output, gpu_memory):
+def collect(
+    output,
+    gpu_memory,
+    *,
+    model=DEFAULT_MODEL,
+    revision=None,
+    datasets=tuple(TOKEN_LIMITS),
+    batch_size=1,
+    samples_per_prompt=SAMPLES,
+    serial_greedy=False,
+):
+    if batch_size < 1 or samples_per_prompt < 1:
+        raise ValueError("the benchmark needs a positive batch size and sample count")
     loaded_at = perf_counter()
     backend = TransformersBackend(
-        DEFAULT_MODEL,
-        DEFAULT_REVISION,
+        model,
+        revision or (DEFAULT_REVISION if model == DEFAULT_MODEL else None),
         device="cuda",
         seed=SEED,
         local_files_only=True,
@@ -185,6 +197,7 @@ def collect(output, gpu_memory):
     )
     torch.cuda.synchronize()
     warmup_seconds = perf_counter() - warmup_at
+    device_map = getattr(backend.model, "hf_device_map", None) or {}
     run = {
         **backend.metadata,
         "torch": torch.__version__,
@@ -192,9 +205,7 @@ def collect(output, gpu_memory):
         "dtype": str(backend.model.config.dtype),
         "weight_memory_cap": gpu_memory,
         "offloaded_modules": [
-            name
-            for name, device in backend.model.hf_device_map.items()
-            if device == "cpu"
+            name for name, device in device_map.items() if device == "cpu"
         ],
         "model_load_seconds": load_seconds,
         "warmup_seconds": warmup_seconds,
@@ -202,26 +213,33 @@ def collect(output, gpu_memory):
     print(
         f"Loaded {run['model']} on {run['device']} in {load_seconds:.1f}s", flush=True
     )
-    for name, token_limit in TOKEN_LIMITS.items():
+    for name in datasets:
+        token_limit = TOKEN_LIMITS[name]
         folder = output / name
         prompts = list(read_prompts(folder / "prompts.jsonl").items())
         torch.manual_seed(SEED)
         torch.cuda.reset_peak_memory_stats()
         all_records, totals = [], {}
         collection_start = perf_counter()
-        for start in range(0, len(prompts), 16):
+        chunk_size = max(1, 16 // batch_size) * batch_size
+        for start in range(0, len(prompts), chunk_size):
             records, timings = collect_responses(
-                dict(prompts[start : start + 16]),
+                dict(prompts[start : start + chunk_size]),
                 backend,
                 max_new_tokens=token_limit,
                 p_true=True,
                 verbalized=True,
-                samples=SAMPLES,
+                samples=samples_per_prompt,
+                batch_size=batch_size,
+                serial_greedy=serial_greedy,
             )
             all_records.extend(records)
             for method, timing in timings.items():
-                total = totals.setdefault(method, {"calls": 0, "seconds": 0.0})
+                total = totals.setdefault(
+                    method, {"calls": 0, "batches": 0, "seconds": 0.0}
+                )
                 total["calls"] += timing["calls"]
+                total["batches"] += timing["batches"]
                 total["seconds"] += timing["seconds"]
             print(
                 f"{name} {len(all_records)}/{len(prompts)} in {perf_counter() - collection_start:.1f}s",
@@ -232,7 +250,9 @@ def collect(output, gpu_memory):
             **run,
             "prompt_count": len(prompts),
             "max_new_tokens": token_limit,
-            "samples_per_prompt": SAMPLES,
+            "samples_per_prompt": samples_per_prompt,
+            "batch_size": batch_size,
+            "serial_greedy": serial_greedy,
             "peak_gpu_reserved_bytes": torch.cuda.max_memory_reserved(),
             "collection_seconds": perf_counter() - collection_start,
             "methods": totals,
@@ -300,7 +320,7 @@ def nli_clusters(question, samples, model, tokenizer, torch, entailment):
     return memberships, int(bool(pairs)), 2 * len(pairs)
 
 
-def cluster(output):
+def cluster(output, datasets=tuple(TOKEN_LIMITS)):
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
@@ -316,7 +336,7 @@ def cluster(output):
         if label.lower() == "entailment"
     ]
     model_load_seconds = perf_counter() - start
-    for dataset in TOKEN_LIMITS:
+    for dataset in datasets:
         folder = output / dataset
         questions = read_jsonl(folder / "questions.jsonl")
         responses = read_jsonl(folder / "responses.jsonl")
@@ -359,7 +379,7 @@ def cluster(output):
         )
 
 
-def score_rows(dataset, folder):
+def score_rows(dataset, folder, samples_per_prompt):
     questions = read_jsonl(folder / "questions.jsonl")
     responses = read_jsonl(folder / "responses.jsonl")
     clusters = read_jsonl(folder / "clusters.jsonl")
@@ -367,8 +387,8 @@ def score_rows(dataset, folder):
     check_ids(questions, clusters)
     for item_id, question in questions.items():
         record = {**responses[item_id], "clusters": clusters[item_id]["clusters"]}
-        if len(record["samples"]) != SAMPLES:
-            raise ValueError(f"Expected {SAMPLES} samples for {item_id}")
+        if len(record["samples"]) != samples_per_prompt:
+            raise ValueError(f"Expected {samples_per_prompt} samples for {item_id}")
         raw_answer = record["text"]
         if dataset == "triviaqa":
             correct = normalize_answer(raw_answer) in question["aliases"]
@@ -481,25 +501,28 @@ def comparison_rows(scores_dir):
             }
 
 
-def summarize(work, results):
+def summarize(work, results, *, include_comparison=True):
     results.mkdir(parents=True, exist_ok=True)
     costs, metadata = [], {}
     for dataset in TOKEN_LIMITS:
         folder = work / dataset
-        scored = list(score_rows(dataset, folder))
-        write_report(results / f"{dataset}_scores.csv", scored)
         timing = json.loads((folder / "timing.json").read_text(encoding="utf-8"))
+        samples_per_prompt = timing["samples_per_prompt"]
+        if type(samples_per_prompt) is not int or samples_per_prompt < 1:
+            raise ValueError(f"Invalid sample count in {dataset} timing metadata")
+        scored = list(score_rows(dataset, folder, samples_per_prompt))
+        write_report(results / f"{dataset}_scores.csv", scored)
         clustering = json.loads(
             (folder / "clustering.json").read_text(encoding="utf-8")
         )
         count = len(scored)
-        if timing["prompt_count"] != count or timing["samples_per_prompt"] != SAMPLES:
+        if timing["prompt_count"] != count:
             raise ValueError(f"Call metadata differs from scored rows for {dataset}")
         for method, per_question in (
             ("greedy", 1),
             ("p_true", 1),
             ("verbalized_confidence", 1),
-            ("sample", SAMPLES),
+            ("sample", samples_per_prompt),
         ):
             observed = timing["methods"][method]
             if (
@@ -512,7 +535,7 @@ def summarize(work, results):
                 {
                     "dataset": dataset,
                     "operation": method,
-                    "qwen_calls": observed["calls"],
+                    "model_calls": observed["calls"],
                     "nli_forward_calls": 0,
                     "nli_directional_pairs": 0,
                     "seconds": observed["seconds"],
@@ -524,7 +547,7 @@ def summarize(work, results):
             {
                 "dataset": dataset,
                 "operation": clustering["method"],
-                "qwen_calls": 0,
+                "model_calls": 0,
                 "nli_forward_calls": clustering["nli_forward_calls"],
                 "nli_directional_pairs": clustering["nli_directional_pairs"],
                 "seconds": seconds,
@@ -536,7 +559,7 @@ def summarize(work, results):
             "split": "web validation" if dataset == "triviaqa" else "test",
             "greedy_correct": sum(row["correct"] for row in scored),
             "decoding": {
-                "batch_size": 1,
+                "batch_size": timing.get("batch_size", 1),
                 "sample_temperature": 0.7,
                 "sample_top_p": 0.9,
                 "sample_top_k": 0,
@@ -545,7 +568,8 @@ def summarize(work, results):
             "collection": timing,
             "clustering": clustering,
         }
-    write_report(results / "comparison.csv", list(comparison_rows(results)))
+    if include_comparison:
+        write_report(results / "comparison.csv", list(comparison_rows(results)))
     write_report(results / "costs.csv", costs)
     write_json(results / "run.json", metadata)
 
@@ -561,12 +585,24 @@ def main():
     collection = subcommands.add_parser(
         "collect", help="Collect saved responses on CUDA."
     )
+    collection.add_argument("--model", default=DEFAULT_MODEL)
+    collection.add_argument("--revision")
+    collection.add_argument("--dataset", choices=TOKEN_LIMITS, help="Collect one task.")
     collection.add_argument("--gpu-memory", default=GPU_MEMORY)
-    subcommands.add_parser("cluster", help="Cluster saved samples on CPU.")
+    collection.add_argument("--batch-size", type=int, default=1)
+    collection.add_argument("--samples", type=int, default=SAMPLES)
+    collection.add_argument("--serial-greedy", action="store_true")
+    clustering = subcommands.add_parser("cluster", help="Cluster saved samples on CPU.")
+    clustering.add_argument("--dataset", choices=TOKEN_LIMITS, help="Cluster one task.")
     scoring = subcommands.add_parser(
         "summarize", help="Score saved answers and export results."
     )
     scoring.add_argument("--results", type=Path, default=ROOT / "results/black_box")
+    scoring.add_argument(
+        "--no-comparison",
+        action="store_true",
+        help="Export scores and costs for a separate comparison.",
+    )
     replay = subcommands.add_parser(
         "replay", help="Recompute comparisons from saved scores."
     )
@@ -576,11 +612,22 @@ def main():
     if args.operation == "prepare":
         prepare(args.work_dir, args.size)
     elif args.operation == "collect":
-        collect(args.work_dir, args.gpu_memory)
+        collect(
+            args.work_dir,
+            args.gpu_memory,
+            model=args.model,
+            revision=args.revision,
+            datasets=(args.dataset,) if args.dataset else tuple(TOKEN_LIMITS),
+            batch_size=args.batch_size,
+            samples_per_prompt=args.samples,
+            serial_greedy=args.serial_greedy,
+        )
     elif args.operation == "cluster":
-        cluster(args.work_dir)
+        cluster(args.work_dir, (args.dataset,) if args.dataset else tuple(TOKEN_LIMITS))
     elif args.operation == "summarize":
-        summarize(args.work_dir, args.results)
+        summarize(
+            args.work_dir, args.results, include_comparison=not args.no_comparison
+        )
     else:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         write_report(args.output, list(comparison_rows(args.scores_dir)))
