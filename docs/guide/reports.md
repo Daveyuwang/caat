@@ -238,6 +238,23 @@ and `accepted` is the number sampled. The input metadata records the batch
 path, requested label cap, cutoff, confidence, seed, and the digest of the
 eligible IDs, oriented scores and output keys. This sampling mode produces
 no certification probability. [Draw a fixed-budget sample](queue.md#draw-an-audit-sample-after-a-policy-misses-its-target)
+
+For a nonempty draw, `max_errors_to_meet` and `min_errors_to_exceed` give
+the inclusive thresholds for the observed sample error count. A null limit
+means that direction cannot be established at the chosen budget. The plan
+records the source report's canonical JSON SHA-256. A fixed-budget
+`evaluate` or `audit` replays the draw on the supplied raw batch and
+compares every sampled ID, oriented score and output key.
+
+Each assessment reports `batch_verdict` and the exact lower and upper
+population error counts (`risk_lower_errors`, `risk_upper_errors`) and
+rates (`risk_lower_bound`, `risk_upper_bound`). Each limit is one-sided
+at the declared confidence, which must exceed 50% in this mode. For a
+population of N eligible outputs, the target permits floor(N × target)
+errors. An upper limit at or below that integer supports the target. A lower
+limit above it establishes excess. All other outcomes are inconclusive.
+The existing `meets_target` field records whether the upper limit supports
+the target.
 Each required label comes from an independently sampled accepted row.
 The command computes certification power from the exact binomial count
 of errors at the assumed rate. Check the collected labels with the same

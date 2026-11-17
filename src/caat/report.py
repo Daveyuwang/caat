@@ -3,6 +3,7 @@
 import csv
 import json
 import re
+from hashlib import sha256
 from importlib.metadata import version
 from math import isfinite
 
@@ -105,7 +106,7 @@ def read_fit_outputs(path, inputs, *, artifact="threshold report"):
     return fit_outputs
 
 
-def read_threshold_report(path, *, require_confirmed=False):
+def read_threshold_report(path, *, require_confirmed=False, fingerprint=False):
     report = _read_json_report(path)
     error = f"{path}: expected a CAAT select, policy, or run JSON report"
     if not isinstance(report, dict) or report.get("command") not in (
@@ -183,6 +184,9 @@ def read_threshold_report(path, *, require_confirmed=False):
             options["heldout_error_rate"] = rate
     if source := read_negated_score_source(path, report, score_column):
         options["negated_score_source"] = source
+    if fingerprint:
+        canonical = json.dumps(report, sort_keys=True, separators=(",", ":"))
+        options["threshold_report_sha256"] = sha256(canonical.encode()).hexdigest()
     return options
 
 
@@ -222,7 +226,43 @@ def read_label_plan(path):
         raise ValueError(
             f"{path}: invalid sample seed or missing batch digest in label plan"
         )
+    fixed = {}
+    if "batch_predictions" in report["input"]:
+        inputs = report["input"]
+        fingerprint = inputs.get("threshold_report_sha256")
+        budget = inputs.get("label_budget")
+        total = report.get("total")
+        selection = inputs.get("prediction_filter")
+        if (
+            not isinstance(fingerprint, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", fingerprint)
+            or type(total) is not int
+            or population is None
+            or total < population
+            or type(budget) is not int
+            or labels != min(budget, population)
+            or sample_seed is None
+            or threshold is None
+            or not isinstance(sample_path, str)
+            or confidence <= 0.5
+        ):
+            raise ValueError(
+                f"{path}: invalid fixed-budget plan, regenerate it from the source report"
+            )
+        if selection is not None and (
+            not isinstance(selection, dict)
+            or not all(isinstance(selection.get(k), str) for k in ("column", "value"))
+        ):
+            raise ValueError(f"{path}: invalid prediction filter in plan")
+        fixed = {
+            "threshold_report_sha256": fingerprint,
+            "selection": (selection["column"], selection["value"])
+            if selection
+            else None,
+            "total": total,
+        }
     return {
+        **fixed,
         "accepted": labels,
         "accepted_population": population,
         "risk_target": risk,
@@ -258,6 +298,15 @@ def emit(report, *, json_output, output=None):
         write_report(output, serialized)
     print(serialized if json_output else render_report("text", report))
     return serialized
+
+
+def describe_batch_verdict(counts, report):
+    target = percent(report["risk_target"])
+    return {
+        "meets": f"The fixed batch meets the {target} target.",
+        "exceeds": f"The fixed batch exceeds the {target} target.",
+        "inconclusive": f"The sample is inconclusive for the {target} batch target.",
+    }[counts["batch_verdict"]]
 
 
 def describe_refits(diag):
@@ -310,12 +359,17 @@ def describe(report):
         target = report["risk_target"]
         population = report.get("accepted_population")
         if "batch_predictions" in inputs:
-            return (
+            summary = (
                 f"At the saved cutoff, {population} of {report['total']} rows would qualify "
                 f"and {report['review']} would go to review. "
                 f"Wrote {report['accepted']} rows to {report['sample_path']} "
                 f"for the {percent(target)} target (seed {inputs['sample_seed']})."
             )
+            if (maximum := report.get("max_errors_to_meet")) is not None:
+                summary += f" At most {maximum} sampled errors support the target."
+            if (minimum := report.get("min_errors_to_exceed")) is not None:
+                summary += f" At least {minimum} show excess error."
+            return summary
         batch = (
             f" The plan assumes {report['expected_population_errors']} errors among "
             f"{population} accepted rows in the fixed batch."
@@ -357,7 +411,9 @@ def describe(report):
             summary += " " + upper_bound_summary(
                 counts, report["holdout_confidence"], report.get("accepted_population")
             )
-        if "risk_target" in report:
+        if "batch_verdict" in counts:
+            summary += " " + describe_batch_verdict(counts, report)
+        elif "risk_target" in report:
             verdict = "Meets" if counts["meets_target"] else "Misses"
             summary += f" {verdict} the {percent(report['risk_target'])} error target."
         if "ece" in report:
@@ -576,7 +632,9 @@ def describe(report):
                     report.get("accepted_population"),
                 )
             verdict = ""
-            if report["risk_target"] is not None:
+            if "batch_verdict" in counts:
+                verdict = " " + describe_batch_verdict(counts, report)
+            elif report["risk_target"] is not None:
                 verdict = (
                     " Meets target." if counts["meets_target"] else " Target not met."
                 )

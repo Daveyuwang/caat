@@ -3,6 +3,7 @@
 from bisect import bisect_left
 from fractions import Fraction
 from math import ceil, floor
+from operator import attrgetter
 
 from .finite import (
     binomial_cdf_float,
@@ -14,6 +15,7 @@ from .finite import (
     validate_population,
 )
 from .metrics import Counts
+from .queue import shuffled_by_id
 from .report import check_fit_overlap
 from .route import accepted_population_digest
 from .rules import binomial_upper_bound
@@ -76,6 +78,67 @@ def check_label_plan(plan, *, threshold, accepted, accepted_population):
         raise ValueError(
             f"label plan requires {plan['accepted']} accepted labels, found {accepted}"
         )
+
+
+def check_candidate_sample(path, saved, plan, labeled):
+    if (
+        saved["threshold_report_sha256"] != plan["threshold_report_sha256"]
+        or saved["risk_target"] != plan["risk_target"]
+    ):
+        raise ValueError(
+            "threshold report or risk target does not match the fixed-budget plan"
+        )
+    eligible, total, digest, _ = read_candidate_batch(
+        path, saved, selection=plan["selection"]
+    )
+    if total != plan["total"] or digest != plan["accepted_population_sha256"]:
+        raise ValueError("batch population does not match the fixed-budget plan")
+    draw = shuffled_by_id(eligible, plan["sample_seed"], key=attrgetter("id"))[
+        : plan["accepted"]
+    ]
+    expected = {r.id: (r.score, r.output_key) for r in draw}
+    actual = {r.id: (r.score, r.output_key) for r in labeled}
+    if len(labeled) != len(draw) or expected != actual:
+        raise ValueError(
+            "labeled IDs, scores or output keys do not match the fixed-budget draw"
+        )
+    return len(eligible)
+
+
+def sample_error_limits(size, labels, target, confidence):
+    """Inclusive sample-count boundaries for the two one-sided exact tests."""
+    level = 1 - Fraction(str(confidence))
+    allowed = floor(Fraction(str(target)) * size)
+    if allowed == size:
+        return {"max_errors_to_meet": labels, "min_errors_to_exceed": None}
+
+    def max_count(null):
+        return _error_limit(
+            lambda m, x: compare_hypergeometric_cdf(size, null, m, x, level), labels
+        )
+
+    meet = max_count(allowed + 1)
+    correct = max_count(size - allowed)
+    return {
+        "max_errors_to_meet": meet if meet >= 0 else None,
+        "min_errors_to_exceed": labels - correct if correct >= 0 else None,
+    }
+
+
+def batch_verdict(counts, size, target, confidence):
+    labels, errors = counts["accepted"], counts["errors"]
+    level = 1 - Fraction(str(confidence))
+    lower = size - upper_population_errors(size, labels, labels - errors, level)
+    verdict = "inconclusive"
+    if counts["meets_target"]:
+        verdict = "meets"
+    elif lower > Fraction(str(target)) * size:
+        verdict = "exceeds"
+    return {
+        "risk_lower_errors": lower,
+        "risk_lower_bound": lower / size,
+        "batch_verdict": verdict,
+    }
 
 
 def _error_quantile(compare_expected, labels):

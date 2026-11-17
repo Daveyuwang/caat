@@ -4,11 +4,16 @@ import json
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from hashlib import sha256
+from fractions import Fraction
+from math import comb
 from pathlib import Path
 from random import Random
 from tempfile import TemporaryDirectory
 
 from caat.cli import main
+from caat.plan import batch_verdict, sample_error_limits
+from caat.metrics import Counts
+from caat.rules import assess_accepted_risk
 from caat.scorer import LinearScorer
 from caat.table import output_fingerprint
 
@@ -177,3 +182,117 @@ class CandidateSampleTests(unittest.TestCase):
         self.write_inputs(self.rows)
         self.assert_cli_error(self.plan_args(), "did not select a cutoff")
         self.assertEqual((self.sample.read_bytes(), self.plan.read_bytes()), prior)
+
+    def test_graders_are_bound_to_the_draw_and_get_separate_verdicts(self):
+        self.write_inputs(self.rows)
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(main(self.plan_args(budget=100)), 0)
+        with self.sample.open() as f:
+            sample = list(csv.DictReader(f))
+        labeled = self.sample.with_name("graded.csv")
+
+        def write_labels(rows):
+            with labeled.open("w", newline="") as f:
+                w = csv.DictWriter(f, [*sample[0], "first", "second"])
+                w.writeheader()
+                w.writerows(dict(r, first=1, second=0) for r in rows)
+
+        write_labels(reversed(sample))
+        args = list(
+            map(
+                str,
+                [
+                    "audit",
+                    labeled,
+                    "--correct-column",
+                    "first",
+                    "--correct-column",
+                    "second",
+                    "--threshold-report",
+                    self.policy,
+                    "--plan-report",
+                    self.plan,
+                    "--batch-predictions",
+                    self.batch,
+                    "--json",
+                ],
+            )
+        )
+        with redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(main(args), 1)
+        report = json.loads(out.getvalue())
+        self.assertEqual(report["graders"]["first"]["batch_verdict"], "meets")
+        self.assertEqual(report["graders"]["second"]["batch_verdict"], "exceeds")
+        self.assertEqual(report["min_errors_to_exceed"], 1)
+        for bad in (
+            sample[:-1],
+            [dict(sample[0], output_key="other"), *sample[1:]],
+            [dict(sample[0], score="55"), *sample[1:]],
+        ):
+            write_labels(bad)
+            self.assert_cli_error(args, "do not match the fixed-budget draw")
+        write_labels(sample)
+        self.write_inputs([*self.rows, "f,5,A"])
+        self.assert_cli_error(args, "batch population does not match")
+        self.report["policy"]["confirmed"] = True
+        self.write_inputs(self.rows)
+        self.assert_cli_error(args, "threshold report or risk target")
+
+    def test_integer_limits_match_enumerated_tails(self):
+        alpha = Fraction(1, 20)
+        for n in range(1, 9):
+            for m in range(1, n + 1):
+                for target in (0, 0.2, 0.5, 1):
+                    allowed = int(Fraction(str(target)) * n)
+
+                    def mass(k, x):
+                        return Fraction(comb(k, x) * comb(n - k, m - x), comb(n, m))
+
+                    verdicts = []
+                    for errors in range(m + 1):
+                        upper = max(
+                            k
+                            for k in range(n + 1)
+                            if sum(mass(k, x) for x in range(errors + 1)) > alpha
+                        )
+                        lower = min(
+                            k
+                            for k in range(n + 1)
+                            if sum(mass(k, x) for x in range(errors, m + 1)) > alpha
+                        )
+                        wanted = (
+                            "meets"
+                            if upper <= allowed
+                            else ("exceeds" if lower > allowed else "inconclusive")
+                        )
+                        counts = assess_accepted_risk(
+                            Counts(m, m, errors), target, 0.95, accepted_population=n
+                        )
+                        result = batch_verdict(counts, n, target, 0.95)
+                        self.assertEqual(
+                            (
+                                counts["risk_upper_errors"],
+                                result["risk_lower_errors"],
+                                result["batch_verdict"],
+                            ),
+                            (upper, lower, wanted),
+                        )
+                        verdicts.append(wanted)
+                    limits = sample_error_limits(n, m, target, 0.95)
+                    self.assertEqual(
+                        limits["max_errors_to_meet"],
+                        max(
+                            (x for x, v in enumerate(verdicts) if v == "meets"),
+                            default=None,
+                        ),
+                    )
+                    self.assertEqual(
+                        limits["min_errors_to_exceed"],
+                        next(
+                            (x for x, v in enumerate(verdicts) if v == "exceeds"), None
+                        ),
+                    )
+        self.assertEqual(
+            sample_error_limits(588, 100, 0.2, 0.95),
+            {"max_errors_to_meet": 13, "min_errors_to_exceed": 27},
+        )

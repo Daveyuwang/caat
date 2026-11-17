@@ -119,6 +119,21 @@ returns status 1. A report with no selected cutoff gives status 2 before
 writing either output. A withheld policy keeps its original routing status.
 The sample contains IDs and scores for labeling and has no decision column.
 
+Add a 0/1 grade named `correct` to the sampled rows. Keep their IDs,
+oriented scores and output keys. To check the labels, supply the same raw
+batch, cutoff report and sampling plan.
+
+```bash
+caat evaluate replay/labeled-sample.csv --correct-column correct --threshold-report cutoff.json --batch-predictions new-predictions.csv --plan-report replay/label-plan.json --json
+```
+
+Use `audit` with two grader columns or two keyed grader exports to compare
+graders on the same draw. Each grader receives a fixed-batch verdict of
+`meets`, `exceeds` or `inconclusive`. The command returns 0 when every
+requested grader supports the target, 1 for excess or inconclusive evidence,
+and 2 for an invalid plan, batch or labeled sample. A batch verdict applies
+to the eligible outputs in that batch. Routing still uses the original report.
+
 ### Size an audit for an already routed batch
 
 Route the batch with its frozen cutoff and keep the complete decision file.

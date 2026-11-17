@@ -36,9 +36,12 @@ from .metrics import METRICS, Counts, threshold_points
 from .monitor import monitor_risk
 from .plan import (
     DEFAULT_MAX_ACCEPTED,
+    batch_verdict,
+    check_candidate_sample,
     check_label_plan,
     plan_labels,
     read_candidate_batch,
+    sample_error_limits,
 )
 from .plots import reliability_diagram, write_svg
 from .plugins import catalog
@@ -252,7 +255,9 @@ def load_threshold_options(args, *, require_confirmed=False, label_plan=None):
     args.score_column = score_column_override(args)
     saved = (
         read_threshold_report(
-            args.threshold_report, require_confirmed=require_confirmed
+            args.threshold_report,
+            require_confirmed=require_confirmed,
+            fingerprint=getattr(args, "batch_predictions", None) is not None,
         )
         if args.threshold_report is not None
         else {}
@@ -312,7 +317,13 @@ def use_available_output_key_column(args, saved):
 
 def threshold_input_paths(args):
     paths = set()
-    for name in ("predictions", "threshold_report", "batch_decisions", "plan_report"):
+    for name in (
+        "predictions",
+        "threshold_report",
+        "batch_decisions",
+        "batch_predictions",
+        "plan_report",
+    ):
         if path := getattr(args, name, None):
             paths.add(path.resolve())
     return paths
@@ -583,7 +594,7 @@ def holdout_confidence_option(parser):
     )
 
 
-def accepted_population_options(parser, *, check_sample=False, raw_batch=False):
+def accepted_population_options(parser, *, check_sample=False):
     population = parser.add_mutually_exclusive_group()
     population.add_argument(
         "--accepted-population",
@@ -597,13 +608,12 @@ def accepted_population_options(parser, *, check_sample=False, raw_batch=False):
         metavar="FILE",
         help="Read the full fixed batch from a caat route decision table.",
     )
-    if raw_batch:
-        population.add_argument(
-            "--batch-predictions",
-            type=Path,
-            metavar="CSV_OR_JSONL",
-            help="Score a new batch for a fixed-budget audit sample.",
-        )
+    population.add_argument(
+        "--batch-predictions",
+        type=Path,
+        metavar="CSV_OR_JSONL",
+        help="Score a new batch for a fixed-budget audit sample.",
+    )
     if check_sample:
         parser.add_argument(
             "--plan-report",
@@ -864,7 +874,7 @@ def plan_options(parser):
         metavar="LEVEL",
         help="Confidence level. Uses the threshold report's level or 0.95 by default.",
     )
-    accepted_population_options(parser, raw_batch=True)
+    accepted_population_options(parser)
     prediction_filter_option(parser)
     parser.add_argument(
         "--label-budget",
@@ -973,7 +983,7 @@ def run_plan(args):
         if path is not None and path.resolve() in destinations:
             raise ValueError(f"output would overwrite the {name}")
     saved = (
-        read_threshold_report(args.threshold_report)
+        read_threshold_report(args.threshold_report, fingerprint=fixed)
         if args.threshold_report is not None
         else {}
     )
@@ -981,8 +991,10 @@ def run_plan(args):
     if confidence is None:
         confidence = saved.get("holdout_confidence") or 0.95
     if fixed:
-        if not 0 < confidence < 1:
-            raise ValueError("holdout confidence must be strictly between 0 and 1")
+        if not 0.5 < confidence < 1:
+            raise ValueError(
+                "fixed-budget directional checks require confidence above 0.5 and below 1"
+            )
         accepted_rows, total, digest, key = read_candidate_batch(
             args.batch_predictions, saved, selection=args.prediction_filter
         )
@@ -994,7 +1006,14 @@ def run_plan(args):
             "accepted": min(args.label_budget, population),
             "risk_target": saved["risk_target"],
         }
+        if population:
+            result.update(
+                sample_error_limits(
+                    population, result["accepted"], saved["risk_target"], confidence
+                )
+            )
         options = {
+            "threshold_report_sha256": saved["threshold_report_sha256"],
             "batch_predictions": str(args.batch_predictions),
             "label_budget": args.label_budget,
             "accepted_population_sha256": digest,
@@ -2028,9 +2047,20 @@ def load_inputs(args, *, source_rows=None):
 
 def load_label_plan(args):
     if args.plan_report is None:
+        if args.batch_predictions is not None:
+            raise ValueError(
+                "--batch-predictions requires a fixed-budget --plan-report"
+            )
         return None
     plan = read_label_plan(args.plan_report)
-    if plan["sample_seed"] is not None and args.batch_decisions is None:
+    if "threshold_report_sha256" in plan:
+        if args.batch_predictions is None or args.threshold_report is None:
+            raise ValueError(
+                "a fixed-budget plan requires --batch-predictions and --threshold-report"
+            )
+    elif args.batch_predictions is not None:
+        raise ValueError("--batch-predictions requires a fixed-budget plan")
+    elif plan["sample_seed"] is not None and args.batch_decisions is None:
         raise ValueError("the saved label draw requires --batch-decisions")
     for name in ("risk_target", "holdout_confidence", "sample_seed"):
         if plan[name] is None:
@@ -2046,7 +2076,7 @@ def load_label_plan(args):
     return plan
 
 
-def run(args, *, staged, fit_outputs=None, label_plan=None):
+def run(args, *, staged, fit_outputs=None, label_plan=None, candidate_policy=None):
     if fit_outputs is not None and args.output_key_column is None:
         args.output_key_column = fit_outputs["key_column"]
     if args.command in {"select", "policy"} and args.direction == "lower":
@@ -2071,11 +2101,21 @@ def run(args, *, staged, fit_outputs=None, label_plan=None):
     source_rows = [] if holdout_output is not None else None
     batch = getattr(args, "batch_decisions", None)
     sample_seed = getattr(args, "sample_seed", None)
-    if sample_seed is not None and batch is None:
+    if sample_seed is not None and batch is None and candidate_policy is None:
         raise ValueError("--sample-seed requires --batch-decisions")
     rows, meta = load_inputs(args, source_rows=source_rows)
     population = getattr(args, "accepted_population", None)
-    if batch is not None:
+    if candidate_policy is not None:
+        population = check_candidate_sample(
+            args.batch_predictions, candidate_policy, label_plan, rows
+        )
+        meta.update(
+            batch_predictions=str(args.batch_predictions),
+            accepted_population_checked=True,
+            threshold_report_sha256=candidate_policy["threshold_report_sha256"],
+            sample_seed=sample_seed,
+        )
+    elif batch is not None:
         expected_digest = (
             label_plan["accepted_population_sha256"] if label_plan is not None else None
         )
@@ -2305,6 +2345,23 @@ def run(args, *, staged, fit_outputs=None, label_plan=None):
             )
     else:
         curves = None
+    if candidate_policy is not None:
+        result.update(
+            sample_error_limits(
+                population, len(rows), args.risk_target, args.holdout_confidence
+            )
+        )
+        assessments = (
+            (result["overall"],)
+            if args.command == "evaluate"
+            else result["graders"].values()
+        )
+        for counts in assessments:
+            counts.update(
+                batch_verdict(
+                    counts, population, args.risk_target, args.holdout_confidence
+                )
+            )
     return make_report(args.command, meta, result), curve, curves, exit_code
 
 
@@ -2584,10 +2641,12 @@ def main(argv=None):
                 make_report("plugins", {}, {"stages": catalog()}), json_output=args.json
             )
             return 0
-        fit_outputs = label_plan = None
+        fit_outputs = label_plan = candidate_policy = None
         if args.command in {"evaluate", "audit"}:
             label_plan = load_label_plan(args)
             saved = load_threshold_options(args, label_plan=label_plan)
+            if args.batch_predictions is not None:
+                candidate_policy = saved
             if args.holdout_confidence is not None:
                 fit_outputs = saved.get("fit_outputs")
             if fit_outputs is None:
@@ -2595,7 +2654,11 @@ def main(argv=None):
         artifacts, outputs = output_paths(args)
         with staged_outputs(outputs) as staged:
             report, curve, curves, status = run(
-                args, staged=staged, fit_outputs=fit_outputs, label_plan=label_plan
+                args,
+                staged=staged,
+                fit_outputs=fit_outputs,
+                label_plan=label_plan,
+                candidate_policy=candidate_policy,
             )
             stdout = write_analysis_outputs(
                 args, artifacts, staged, report, curve, curves

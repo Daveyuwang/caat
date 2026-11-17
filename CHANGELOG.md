@@ -5,6 +5,9 @@
 - Draw a reproducible, fixed-budget audit sample from new predictions with
   `caat plan --batch-predictions --label-budget`. A withheld policy keeps its
   routing status.
+- Check the completed fixed-budget draw against the original batch and report
+  whether its error rate meets or exceeds the saved target, or the evidence is
+  inconclusive.
 
 ## 0.6.0
 
