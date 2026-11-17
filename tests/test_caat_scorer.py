@@ -15,6 +15,76 @@ from caat.workflow import run_workflow
 
 
 class SavedPolicyTests(unittest.TestCase):
+    def test_categorical_report_handoff(self):
+        model = LinearScorer(
+            ("x",),
+            (1, 1, 1),
+            (0, 0, 0),
+            (1, 1, 1),
+            (0, 1, -1),
+            0,
+            0.1,
+            12,
+            "a" * 64,
+            "label",
+            ("yes", "no"),
+        )
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report = root / "run.json"
+            report.write_text(
+                json.dumps(
+                    {
+                        "command": "run",
+                        "input": {"id_column": "id", "review_missing_scores": True},
+                        "selected_score": "fitted_score",
+                        "scorer": model.to_dict(),
+                        "policy": {
+                            "confirmed": True,
+                            "selection": {
+                                "selected_threshold": 0.5,
+                                "risk_target": 0.4,
+                            },
+                        },
+                    }
+                )
+            )
+            raw = root / "new.csv"
+            raw.write_text(
+                "id,x,label,grade,other\na,0,yes,1,1\nb,0,no,1,1\nc,0,unknown,0,0\nd,0,,0,0\n"
+            )
+            for cmd, flags in (
+                ("route", ["--output", str(root / "decisions.csv")]),
+                ("evaluate", ["--correct-column", "grade"]),
+                ("audit", ["--correct-column", "grade", "--correct-column", "other"]),
+                ("monitor", ["--correct-column", "grade"]),
+            ):
+                with self.subTest(cmd=cmd), redirect_stdout(StringIO()) as out:
+                    main(
+                        [
+                            cmd,
+                            str(raw),
+                            "--threshold-report",
+                            str(report),
+                            "--json",
+                            *flags,
+                        ]
+                    )
+                    result = json.loads(out.getvalue())
+                    if cmd == "route":
+                        with (root / "decisions.csv").open() as saved:
+                            self.assertEqual(
+                                [r["decision"] for r in csv.DictReader(saved)],
+                                ["accept", "review", "review", "review"],
+                            )
+                    else:
+                        counts = (
+                            result["graders"]["grade"]
+                            if cmd == "audit"
+                            else result["overall"]
+                        )
+                        self.assertEqual((counts["accepted"], counts["total"]), (1, 4))
+
     def test_same_decisions_from_features_and_precomputed_scores(self):
         scorer = LinearScorer(
             ("margin", "loss"), (1, -1), (0, 0), (1, 1), (1, 1), 0, 1, 10, "f" * 64
@@ -103,6 +173,39 @@ class SavedPolicyTests(unittest.TestCase):
 
 @unittest.skipUnless(find_spec("sklearn"), "requires the scorer extra")
 class FittedScorerTests(unittest.TestCase):
+    def test_class_vocabulary_matches_reference_and_roundtrips(self):
+        import numpy as np
+        from sklearn.preprocessing import OneHotEncoder, StandardScaler
+        from sklearn.pipeline import make_pipeline
+        from sklearn.linear_model import LogisticRegression
+
+        xs = np.arange(60) % 7
+        labels = np.array(["red", "green", "blue"] * 20)
+        ys = (xs > 3) | (labels == "red")
+        rows = [
+            ScoredRow(str(i), (float(x),), (bool(y),), predicted_class=c)
+            for i, (x, c, y) in enumerate(zip(xs, labels, ys, strict=True))
+        ]
+        model = fit_scorer(["margin"], rows, class_column="prediction")
+        replay = LinearScorer.from_dict(json.loads(json.dumps(model.to_dict())))
+        onehot = OneHotEncoder(sparse_output=False).fit_transform(labels[:, None])
+        design = np.column_stack((xs, onehot))
+        expected = make_pipeline(
+            StandardScaler(), LogisticRegression(C=0.1, max_iter=1000)
+        ).fit(design, ys)
+        np.testing.assert_allclose(
+            [replay.score(r.scores, predicted_class=r.predicted_class) for r in rows],
+            expected.decision_function(design),
+            atol=1e-10,
+        )
+        self.assertEqual(replay.input_columns, ("margin", "prediction"))
+        for label in ("", "yellow"):
+            with self.assertRaisesRegex(ValueError, "missing or unseen"):
+                replay.score_row({"margin": "1", "prediction": label}, 2, False)
+            self.assertIsNone(
+                replay.score_row({"margin": "1", "prediction": label}, 2, True)
+            )
+
     def test_python_reference_and_roundtrip(self):
         import numpy as np
         from sklearn.linear_model import LogisticRegression

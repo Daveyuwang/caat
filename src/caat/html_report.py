@@ -3,7 +3,13 @@
 from html import escape
 
 from .plots import grader_comparison, reliability_diagram, risk_coverage
-from .report import describe, describe_refits, joint_calibration_summary, percent
+from .report import (
+    describe,
+    describe_refits,
+    joint_calibration_summary,
+    percent,
+    scorer_inputs,
+)
 
 
 def table(headers, rows, *, scroll_label=None):
@@ -150,7 +156,7 @@ def workflow_sections(report, sections, add_chart):
     if report.get("scorer"):
         sections.append(
             "<p>Fitted confidence features: "
-            + escape(", ".join(report["scorer"]["columns"]))
+            + escape(scorer_inputs(report["scorer"]))
             + ".</p>"
         )
         if report["selected_score"] == "fitted_score" and not joint_calibration_summary(

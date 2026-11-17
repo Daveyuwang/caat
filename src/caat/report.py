@@ -12,6 +12,13 @@ from .table import negated_score_name, output_fingerprints
 SCHEMA_VERSION = 2
 
 
+def scorer_inputs(scorer):
+    columns = list(scorer["columns"])
+    if scorer.get("class_column"):
+        columns.append(scorer["class_column"])
+    return ", ".join(columns)
+
+
 def make_report(command, input_meta, contents):
     return {
         **contents,
@@ -281,9 +288,7 @@ def describe(report):
         )
         if report.get("scorer") and selected == "fitted_score":
             choice = (
-                "Fitted confidence score from "
-                + ", ".join(report["scorer"]["columns"])
-                + "."
+                "Fitted confidence score from " + scorer_inputs(report["scorer"]) + "."
             )
         if frozen := report["input"].get("frozen"):
             choice = f"Frozen {selected} with {frozen['calibration_labels']} calibration labels and {frozen['reference_rows']} ungraded reference rows."

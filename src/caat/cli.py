@@ -219,7 +219,7 @@ def use_plan_sample_columns(args, saved, sample_path):
     if raw_key is None and "output_key" in fields:
         raw_key = saved.get("output_key_column") or "output_sha256"
     features = (
-        LinearScorer.from_dict(saved["scorer"]).columns
+        LinearScorer.from_dict(saved["scorer"]).input_columns
         if args.score_column is None and "scorer" in saved
         else ()
     )

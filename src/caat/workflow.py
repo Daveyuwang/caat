@@ -262,7 +262,7 @@ def load_workflow(path):
     if scorer is not None:
         if (
             not isinstance(scorer, dict)
-            or scorer.keys() - {"method", "regularization"}
+            or scorer.keys() - {"method", "regularization", "class_column"}
             or scorer.get("method", "logistic") != "logistic"
             or (
                 scorer.get("regularization") != "auto"
@@ -274,6 +274,28 @@ def load_workflow(path):
             )
         if "refit_checks" not in config:
             settings["refit_checks"] = 20
+    class_column = (scorer or {}).get("class_column")
+    if settings["frozen"] and (model := settings["frozen"].get("model")):
+        class_column = model.class_column
+    if class_column is not None and (
+        not isinstance(class_column, str)
+        or not class_column.strip()
+        or class_column
+        in {
+            *settings["score_columns"],
+            settings["id_column"],
+            settings["output_key_column"],
+            settings["reference_column"],
+            *settings["correct_columns"],
+            *settings["check_columns"],
+            *external_graders,
+            FITTED_SCORE,
+        }
+    ):
+        raise ValueError(
+            "class_column must name a prediction distinct from numeric features, ID and reference grades"
+        )
+    settings["class_column"] = class_column
     checks = settings["refit_checks"]
     if type(checks) is not int or checks < 0 or checks % 2:
         raise ValueError("refit_checks must be an even nonnegative integer")
@@ -465,7 +487,19 @@ def _augment_scores(partitions, settings):
     names = settings["score_columns"]
     if settings["frozen"] and (model := settings["frozen"].get("model")):
         scored = [
-            [replace(r, scores=(model.score(r.scores),)) for r in part]
+            [
+                replace(
+                    r,
+                    scores=(
+                        model.score(
+                            r.scores,
+                            predicted_class=r.predicted_class,
+                            review_missing_scores=settings["review_missing_scores"],
+                        ),
+                    ),
+                )
+                for r in part
+            ]
             for part in partitions
         ]
         return scored, model, (FITTED_SCORE,)
@@ -485,17 +519,45 @@ def _augment_scores(partitions, settings):
         (replace(r, scores=raw_values(r)) for r in partitions[0]),
         lower_is_better=settings["lower_is_better"],
         regularization=settings["scorer"].get("regularization", 0.1),
+        class_column=settings["class_column"],
+        review_missing_scores=settings["review_missing_scores"],
     )
     scored = [
-        [replace(r, scores=(*r.scores, model.score(raw_values(r)))) for r in part]
+        [
+            replace(
+                r,
+                scores=(
+                    *r.scores,
+                    model.score(
+                        raw_values(r),
+                        predicted_class=r.predicted_class,
+                        review_missing_scores=settings["review_missing_scores"],
+                    ),
+                ),
+            )
+            for r in part
+        ]
         for part in partitions
     ]
     return scored, model, (*names, FITTED_SCORE)
 
 
 def _refitted_acceptances(design, calibration, holdout, settings, graders):
-    if settings["scorer"] is not None and not any(None not in r.scores for r in design):
-        return None
+    if settings["scorer"] is not None:
+        complete = [
+            r
+            for r in design
+            if None not in r.scores
+            and (settings["class_column"] is None or r.predicted_class)
+        ]
+        if not complete:
+            return None
+        if settings["class_column"] and not settings["review_missing_scores"]:
+            levels = {r.predicted_class for r in complete}
+            if any(
+                r.predicted_class not in levels for r in chain(calibration, holdout)
+            ):
+                return None
     missing = settings["review_missing_scores"]
     (d, c, h), scorer, names = _augment_scores((design, calibration, holdout), settings)
     selected = (
@@ -607,6 +669,7 @@ def run_workflow(path, *, save_outputs=False):
         "selection": prediction_filter,
         "negated_scores": settings["negated_scores"],
         "label_columns": labels,
+        "class_column": settings["class_column"],
         "review_missing_scores": review_missing_scores,
     }
     frozen = settings["frozen"]
