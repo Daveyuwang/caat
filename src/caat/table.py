@@ -355,7 +355,13 @@ def write_external_score_join(
                 review_missing_scores=review_missing_scores,
             )
         except ValueError as exc:
-            raise ValueError(f"{path} ({name}): {exc}") from exc
+            hint = (
+                ". Add your scores to the export command's output, which has the "
+                "identity columns"
+                if " columns: " in str(exc)
+                else ""
+            )
+            raise ValueError(f"{path} ({name}): {exc}{hint}") from exc
         tables.append((name, scores))
     id_position = identity_columns.index("id")
 

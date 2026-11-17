@@ -28,15 +28,20 @@ class FirstUseTests(unittest.TestCase):
         self.addCleanup(workspace.cleanup)
         self.root = Path(workspace.name).resolve()
 
-    def table(self, name="graded.csv", *, reversed_score=False, group=False):
+    def table(
+        self, name="graded.csv", *, reversed_score=False, group=False, noisy=False
+    ):
         # Even rows are right ("cat" == "cat") and carry the high score.
+        # With noisy, every tenth row is a confident error.
         path = self.root / name
-        header = "id,score,guess,truth,ok" + (",group" if group else "")
+        header = "id,score,twin,guess,truth,ok" + (",group" if group else "")
         lines = [header]
         for i in range(100):
-            right = i % 2 == 0
-            score = 0.9 if right != reversed_score else 0.1
-            line = f"{i:03d},{score},cat,{'cat' if right else 'dog'},{int(right)}"
+            right = i % 2 == 0 and not (noisy and i % 10 == 0)
+            score = 0.9 if (i % 2 == 0) != reversed_score else 0.1
+            line = (
+                f"{i:03d},{score},{score},cat,{'cat' if right else 'dog'},{int(right)}"
+            )
             lines.append(line + (f",{'a' if i < 50 else 'b'}" if group else ""))
         path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         return path
@@ -157,6 +162,25 @@ class FirstUseTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("was 50% at 100% coverage (threshold 0.1)", summary)
 
+    def test_no_cutoff_explains_a_rate_under_the_target(self):
+        # Four right rows above the cutoff: 0% error, but 0.6**4 = 0.13 > 0.05.
+        path = self.root / "few.csv"
+        rows = [f"{i},{0.9 if i < 4 else 0.1},{int(i < 4)}" for i in range(8)]
+        path.write_text("id,score,ok\n" + "\n".join(rows) + "\n", encoding="utf-8")
+        command = [
+            "select", path, "--correct-column", "ok", "--thresholds", "0.9",
+            "--risk-target", "0.4",
+        ]  # fmt: skip
+        code, summary, _ = run(*command)
+        self.assertEqual(code, 1)
+        self.assertIn(
+            "was 0% at 50% coverage (threshold 0.9). That rate is under the target, "
+            "but 4 accepted rows are too few to show it with 95% confidence.",
+            summary,
+        )
+        code, summary, _ = run(*command, "--rule", "empirical")
+        self.assertEqual(code, 0)
+
     def test_route_keeps_named_columns_and_omits_an_absent_group(self):
         decisions = self.root / "decisions.csv"
         route = ["route", "--threshold", "0.5", "--output", decisions]
@@ -187,6 +211,126 @@ class FirstUseTests(unittest.TestCase):
         code, _, error = run(*route, self.table(), "--keep-column", "score")
         self.assertEqual(code, 2)
         self.assertIn("--keep-column names must be distinct", error)
+
+    def test_policy_summary_says_why_the_result_holds(self):
+        base = [
+            "policy",
+            self.table(),
+            "--correct-column",
+            "ok",
+            "--risk-target",
+            "0.3",
+        ]
+        _, summary, _ = run(*base)
+        self.assertIn(
+            "The rule keeps accepted error at or below 30% with 95% confidence on new "
+            "rows like the calibration rows.",
+            summary,
+        )
+        self.assertIn(
+            "Score ranking under ok on the calibration rows: AUROC 1.000.", summary
+        )
+        _, report, _ = run(*base, "--json")
+        held = json.loads(report)["heldout"]["graders"]["ok"]
+        # With zero errors among k accepted rows the 95% bound is 1 - 0.05 ** (1 / k).
+        self.assertEqual(held["errors"], 0)
+        bound = 1 - 0.05 ** (1 / held["accepted"])
+        self.assertAlmostEqual(held["upper_bound_95"], bound, places=9)
+        self.assertIn(
+            f"with 0 errors (0%, 95% upper bound {100 * bound:.3g}%). "
+            "The observed rate meets the target.",
+            summary,
+        )
+
+        _, report, _ = run(*base, "--holdout-confidence", "0.95", "--json")
+        held = json.loads(report)["heldout"]["graders"]["ok"]
+        self.assertNotIn("upper_bound_95", held)
+        self.assertAlmostEqual(held["risk_upper_bound"], bound, places=9)
+
+        _, summary, _ = run(*base, "--rule", "empirical")
+        self.assertIn("gives no statistical guarantee.", summary)
+        code, summary, _ = run(
+            "policy", self.table(reversed_score=True), "--correct-column", "ok",
+            "--risk-target", "0.3",
+        )  # fmt: skip
+        self.assertEqual(code, 1)
+        self.assertTrue(
+            summary.rstrip().endswith("Exit status 1: no cutoff was selected.")
+        )
+
+    def test_scores_names_the_split_and_calls_a_tie(self):
+        code, summary, _ = run(
+            "scores", self.table(), "--score-column", "score", "--score-column", "twin",
+            "--correct-column", "ok", "--bootstrap", "50",
+        )  # fmt: skip
+        self.assertEqual(code, 0)
+        self.assertIn("Compared scores on 40 held-out rows against score.", summary)
+        self.assertIn("chosen by AURC gain on 20 design rows.", summary)
+        # The twin column equals the baseline, so every paired difference is zero.
+        self.assertIn(
+            "Tied with score: every 95% interval for the difference includes zero.",
+            summary,
+        )
+        self.assertNotIn("(unknown)", summary)
+
+    def test_plan_takes_the_expected_error_from_a_policy_report(self):
+        report = self.root / "policy.json"
+        table = self.table(noisy=True)
+        # Ten percent of the confident rows are wrong, so a 50% target leaves room.
+        run(
+            "policy",
+            table,
+            "--correct-column",
+            "ok",
+            "--risk-target",
+            "0.5",
+            "--output",
+            report,
+        )
+        held = json.loads(report.read_text(encoding="utf-8"))["heldout"]["graders"][
+            "ok"
+        ]
+        self.assertGreater(held["errors"], 0)
+        code, plan, _ = run("plan", "--threshold-report", report, "--json")
+        self.assertEqual(code, 0, plan)
+        plan = json.loads(plan)
+        self.assertEqual(plan["input"]["expected_error"], held["error_rate"])
+        self.assertEqual(plan["input"]["expected_error_source"], "threshold_report")
+        _, summary, _ = run("plan", "--threshold-report", report)
+        self.assertIn("the held-out rate in the threshold report", summary)
+        code, _, error = run("plan", "--risk-target", "0.3")
+        self.assertEqual(code, 2)
+        self.assertIn("give --expected-error", error)
+
+    def test_calibration_summary_states_the_direction(self):
+        for score, lean in (("0.9", "overconfident"), ("0.1", "underconfident")):
+            path = self.root / f"flat-{lean}.csv"
+            rows = [f"{i},{score},{i % 2}" for i in range(10)]
+            path.write_text("id,score,ok\n" + "\n".join(rows) + "\n", encoding="utf-8")
+            _, summary, _ = run(
+                "evaluate", path, "--correct-column", "ok", "--threshold", "0.5",
+                "--probability",
+            )  # fmt: skip
+            percent = "90%" if score == "0.9" else "10%"
+            self.assertIn(
+                f"Mean probability {percent} against 50% correct: {lean}.", summary
+            )
+
+    def test_inspect_grader_error_lists_the_scorers(self):
+        from types import SimpleNamespace
+
+        from caat.inspect_log import binary_grade
+
+        sample = SimpleNamespace(
+            id="q1",
+            scores={
+                "alias": SimpleNamespace(value="C"),
+                "exact": SimpleNamespace(value="I"),
+            },
+        )
+        self.assertEqual(binary_grade(sample, "alias"), 1)
+        with self.assertRaisesRegex(ValueError, "Scorers in this sample: alias, exact"):
+            binary_grade(sample, "primary")
 
 
 if __name__ == "__main__":

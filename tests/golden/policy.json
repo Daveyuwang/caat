@@ -167,7 +167,8 @@
         "errors": 33,
         "coverage": 0.663594470046083,
         "error_rate": 0.22916666666666666,
-        "meets_target": true
+        "meets_target": true,
+        "upper_bound_95": 0.29419936908048033
       },
       "helm_strict_pass": {
         "total": 217,
@@ -175,7 +176,8 @@
         "errors": 45,
         "coverage": 0.663594470046083,
         "error_rate": 0.3125,
-        "meets_target": true
+        "meets_target": true,
+        "upper_bound_95": 0.3820328480910417
       }
     },
     "accepted_comparisons": {

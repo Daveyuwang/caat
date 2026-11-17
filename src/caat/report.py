@@ -163,6 +163,12 @@ def read_threshold_report(path, *, require_confirmed=False):
         "review_missing_scores": read_review_missing_scores(path, report),
         "fit_outputs": fit_outputs,
     }
+    if command != "select":
+        # The first selection grader's held-out rate is a starting point for label plans.
+        graders = (policy.get("heldout") or {}).get("graders") or {}
+        rate = next(iter(graders.values()), {}).get("error_rate")
+        if _finite_number(rate):
+            options["heldout_error_rate"] = rate
     if source := read_negated_score_source(path, report, score_column):
         options["negated_score_source"] = source
     return options
@@ -298,9 +304,16 @@ def describe(report):
         )
         if sample_path := report.get("sample_path"):
             batch += f" Wrote the seed-{inputs['sample_seed']} sample to {sample_path}."
+        assumed = percent(inputs["expected_error"])
+        source = (
+            f" of {assumed}, the held-out rate in the threshold report"
+            if inputs.get("expected_error_source") == "threshold_report"
+            else f" of {assumed}"
+        )
         return (
             f"{summary} Up to {report['max_errors']} errors certify it at {confidence} confidence. "
-            f"The chance of certification is {chance} at the assumed error rate.{batch}"
+            f"The chance of certification is {chance} at the assumed error rate{source}. "
+            f"The label count grows quickly as the assumed rate nears the target.{batch}"
         )
     if command == "evaluate":
         counts = report["overall"]
@@ -407,12 +420,18 @@ def describe(report):
         return "\n".join(lines)
     if command == "scores":
         recommended = report["recommended_score"]
+        split, baseline = report["split"], report["baseline"]
+        heldout = split["comparison"] == "heldout"
         lines = [
-            f"Compared scores on {report['split']['reported']} rows against {report['baseline']}."
+            f"Compared scores on {split['reported']} {'held-out ' if heldout else ''}rows "
+            f"against {baseline}."
         ]
-        if report["split"]["comparison"] == "heldout":
+        if heldout:
             if recommended:
-                lines.append(f"Design-only recommendation: {recommended}.")
+                lines.append(
+                    f"Design-only recommendation: {recommended}, chosen by AURC gain on "
+                    f"{split['design']} design rows."
+                )
             elif "design_scored" in report:
                 lines.append("No complete design score improved on random by AURC.")
             else:
@@ -424,7 +443,13 @@ def describe(report):
                 for key, value in comparison["controls"].items()
             ]
             candidates = [
-                (name, value, f" ({report['costs'][name]})")
+                (
+                    name,
+                    value,
+                    ""
+                    if report["costs"][name] == "unknown"
+                    else f" ({report['costs'][name]})",
+                )
                 for name, value in comparison["scores"].items()
             ]
             for name, score, cost in controls + candidates:
@@ -449,6 +474,19 @@ def describe(report):
                     if score.get("direction_warning")
                     else ""
                 )
+                intervals = [
+                    entry.get("risk_delta_95")
+                    for entry in score["budgets"]
+                    if name != baseline
+                ]
+                if intervals and all(
+                    interval is not None and interval[0] <= 0 <= interval[1]
+                    for interval in intervals
+                ):
+                    warning += (
+                        f" Tied with {baseline}: every 95% interval for the difference "
+                        "includes zero."
+                    )
                 lines.append(
                     f"  {name}{cost}. AUROC {roc}.{availability} {risks}.{warning}"
                 )
@@ -496,12 +534,21 @@ def lowest_error_summary(selection):
     if not reached:
         return " No candidate accepted any calibration row."
     best = min(reached, key=lambda row: (row["worst_error_rate"], -row["accepted"]))
-    return (
+    summary = (
         f" The lowest calibration error among the candidates was "
         f"{percent(best['worst_error_rate'])} at {percent(best['coverage'])} coverage "
-        f"(threshold {best['threshold']!r}). Compare other scores with `caat scores`, "
-        "or raise the target."
+        f"(threshold {best['threshold']!r})."
     )
+    if (
+        selection["rule"] != "empirical"
+        and best["worst_error_rate"] <= selection["risk_target"]
+    ):
+        return summary + (
+            f" That rate is under the target, but {best['accepted']} accepted rows "
+            f"are too few to show it with {percent(1 - selection['failure_rate'])} "
+            "confidence. Add calibration rows, test fewer candidates, or raise the target."
+        )
+    return summary + " Compare other scores with `caat scores`, or raise the target."
 
 
 def counts_summary(counts):
@@ -543,9 +590,17 @@ def joint_calibration_summary(selection):
 def calibration_summary(metrics):
     if metrics["brier_score"] is None:
         return "No scored rows for calibration metrics."
+    bins = [row for row in metrics["reliability_bins"] if row["count"]]
+    total = sum(row["count"] for row in bins)
+    confidence = sum(row["count"] * row["mean_probability"] for row in bins) / total
+    accuracy = sum(row["count"] * row["accuracy"] for row in bins) / total
+    lean = "overconfident" if confidence > accuracy else "underconfident"
+    if abs(confidence - accuracy) < 0.005:
+        lean = "matched on average"
     return (
         f"Brier {metrics['brier_score']:.4f}. "
-        f"ECE {percent(metrics['ece'])}. ACE {percent(metrics['ace'])}."
+        f"ECE {percent(metrics['ece'])}. ACE {percent(metrics['ace'])}. "
+        f"Mean probability {percent(confidence)} against {percent(accuracy)} correct: {lean}."
     )
 
 
@@ -580,7 +635,9 @@ def describe_policy(report) -> str:
                 "calibration rows. Larger scores must indicate greater confidence."
             )
         else:
-            lines.append(f"Score ranking under {name}: AUROC {auroc:.3f}.")
+            lines.append(
+                f"Score ranking under {name} on the calibration rows: AUROC {auroc:.3f}."
+            )
     target, rule = percent(selection["risk_target"]), selection["rule"]
     graders = " and ".join(selection["graders"])
     threshold = selection["selected_threshold"]
@@ -605,23 +662,39 @@ def describe_policy(report) -> str:
             f"No candidate threshold met the {target} risk target under {graders} ({rule})."
             + lowest_error_summary(selection)
         )
+        lines.append("Exit status 1: no cutoff was selected.")
         return "\n".join(lines)
     lines.append(
         f"Selected threshold {threshold!r} for a {target} risk target under {graders} ({rule})."
     )
+    if guarantee := selection.get("guarantee"):
+        lines.append(
+            f"The rule keeps accepted error at or below {target} with "
+            f"{percent(guarantee['confidence'])} confidence on new rows like the "
+            "calibration rows."
+        )
+    else:
+        lines.append(
+            "The empirical rule fits the observed calibration rate and gives no "
+            "statistical guarantee."
+        )
     for name, result in report["heldout"]["graders"].items():
         role = " (check only)" if name in report["check_graders"] else ""
         if result["error_rate"] is None:
             lines.append(f"Held-out rows under {name}{role}: none accepted.")
             continue
         verdict = "meets" if result["meets_target"] else "exceeds"
+        rate = percent(result["error_rate"])
         check = f", which {verdict} the target."
         if result.get("risk_upper_bound") is not None:
             bound = upper_bound_summary(result, report["holdout_confidence"])
             check = f". {bound} The bound {verdict} the target."
+        elif result.get("upper_bound_95") is not None:
+            rate += f", 95% upper bound {percent(result['upper_bound_95'])}"
+            check = f". The observed rate {verdict} the target."
         lines.append(
             f"Held-out rows under {name}{role}: accepted {result['accepted']} of {result['total']} "
-            f"with {result['errors']} errors ({percent(result['error_rate'])}){check}"
+            f"with {result['errors']} errors ({rate}){check}"
         )
     if everything := report.get("all_rows"):
         lines.append(
@@ -633,6 +706,6 @@ def describe_policy(report) -> str:
     lines.append(
         "The held-out rows confirm the policy."
         if report["confirmed"]
-        else "The held-out rows do not confirm the policy."
+        else "The held-out rows do not confirm the policy. Exit status 1."
     )
     return "\n".join(lines)

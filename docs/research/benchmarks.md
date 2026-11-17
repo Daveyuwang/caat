@@ -426,6 +426,47 @@ python scripts/study_mapie.py
 
 [Replay script](../../scripts/study_mapie.py) · [MAPIE 1.4.1 protocol](../../results/decision_baselines/mapie_protocol.json) · [MAPIE 1.6.0 protocol](../../results/decision_baselines/mapie_1.6_protocol.json)
 
+### Default selection rule
+
+This replay asks which rule `caat policy` should use when the user names
+none. It repeats the 20/40/40 split with 200 seeds on six saved archives at
+two risk targets each, and applies all four rules to every split. A split
+with no selected cutoff counts as zero coverage.
+
+| Rule | Splits with a cutoff | Mean held-out coverage | Held-out error above target | Worst setting |
+| --- | ---: | ---: | ---: | ---: |
+| `empirical` | 99.5% | 67.3% | 22.6% | 45.0% |
+| `ltt-bonferroni` (default) | 78.7% | 41.0% | 0.8% | 3.0% |
+| `ltt-holm` | 78.7% | 41.6% | 1.0% | 4.0% |
+| `ltt-fixed-sequence` | 75.5% | 41.9% | 2.5% | 7.5% |
+
+The empirical rule accepts more, and its accepted error on the held-out
+rows exceeded the target in 22.6% of splits, up to 45.0% for IFEval at a
+25% target. Bonferroni and Holm stayed below their 5% failure rate in
+every setting. Fixed sequence averaged 2.5% and reached 7.5% on FEVER at a
+30% target. Holm selects a cutoff in the same splits as Bonferroni and
+adds 0.6 points of coverage. Fixed sequence stops at the first candidate
+that fails. It selects less often on IFEval and IMDb, where the strictest
+cutoffs accept few rows, and more often on FEVER.
+
+`ltt-bonferroni` stays the default. It is the most conservative of the
+three, the gain from Holm is small, and both give the same guarantee. Use
+`--rule ltt-holm` for the extra coverage and `--rule empirical` only for
+exploration.
+
+The archives are the 541 Qwen IFEval rows, the 1,000-question Qwen TriviaQA
+and MMLU-Pro runs, and the IMDb, Jigsaw, and FEVER course predictions. The
+splits of one archive share rows, so the shares describe these archives
+and are not independent trials. An observed held-out rate above the target
+is also a noisy sign of a true rate above it when few rows are accepted.
+
+```bash
+python scripts/study_default_rule.py
+```
+
+The script reads only files in the repository and runs in under a minute.
+[Results by setting](../../results/decision_baselines/default_rule.csv) · [Replay script](../../scripts/study_default_rule.py) · [Terms](../guide/glossary.md#selection-rules)
+
 ## Design score screen
 
 Run `python scripts/study_features.py` after preparing the four complete

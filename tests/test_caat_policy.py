@@ -430,9 +430,12 @@ class PolicyTests(unittest.TestCase):
         )
         self.assertEqual(exit_code, 1)
         self.assertIn(
-            "helm_strict_pass (check only): accepted 144 of 217 with 45 errors (31.2%), which exceeds",
+            "helm_strict_pass (check only): accepted 144 of 217 with 45 errors "
+            "(31.2%, 95% upper bound 38.2%). The observed rate exceeds the target.",
             summary,
         )
+        self.assertIn("gives no statistical guarantee.", summary)
+        self.assertTrue(summary.rstrip().endswith("Exit status 1."))
 
     def test_reversed_score_selects_nothing(self):
         with TemporaryDirectory() as directory:

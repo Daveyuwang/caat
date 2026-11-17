@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- State the selection rule's guarantee in the `caat policy` summary, show a 95% upper bound next to the held-out error rate, and name the exit status when it is 1.
+- When no cutoff qualifies although a candidate's error is under the target, say that too few rows were accepted to show it.
+- Name the split behind each number in `caat scores`, and call two scores tied when every interval for their difference includes zero.
+- Default `caat plan --expected-error` to the held-out rate in a `policy` or `run` report.
+- Say whether probabilities are overconfident or underconfident in calibration summaries.
+- List the saved scorers when `caat inspect join` gets an unknown grader, and point to the export when a score file lacks the identity columns.
+- Add a glossary of report terms and two walkthroughs: a classifier's predictions, and model labels for human review.
+- Compare the four selection rules over 200 splits of six archives and keep `ltt-bonferroni` as the default.
 - Grade by exact match between `--prediction-column` and `--reference-column` in `policy`, `select`, and `scores`, as `evaluate` already does.
 - Report the accepted count for the whole input next to the held-out check in `caat policy`.
 - When no cutoff qualifies, report the lowest calibration error the candidates reached and its coverage.

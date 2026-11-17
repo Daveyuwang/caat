@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "caat-annotation"
 version = "0.2.0"
-description = "Select and audit confidence-based acceptance policies for saved predictions"
+description = "Score, calibrate, evaluate, and use model confidence to decide what to accept or review"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]

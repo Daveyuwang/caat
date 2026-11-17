@@ -2,10 +2,22 @@
 
 [![CI](https://github.com/Daveyuwang/caat/actions/workflows/ci.yml/badge.svg)](https://github.com/Daveyuwang/caat/actions/workflows/ci.yml)
 
-CAAT turns saved predictions, confidence scores, and grades into acceptance
-and review policies. Choose a cutoff for a target error rate, check it on
-held-out data, and audit what changes under a different grader. The analysis
-commands run on a CPU with Python 3.10 or later.
+CAAT is a toolkit for model confidence. It covers the steps between a
+model's output and a decision about it: score each output, calibrate the
+scores, evaluate them, and use them to accept an output or send it to
+review. It reads saved predictions from a classifier or an LLM, runs on a
+CPU with Python 3.10 or later, and has no required dependencies.
+
+| Step | Question | Commands |
+| --- | --- | --- |
+| Score | Which confidence signal ranks right answers above wrong ones? | `features`, `collect`, `scores` |
+| Calibrate | Can the score be read as a probability of being right? | `calibrate` |
+| Evaluate | How good is it, by AUROC, risk at a coverage, ECE, and Brier score? | `evaluate`, `scores` |
+| Use | Which outputs to accept, which to review, and which to label next? | `policy`, `select`, `route`, `queue`, `plan`, `monitor`, `audit` |
+
+Start with [a classifier's predictions](https://github.com/Daveyuwang/caat/blob/main/docs/guide/classifier.md) or
+[model labels that need human review](https://github.com/Daveyuwang/caat/blob/main/docs/guide/annotation.md).
+The [glossary](https://github.com/Daveyuwang/caat/blob/main/docs/guide/glossary.md) explains every term in the reports.
 
 ## Try a review policy
 
@@ -19,7 +31,14 @@ caat policy examples/ifeval_graders.csv --score-column mean_token_logprob --corr
 The example selects a cutoff using Google's strict IFEval grader. On the
 217 held-out rows the frozen policy accepts 144 responses (66.4%). Google
 counts 33 errors among accepted responses (22.9%), and HELM counts 45
-(31.2%). Both observed rates meet the 40% target.
+(31.2%). Both observed rates meet the 40% target. The summary states the
+guarantee behind the cutoff and a 95% upper bound for each rate.
+
+The default rule tests each candidate cutoff before keeping it. Over 200
+random splits of six saved archives, a cutoff fitted to the observed
+calibration error exceeded its target on held-out rows in 22.6% of splits.
+The default rule did so in 0.8%.
+[Rule comparison](https://github.com/Daveyuwang/caat/blob/main/docs/research/benchmarks.md#default-selection-rule)
 
 ![Held-out IFEval risk for the Google and HELM graders](https://github.com/Daveyuwang/caat/raw/main/docs/figures/policy-example.svg)
 
@@ -136,7 +155,8 @@ report. [Configuration and exit codes](https://github.com/Daveyuwang/caat/blob/m
 ## Plan labels
 
 Use `caat plan --risk-target 0.10 --expected-error 0.05` to size an
-independent holdout for a frozen policy. At 95% confidence, 179 labeled
+independent holdout for a frozen policy. With `--threshold-report` and a
+saved `policy` report, both values come from the report. At 95% confidence, 179 labeled
 accepted rows give an 81.3% chance of certifying the 10% target if the
 policy's true error rate is 5%. Pass `--accepted N` in place of
 `--risk-target` to find the smallest target a fixed label budget can

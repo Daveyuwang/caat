@@ -1,8 +1,9 @@
 Split with seed 42: 108 design, 216 calibration, and 217 held-out rows.
-Score ranking under strict_pass: AUROC 0.596.
-Score ranking under helm_strict_pass: AUROC 0.614.
+Score ranking under strict_pass on the calibration rows: AUROC 0.596.
+Score ranking under helm_strict_pass on the calibration rows: AUROC 0.614.
 Selected threshold -0.43964836263206303 for a 40% risk target under strict_pass (ltt-bonferroni).
-Held-out rows under strict_pass: accepted 144 of 217 with 33 errors (22.9%), which meets the target.
-Held-out rows under helm_strict_pass (check only): accepted 144 of 217 with 45 errors (31.2%), which meets the target.
+The rule keeps accepted error at or below 40% with 95% confidence on new rows like the calibration rows.
+Held-out rows under strict_pass: accepted 144 of 217 with 33 errors (22.9%, 95% upper bound 29.4%). The observed rate meets the target.
+Held-out rows under helm_strict_pass (check only): accepted 144 of 217 with 45 errors (31.2%, 95% upper bound 38.2%). The observed rate meets the target.
 Applied to all 541 rows, the cutoff accepts 367 (67.8%). 324 of the 541 rows were used to choose the cutoff, so only the held-out rows give the error estimate.
 The held-out rows confirm the policy.
