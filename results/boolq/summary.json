@@ -1,0 +1,186 @@
+{
+  "design_gain": {
+    "winner_logprob": 0.5223668191510971,
+    "gap": 0.6090419071803684,
+    "p_true": 0.5235506186102321
+  },
+  "quality": {
+    "count": 2204,
+    "accepted_error": {
+      "winner_logprob": 0.09509448062346536,
+      "gap": 0.09522212577921566,
+      "p_true": 0.1590621750035686,
+      "confidence": 0.09522212577921566,
+      "fitted": 0.07168784029038112
+    },
+    "comparisons": {
+      "gap": {
+        "delta": -0.02353428548883453,
+        "lower95": -0.03138616308905439,
+        "upper95": -0.015020125098402195
+      }
+    },
+    "design_selected_single": "gap",
+    "design_selected_native": "gap"
+  },
+  "arms": {
+    "confidence_numeric_320": {
+      "mean_flip": 0.27107896528250514,
+      "mean_coverage": 0.8042460857726345,
+      "no_cutoff": 32,
+      "primary": {
+        "cutoff": 0.95,
+        "accepted": 2680,
+        "errors": 368,
+        "upper95": 0.1487293431033386,
+        "confirmed": true
+      }
+    },
+    "confidence_numeric_480": {
+      "mean_flip": 0.03413206262763785,
+      "mean_coverage": 0.9726582709326073,
+      "no_cutoff": 1,
+      "primary": {
+        "cutoff": 0.8,
+        "accepted": 2835,
+        "errors": 425,
+        "upper95": 0.1613836094434842,
+        "confirmed": true
+      }
+    },
+    "confidence_reference_320": {
+      "mean_flip": 0.05242341729067394,
+      "mean_coverage": 0.9045915588835942,
+      "no_cutoff": 0,
+      "primary": {
+        "cutoff": 0.970687747001648,
+        "accepted": 2629,
+        "errors": 344,
+        "upper95": 0.14216202850523685,
+        "confirmed": true
+      }
+    },
+    "confidence_reference_480": {
+      "mean_flip": 0.04728386657590199,
+      "mean_coverage": 0.9431381892443838,
+      "no_cutoff": 0,
+      "primary": {
+        "cutoff": 0.970687747001648,
+        "accepted": 2629,
+        "errors": 344,
+        "upper95": 0.14216202850523685,
+        "confirmed": true
+      }
+    },
+    "fitted_reference_320": {
+      "mean_flip": 0.02750850918992512,
+      "mean_coverage": 0.9233287950987068,
+      "no_cutoff": 0,
+      "primary": {
+        "cutoff": 0.5459637342569978,
+        "accepted": 2666,
+        "errors": 321,
+        "upper95": 0.1312699266024389,
+        "confirmed": true
+      }
+    },
+    "fitted_reference_480": {
+      "mean_flip": 0.03390061266167461,
+      "mean_coverage": 0.9472532334921716,
+      "no_cutoff": 0,
+      "primary": {
+        "cutoff": 0.5459637342569978,
+        "accepted": 2666,
+        "errors": 321,
+        "upper95": 0.1312699266024389,
+        "confirmed": true
+      }
+    },
+    "p_true_reference_320": {
+      "mean_flip": 0.16601089176310416,
+      "mean_coverage": 0.6129203539823008,
+      "no_cutoff": 0,
+      "primary": {
+        "cutoff": 0.562176525592804,
+        "accepted": 1763,
+        "errors": 211,
+        "upper95": 0.133153316033639,
+        "confirmed": true
+      }
+    },
+    "p_true_reference_480": {
+      "mean_flip": 0.1977331518039483,
+      "mean_coverage": 0.7485228046289994,
+      "no_cutoff": 0,
+      "primary": {
+        "cutoff": 0.562176525592804,
+        "accepted": 1763,
+        "errors": 211,
+        "upper95": 0.133153316033639,
+        "confirmed": true
+      }
+    },
+    "winner_logprob_reference_320": {
+      "mean_flip": 0.049894486044928514,
+      "mean_coverage": 0.9040418652144316,
+      "no_cutoff": 0,
+      "primary": {
+        "cutoff": -0.029750823974609375,
+        "accepted": 2618,
+        "errors": 341,
+        "upper95": 0.14157020957256242,
+        "confirmed": true
+      }
+    },
+    "winner_logprob_reference_480": {
+      "mean_flip": 0.04917631041524847,
+      "mean_coverage": 0.9423076923076923,
+      "no_cutoff": 0,
+      "primary": {
+        "cutoff": -0.029750823974609375,
+        "accepted": 2618,
+        "errors": 341,
+        "upper95": 0.14157020957256242,
+        "confirmed": true
+      }
+    },
+    "gap_reference_320": {
+      "mean_flip": 0.05242341729067394,
+      "mean_coverage": 0.8953403675970045,
+      "no_cutoff": 0,
+      "primary": {
+        "cutoff": 3.5,
+        "accepted": 2629,
+        "errors": 344,
+        "upper95": 0.14216202850523685,
+        "confirmed": true
+      }
+    },
+    "gap_reference_480": {
+      "mean_flip": 0.046255956432947595,
+      "mean_coverage": 0.9374846834581346,
+      "no_cutoff": 0,
+      "primary": {
+        "cutoff": 3.5,
+        "accepted": 2629,
+        "errors": 344,
+        "upper95": 0.14216202850523685,
+        "confirmed": true
+      }
+    }
+  },
+  "label_savings": {
+    "flips": {
+      "difference": 0.018291354663036084,
+      "upper95": 0.03353386657590198
+    },
+    "empty": {
+      "difference": -0.005,
+      "upper95": 0.0
+    },
+    "coverage": {
+      "difference": 0.06806671204901296,
+      "upper95": 0.07668218175629685
+    }
+  }
+}
