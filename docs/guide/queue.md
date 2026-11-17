@@ -40,7 +40,11 @@ caat route examples/audit/predictions.csv --threshold 0.75 --output-key-column o
 ```
 
 The example accepts three tickets and marks two for review. The CSV keeps
-input order and has `id`, `score`, `decision`, and `group` columns.
+input order and has `id`, `score`, and `decision` columns, plus `group` when
+the input has a group column. The `id` column holds the values of your ID
+column under the name `id`, which the later commands read. Add
+`--keep-column NAME` for each input column to copy into the file, such as
+your labels.
 CAAT writes decisions as it reads the batch and replaces the destination
 after all rows pass validation.
 `--output-key-column` adds an `output_key` column with the supplied identity

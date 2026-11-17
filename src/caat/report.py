@@ -475,13 +475,32 @@ def describe(report):
         return "\n".join(lines)
     threshold = report["selected_threshold"]
     if threshold is None:
-        return f"No candidate threshold met the {percent(report['risk_target'])} target ({report['rule']})."
+        return (
+            f"No candidate threshold met the {percent(report['risk_target'])} target ({report['rule']})."
+            + lowest_error_summary(report)
+        )
     candidate = next(
         row for row in report["candidates"] if row["threshold"] == threshold
     )
     return (
         f"Selected threshold {threshold!r} ({report['rule']}). "
         f"Calibration accepted {candidate['accepted']} of {report['calibration_total']} rows."
+    )
+
+
+def lowest_error_summary(selection):
+    """Say how close the candidates came when no cutoff qualified."""
+    reached = [
+        row for row in selection["candidates"] if row["worst_error_rate"] is not None
+    ]
+    if not reached:
+        return " No candidate accepted any calibration row."
+    best = min(reached, key=lambda row: (row["worst_error_rate"], -row["accepted"]))
+    return (
+        f" The lowest calibration error among the candidates was "
+        f"{percent(best['worst_error_rate'])} at {percent(best['coverage'])} coverage "
+        f"(threshold {best['threshold']!r}). Compare other scores with `caat scores`, "
+        "or raise the target."
     )
 
 
@@ -584,6 +603,7 @@ def describe_policy(report) -> str:
     if threshold is None:
         lines.append(
             f"No candidate threshold met the {target} risk target under {graders} ({rule})."
+            + lowest_error_summary(selection)
         )
         return "\n".join(lines)
     lines.append(
@@ -602,6 +622,13 @@ def describe_policy(report) -> str:
         lines.append(
             f"Held-out rows under {name}{role}: accepted {result['accepted']} of {result['total']} "
             f"with {result['errors']} errors ({percent(result['error_rate'])}){check}"
+        )
+    if everything := report.get("all_rows"):
+        lines.append(
+            f"Applied to all {everything['total']} rows, the cutoff accepts "
+            f"{everything['accepted']} ({percent(everything['coverage'])}). "
+            f"{everything['fitting']} of the {everything['total']} rows were used to "
+            "choose the cutoff, so only the held-out rows give the error estimate."
         )
     lines.append(
         "The held-out rows confirm the policy."
