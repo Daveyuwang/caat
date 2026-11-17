@@ -8,12 +8,37 @@ python -m pip install -e ".[dev]"
 ruff check src scripts tests
 ruff format --check src scripts tests
 python -m unittest discover -s tests -v
+python -m unittest discover -s tests/properties -v
 ```
 
 The tests execute the README examples, compare their reports with the saved
 fixtures, and replay the three bundled CPU benchmarks. A change to a report
 or a numerical method needs the corresponding test and an explanation of
 the affected fields or results.
+
+The installed wheel includes `caat/py.typed`. CI type-checks the public
+imports and verifies that invalid arguments still produce diagnostics.
+Python report payloads use dictionaries with the fields documented in
+the [report reference](docs/guide/reports.md).
+[Packaging type information](https://typing.python.org/en/latest/spec/distributing.html#packaging-type-information)
+
+```bash
+python -m pip install ".[dev]"
+python -m mypy --strict --python-version 3.10 tests/types/public_api.py
+```
+
+## Build the documentation
+
+Build from the checkout root and serve the generated pages locally.
+
+```bash
+python -m pip install ".[docs]"
+python scripts/build_docs.py
+python -m http.server 8000 --bind 127.0.0.1 --directory replay/docs/site
+```
+
+Open `http://127.0.0.1:8000`. CI runs the same strict build and provides a
+downloadable `caat-docs` artifact with the pages and bundled examples.
 
 ## Extend a pipeline stage
 
@@ -44,22 +69,26 @@ CLI flags, exit codes, and documented report fields. A flag or report
 field stays available through at least one minor release after
 deprecation. A reporting change that alters the meaning of an existing
 field increments `schema_version`. Keep the [report guide](docs/guide/reports.md),
-[golden reports](tests/golden), and [changelog](CHANGELOG.md) aligned.
+[golden reports](https://github.com/Daveyuwang/caat/tree/main/tests/golden), and [changelog](CHANGELOG.md) aligned.
 
 ## Build a release
 
-Run the suite from a clean checkout. Build both distribution files and
-check their metadata.
+Run the suite from a clean checkout. Use the same build command as the
+release workflow.
 
 ```bash
 python -m pip install build==1.6.1 twine==7.0.0
-python -m build
-python -m twine check --strict dist/*
+python scripts/build_release.py
 ```
+
+The script sets the archive timestamp from the checkout commit, builds the
+wheel from the finalized source archive, and checks both files with Twine.
+Set `SOURCE_DATE_EPOCH` to reuse a timestamp or to build from a source tree
+without Git metadata.
 
 Install the wheel in an empty environment and run the README examples.
 Update the [changelog](CHANGELOG.md) and tag the tested commit. A version
-tag runs the [release workflow](.github/workflows/release.yml) and produces
+tag runs the [release workflow](https://github.com/Daveyuwang/caat/blob/main/.github/workflows/release.yml) and produces
 the wheel and source archive.
 
 After the maintainer approves PyPI publication, set up a Trusted Publisher

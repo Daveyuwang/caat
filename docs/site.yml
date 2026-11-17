@@ -1,0 +1,58 @@
+site_name: CAAT
+site_description: Confidence scores, acceptance policies, and grader audits
+repo_url: https://github.com/Daveyuwang/caat
+repo_name: Daveyuwang/caat
+edit_uri: edit/main/
+site_dir: ../replay/docs/site
+strict: true
+
+theme:
+  name: mkdocs
+  highlightjs: false
+
+extra_css:
+  - docs/site.css
+
+validation:
+  nav:
+    omitted_files: warn
+  links:
+    anchors: warn
+    absolute_links: warn
+    unrecognized_links: warn
+
+nav:
+  - Home: README.md
+  - Workflows:
+      - Run a review policy: docs/guide/workflow.md
+      - Compare scores: docs/guide/scores.md
+      - Calibrate probabilities: docs/guide/calibration.md
+      - Audit graders in CI: docs/guide/ci-audit.md
+      - Monitor a frozen policy: docs/guide/monitor.md
+      - Queue reviews: docs/guide/queue.md
+  - Inputs:
+      - Prediction tables: docs/guide/csv-format.md
+      - Collect model responses: docs/guide/collect.md
+      - Inspect AI: docs/guide/inspect.md
+      - lm-evaluation-harness: docs/guide/lm-eval.md
+      - Every Eval Ever: docs/guide/every-eval-ever.md
+      - HELM: docs/guide/helm.md
+  - Reference:
+      - Score definitions: docs/guide/features.md
+      - Report fields and exit codes: docs/guide/reports.md
+      - Plugin contracts: docs/guide/plugins.md
+  - Benchmarks:
+      - Reproduce CPU benchmarks: docs/research/benchmarks.md
+      - Qwen confidence benchmark: docs/research/black-box-benchmark.md
+      - Compare model families: docs/research/model-families.md
+      - Combine confidence scores: docs/research/combined-scores.md
+      - Sampling budgets: docs/research/sample-budget.md
+      - Grader changes: docs/research/judge-study.md
+      - Model cascade costs: docs/research/matched-cost.md
+      - Figures: docs/figures/README.md
+  - Project:
+      - Compare tools: docs/comparison.md
+      - Method and related work: docs/research/method.md
+      - Roadmap: docs/ROADMAP.md
+      - Contributing: CONTRIBUTING.md
+      - Changelog: CHANGELOG.md

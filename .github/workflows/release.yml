@@ -27,8 +27,7 @@ jobs:
           version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
           test "$GITHUB_REF_NAME" = "v$version"
           python -m pip install build==1.6.1 twine==7.0.0
-          python -m build
-          python -m twine check --strict dist/*
+          python scripts/build_release.py
       - name: Verify the installed wheel
         run: |
           python -m venv "$RUNNER_TEMP/release-wheel"
