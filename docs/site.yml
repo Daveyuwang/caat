@@ -1,5 +1,5 @@
 site_name: CAAT
-site_description: Confidence scores, acceptance policies, and grader audits
+site_description: Score, calibrate, evaluate, and use model confidence
 repo_url: https://github.com/Daveyuwang/caat
 repo_name: Daveyuwang/caat
 edit_uri: edit/main/
@@ -23,6 +23,10 @@ validation:
 
 nav:
   - Home: README.md
+  - Start here:
+      - A classifier's predictions: docs/guide/classifier.md
+      - Model labels for human review: docs/guide/annotation.md
+      - Terms in the reports: docs/guide/glossary.md
   - Workflows:
       - Run a review policy: docs/guide/workflow.md
       - Compare scores: docs/guide/scores.md

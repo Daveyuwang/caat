@@ -33,7 +33,8 @@ caat inspect join run.eval --epoch 1 --scores scored.csv --grader primary --grad
 caat policy graded.csv --score-column confidence --correct-column primary --check-column alternate --risk-target 0.20 --holdout-confidence 0.95 --output policy.json
 ```
 
-Use the scorer names from the log in `--grader`. The importer accepts
+Use the scorer names from the log in `--grader`. If a name is not in the
+log, the error lists the scorers saved with the sample. The importer accepts
 binary grades encoded as `C`/`I`, 0/1, or booleans. It outputs one grade
 column per listed scorer. Score rows may be in any order. The importer checks
 that each selected sample has exactly one score and that its completion
@@ -46,6 +47,33 @@ target decision on the one-sided upper error bound and includes the observed
 error rate in the same report. Save `policy.json` to reuse its full cutoff
 with `--threshold-report`.
 [Report fields](reports.md)
+
+## Join scores keyed by sample ID
+
+A score file with only a sample ID and a confidence value lacks the
+evaluation ID, epoch, and completion hash, so the join rejects it. Copy the
+identity columns from the export onto your scores first. This example reads
+`my_confidence.csv` with `sample_id` and `confidence` columns.
+
+```python
+import csv
+
+with open("my_confidence.csv", newline="", encoding="utf-8") as source:
+    confidence = {row["sample_id"]: row["confidence"] for row in csv.DictReader(source)}
+with (
+    open("scoring-input.csv", newline="", encoding="utf-8") as source,
+    open("scored.csv", "w", newline="", encoding="utf-8") as target,
+):
+    columns = ["eval_id", "id", "epoch", "output_sha256"]
+    writer = csv.DictWriter(target, [*columns, "confidence"])
+    writer.writeheader()
+    for row in csv.DictReader(source):
+        writer.writerow({name: row[name] for name in columns} | {"confidence": confidence[row["id"]]})
+```
+
+Then run `caat inspect join` with `--scores scored.csv`. The hash ties each
+score to the completion that was in the log when you exported it. Export
+again if the log is replaced.
 
 ## Compare several score files
 

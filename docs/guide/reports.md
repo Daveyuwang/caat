@@ -1,5 +1,7 @@
 # CLI reports
 
+[Terms used in the summaries](glossary.md)
+
 The four review commands print a plain-text summary by default. `--json` prints the
 full report to stdout. `--output FILE` writes that report as JSON whether
 or not you use `--json`. A valid report can accompany exit code 1. Exit
@@ -255,7 +257,10 @@ includes equality at the test level and at the requested power.
 Use `--threshold-report FILE` to find the minimum labels for the risk target
 in a saved `select`, `policy`, or `run` report. The planner also uses the
 report's holdout confidence when present. Otherwise it defaults to 0.95.
-Specify `--holdout-confidence` to use a different level.
+Specify `--holdout-confidence` to use a different level. With a `policy` or
+`run` report whose held-out check accepted rows, `--expected-error` is
+optional and defaults to the held-out error rate of the first grader. The
+report then records `input.expected_error_source` as `threshold_report`.
 
 | Field | Meaning |
 | --- | --- |
@@ -403,7 +408,10 @@ that column for selection and validation.
 | `all_rows.fitting` | Design and calibration rows. They chose the cutoff, so the held-out rows give the error estimate. |
 | `confirmed` | True if a cutoff is selected and all graders meet the selected holdout check. |
 
-`heldout` is null when selection finds no cutoff.
+`heldout` is null when selection finds no cutoff. Without
+`--holdout-confidence`, each held-out grader also has `upper_bound_95`, a
+one-sided 95% exact upper bound shown next to the observed rate. It does
+not change `meets_target`.
 
 Set `--design-grid-size N` on `caat select --design` or `caat policy`
 to choose the number of evenly spaced design quantiles. The default is

@@ -31,6 +31,8 @@ SOURCES = (
     "scripts/study_choice_decoding.py",
     "scripts/study_combined_scores.py",
     "scripts/study_decision_baselines.py",
+    "scripts/study_default_rule.py",
+    "scripts/prepare_digit_example.py",
     "scripts/study_paired_calibration.py",
     "scripts/study_score_choice.py",
     "scripts/study_cutoff_grid.py",

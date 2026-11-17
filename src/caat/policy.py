@@ -5,7 +5,11 @@ from typing import Any, Iterable, Sequence
 from .audit import audit
 from .calibrate import calibration_transform, default_scale, fit_calibration
 from .metrics import Counts, calibration_metrics, ranking_metrics, threshold_points
-from .rules import assess_accepted_risk, validate_holdout_confidence
+from .rules import (
+    assess_accepted_risk,
+    binomial_upper_bound,
+    validate_holdout_confidence,
+)
 from .select import DEFAULT_DESIGN_GRID_SIZE, design_thresholds, select
 from .table import GradedRow, UnscoredRow, accepted_at, graded_row, validated_rows
 
@@ -158,6 +162,12 @@ def _policy_for_splits(
                 )
             }
         }
+    if check is not None and holdout_confidence is None:
+        # Shown next to the observed rate. It does not change meets_target.
+        for summary in check["graders"].values():
+            summary["upper_bound_95"] = binomial_upper_bound(
+                Counts(summary["total"], summary["accepted"], summary["errors"]), 0.95
+            )
     report = {
         "schema_version": 1,
         "split": {

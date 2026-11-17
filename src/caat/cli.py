@@ -819,8 +819,7 @@ def plan_options(parser):
     parser.add_argument(
         "--expected-error",
         type=float,
-        required=True,
-        help="Assumed accepted error rate.",
+        help="Assumed accepted error rate. Defaults to the held-out rate in --threshold-report.",
     )
     parser.add_argument(
         "--holdout-confidence",
@@ -912,8 +911,16 @@ def run_plan(args):
     confidence = args.holdout_confidence
     if confidence is None:
         confidence = saved.get("holdout_confidence") or 0.95
+    expected = args.expected_error
+    if expected is None:
+        expected = saved.get("heldout_error_rate")
+        if expected is None:
+            raise ValueError(
+                "give --expected-error, or a policy or run report whose held-out "
+                "check accepted rows"
+            )
     options = {
-        "expected_error": args.expected_error,
+        "expected_error": expected,
         "holdout_confidence": confidence,
         "power": args.power,
     }
@@ -937,6 +944,8 @@ def run_plan(args):
             max_accepted=args.max_accepted,
         )
     result = plan_labels(**options)
+    if args.expected_error is None:
+        options["expected_error_source"] = "threshold_report"
     if args.batch_decisions is not None:
         options.update(
             batch_decisions=str(args.batch_decisions), accepted_population_sha256=digest
@@ -1073,7 +1082,12 @@ def policy_options(parser):
     parser.add_argument(
         "--holdout-output", type=Path, metavar="CSV", help="Export the held-out rows."
     )
-    parser.add_argument("--calibrate", choices=CALIBRATORS, metavar="METHOD")
+    parser.add_argument(
+        "--calibrate",
+        choices=CALIBRATORS,
+        metavar="METHOD",
+        help=f"Also fit a probability map: {', '.join(CALIBRATORS)}.",
+    )
     parser.add_argument("--calibration-input", choices=("score", "probability"))
 
 
@@ -2256,7 +2270,14 @@ def run_workflow_command(args):
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="caat",
-        description="Select and audit confidence-based acceptance policies for saved predictions.",
+        description=(
+            "Score, calibrate, evaluate, and use model confidence to decide "
+            "which saved predictions to accept and which to review."
+        ),
+        epilog=(
+            "Terms used in the reports: "
+            "https://github.com/Daveyuwang/caat/blob/main/docs/guide/glossary.md"
+        ),
     )
     parser.add_argument(
         "--version", action="version", version=f"caat {version('caat-annotation')}"

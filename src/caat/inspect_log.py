@@ -178,7 +178,11 @@ def export_for_scoring(log, output, *, epoch=1):
 def binary_grade(sample, grader):
     score = (sample.scores or {}).get(grader)
     if score is None:
-        raise ValueError(f"sample {sample.id!r} has no score for grader {grader!r}")
+        available = ", ".join(sorted(sample.scores or {})) or "none"
+        raise ValueError(
+            f"sample {sample.id!r} has no score for grader {grader!r}. "
+            f"Scorers in this sample: {available}"
+        )
     if score.value in ("C", 1):
         return 1
     if score.value in ("I", 0):
