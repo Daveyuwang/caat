@@ -32,7 +32,7 @@ The Inspect fixture uses the saved sample IDs, scores and alias grades from Insp
 From a checkout with Python 3.12, run the following commands. Each case saves the ordered holdout IDs, design and calibration IDs for each fit, and a decision bit per holdout ID (1 means accept). Seed −1 denotes the original assignment.
 
 ```bash
-python -m pip install . scikit-learn==1.7.2 numpy scipy
+python -m pip install . scikit-learn==1.9.1 numpy==2.5.5 scipy==1.18.1
 python scripts/study_routing_stability.py
 python scripts/study_routing_stability.py --fit-fraction 0.8 --output replay/routing-subsamples
 ```
@@ -58,10 +58,13 @@ The RTX 5080 scored 9,163 option likelihoods for 1,119 training and 1,172 test q
 
 At the locked 20% target, every original-split cell sent all 1,172 answers to review. At 75% coverage the design-selected single margin accepted 879 answers at 40.16% error. The fitted score had 41.87% error at the same budget. The paired difference was +1.71 percentage points (95% interval −0.16 to +3.33). The scorer ships as an opt-in choice. [ARC audits](../../results/routing_stability/arc_audits.csv) · [Refits](../../results/routing_stability/arc_stability.csv) · [Score comparison](../../results/routing_stability/arc_quality.csv)
 
+Using 80% of the fitting rows gave the same pattern. The single score found no cutoff in 200 refits with either grid. The fitted score found a cutoff in one refit per grid. Each averaged under 0.05% coverage. [Matched ARC refits](../../results/routing_stability/arc_stability_80pct.csv)
+
 Replay the verified feature table on CPU. The diagnosis script also verifies 232 candidate decisions against independent SciPy binomial tails and MAPIE's Bonferroni correction.
 
 ```bash
 python scripts/study_routing_stability.py --arc results/routing_stability/arc_scores.csv --output replay/arc04/replay
+python scripts/study_routing_stability.py --arc results/routing_stability/arc_scores.csv --fit-fraction 0.8 --output replay/arc04/matched
 python -m pip install mapie==1.6.0
 python scripts/study_routing_diagnosis.py
 ```
