@@ -1,0 +1,151 @@
+{
+  "schema_version": 2,
+  "rule": "ltt-bonferroni",
+  "graders": [
+    "correct"
+  ],
+  "risk_target": 0.8,
+  "failure_rate": 0.05,
+  "per_candidate_level": 0.005,
+  "guarantee": {
+    "confidence": 0.95,
+    "assumptions": "IID calibration from the target population and independent candidate thresholds"
+  },
+  "calibration_total": 400,
+  "selected_threshold": -0.22340339817772675,
+  "candidates": [
+    {
+      "threshold": -0.03390655749860211,
+      "accepted": 51,
+      "coverage": 0.1275,
+      "errors": {
+        "correct": 33
+      },
+      "worst_error_rate": 0.6470588235294118,
+      "pvalue": 0.007896951131341317,
+      "tested": true,
+      "passes": false
+    },
+    {
+      "threshold": -0.04466817699850926,
+      "accepted": 76,
+      "coverage": 0.19,
+      "errors": {
+        "correct": 47
+      },
+      "worst_error_rate": 0.618421052631579,
+      "pvalue": 0.00019900787664046984,
+      "tested": true,
+      "passes": true
+    },
+    {
+      "threshold": -0.05297332269376157,
+      "accepted": 113,
+      "coverage": 0.2825,
+      "errors": {
+        "correct": 65
+      },
+      "worst_error_rate": 0.5752212389380531,
+      "pvalue": 4.571626080216062e-08,
+      "tested": true,
+      "passes": true
+    },
+    {
+      "threshold": -0.06418600546763231,
+      "accepted": 166,
+      "coverage": 0.415,
+      "errors": {
+        "correct": 102
+      },
+      "worst_error_rate": 0.6144578313253012,
+      "pvalue": 2.8927234289376895e-08,
+      "tested": true,
+      "passes": true
+    },
+    {
+      "threshold": -0.07523173065338364,
+      "accepted": 217,
+      "coverage": 0.5425,
+      "errors": {
+        "correct": 139
+      },
+      "worst_error_rate": 0.6405529953917051,
+      "pvalue": 3.606063377899975e-08,
+      "tested": true,
+      "passes": true
+    },
+    {
+      "threshold": -0.08869067991807177,
+      "accepted": 253,
+      "coverage": 0.6325,
+      "errors": {
+        "correct": 167
+      },
+      "worst_error_rate": 0.6600790513833992,
+      "pvalue": 1.3644376334547842e-07,
+      "tested": true,
+      "passes": true
+    },
+    {
+      "threshold": -0.0982884860877668,
+      "accepted": 277,
+      "coverage": 0.6925,
+      "errors": {
+        "correct": 187
+      },
+      "worst_error_rate": 0.6750902527075813,
+      "pvalue": 6.852223885674411e-07,
+      "tested": true,
+      "passes": true
+    },
+    {
+      "threshold": -0.11554861824314845,
+      "accepted": 323,
+      "coverage": 0.8075,
+      "errors": {
+        "correct": 224
+      },
+      "worst_error_rate": 0.6934984520123839,
+      "pvalue": 3.7387264682100178e-06,
+      "tested": true,
+      "passes": true
+    },
+    {
+      "threshold": -0.1355314732473711,
+      "accepted": 356,
+      "coverage": 0.89,
+      "errors": {
+        "correct": 248
+      },
+      "worst_error_rate": 0.6966292134831461,
+      "pvalue": 2.3915429722204385e-06,
+      "tested": true,
+      "passes": true
+    },
+    {
+      "threshold": -0.22340339817772675,
+      "accepted": 398,
+      "coverage": 0.995,
+      "errors": {
+        "correct": 284
+      },
+      "worst_error_rate": 0.7135678391959799,
+      "pvalue": 2.3410221513243062e-05,
+      "tested": true,
+      "passes": true
+    }
+  ],
+  "command": "select",
+  "caat_version": "0.2.0",
+  "input": {
+    "path": "calibration.csv",
+    "id_column": "id",
+    "score_column": "mean_token_logprob",
+    "correct_columns": [
+      "correct"
+    ],
+    "output_key_column": null,
+    "group_column": null,
+    "design_path": "design.csv"
+  }
+}

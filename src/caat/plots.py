@@ -157,6 +157,11 @@ def grader_comparison(report):
         target = report["risk_target"]
         graders = report["graders"]
         title = "Accepted error rate by grader"
+    confidence = report.get("holdout_confidence")
+    rate_key = "error_rate"
+    if confidence is not None:
+        title = f"{confidence * 100:.4g}% upper error bound by grader"
+        rate_key = "risk_upper_bound"
     width, left, right, top = 670, 166, 577, 72
     axis = top + max(1, len(graders)) * 43
     marks = [label(22, 28, title, size=18, weight="650")]
@@ -166,9 +171,7 @@ def grader_comparison(report):
         )
         return canvas(width, 88, title, marks)
     marks.append(label(22, 48, f"Cutoff {threshold:.8g}", color=MUTED))
-    observed = max(
-        [target or 0, *(entry["error_rate"] or 0 for entry in graders.values())]
-    )
+    observed = max([target or 0, *(entry[rate_key] or 0 for entry in graders.values())])
     maximum = min(1.0, ceil(max(0.25, 1.1 * observed) * 10) / 10)
 
     def x(value):
@@ -181,7 +184,7 @@ def grader_comparison(report):
         )
     for index, (name, counts) in enumerate(graders.items()):
         center = top + 43 * index + 12
-        rate = counts["error_rate"]
+        rate = counts[rate_key]
         display_name = name if len(name) <= 21 else name[:19] + "…"
         marks.append(
             f"<g><title>{escape(name)}</title>{label(left - 10, center + 4, display_name, anchor='end')}</g>"

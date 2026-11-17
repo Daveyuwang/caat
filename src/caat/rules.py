@@ -1,31 +1,20 @@
 """Selection rules and the exact binomial test they use."""
 
 from dataclasses import dataclass
-from math import exp, expm1, fsum, lgamma, log, log1p
+from fractions import Fraction
+from itertools import groupby
 from typing import Callable
 
+from .finite import (
+    binomial_cdf_float,
+    compare_binomial_cdf,
+    round_rate_up,
+    upper_binomial_rate,
+    upper_population_errors,
+    validate_population,
+)
 from .metrics import Counts
 from .registry import Registry
-
-
-def log_lower_tail(n, k, log_p, log_q):
-    # Scale by the probability of the boundary count to avoid overflow.
-    term = mass = 1.0
-    for successes in range(k, 0, -1):
-        term *= exp(log(successes / (n - successes + 1)) + log_q - log_p)
-        mass += term
-        if term == 0:
-            break
-    return fsum(
-        (
-            lgamma(n + 1),
-            -lgamma(k + 1),
-            -lgamma(n - k + 1),
-            k * log_p,
-            (n - k) * log_q,
-            log(mass),
-        )
-    )
 
 
 def binomial_pvalue(counts: Counts, target: float) -> float:
@@ -33,14 +22,62 @@ def binomial_pvalue(counts: Counts, target: float) -> float:
     n, k = counts.accepted, counts.errors
     if not (0 <= k <= n and 0 <= target <= 1):
         raise ValueError("invalid binomial count or probability")
-    if k == n or target == 0:
+    return binomial_cdf_float(n, k, Fraction(str(target)))
+
+
+def validate_holdout_confidence(confidence, *, accepted_population=None):
+    if confidence is not None and not 0 < confidence < 1:
+        raise ValueError("holdout confidence must be strictly between 0 and 1")
+    if accepted_population is not None:
+        validate_population(accepted_population)
+        if confidence is None:
+            raise ValueError("accepted population requires holdout confidence")
+
+
+def binomial_upper_bound(counts: Counts, confidence: float) -> float | None:
+    """Return the smallest representable risk rejected by the exact test."""
+    if not counts.accepted:
+        return None
+    if counts.errors == counts.accepted:
         return 1.0
-    if target == 1:
-        return 0.0
-    log_p, log_q = log(target), log1p(-target)
-    if k < n * target:
-        return exp(min(0.0, log_lower_tail(n, k, log_p, log_q)))
-    return -expm1(min(0.0, log_lower_tail(n, n - k - 1, log_q, log_p)))
+    failure_rate = 1 - Fraction(str(confidence))
+    return upper_binomial_rate(counts.accepted, counts.errors, failure_rate)
+
+
+def assess_accepted_risk(
+    counts: Counts, risk_target, holdout_confidence, *, accepted_population=None
+):
+    """Report observed risk and check the requested quantity against the target."""
+    report = counts.metrics()
+    risk = None
+    if accepted_population is not None:
+        if counts.accepted > accepted_population:
+            raise ValueError("accepted label count exceeds the accepted population")
+        upper = (
+            upper_population_errors(
+                accepted_population,
+                counts.accepted,
+                counts.errors,
+                1 - Fraction(str(holdout_confidence)),
+            )
+            if counts.accepted
+            else None
+        )
+        report["risk_upper_errors"] = upper
+        risk = Fraction(upper, accepted_population) if upper is not None else None
+        report["risk_upper_bound"] = round_rate_up(risk) if risk is not None else None
+    elif holdout_confidence is not None:
+        bound = binomial_upper_bound(counts, holdout_confidence)
+        report["risk_upper_bound"] = bound
+        risk = Fraction(str(bound)) if bound is not None else None
+    elif counts.accepted:
+        risk = Fraction(counts.errors, counts.accepted)
+    report["meets_target"] = (
+        risk <= Fraction(str(risk_target))
+        if risk is not None and risk_target is not None
+        else None
+    )
+    return report
 
 
 @dataclass(frozen=True)
@@ -60,27 +97,46 @@ class RuleResult:
 
 
 def empirical(candidates, risk_target, failure_rate):
+    numerator, denominator = Fraction(str(risk_target)).as_integer_ratio()
     return RuleResult(
         tuple(
-            candidate["accepted"] > 0 and candidate["worst_error_rate"] <= risk_target
+            candidate["accepted"] > 0
+            and max(candidate["errors"].values()) * denominator
+            <= candidate["accepted"] * numerator
             for candidate in candidates
         )
     )
 
 
-def bonferroni(candidates, risk_target, failure_rate):
-    level = failure_rate / len(candidates)
-    decisions = tuple(
-        candidate["accepted"] > 0 and candidate["pvalue"] <= level
-        for candidate in candidates
+def _passes_binomial_test(candidate, target, level):
+    if not candidate["accepted"]:
+        return False
+    rounded_level = float(level)
+    if candidate["pvalue"] != rounded_level:
+        # Rounding preserves strict order when the reported values differ.
+        return candidate["pvalue"] < rounded_level
+    return (
+        compare_binomial_cdf(
+            candidate["accepted"], max(candidate["errors"].values()), target, level
+        )
+        <= 0
     )
-    return RuleResult(decisions, level, controls_risk=True)
+
+
+def bonferroni(candidates, risk_target, failure_rate):
+    level = Fraction(str(failure_rate)) / len(candidates)
+    target = Fraction(str(risk_target))
+    decisions = tuple(
+        _passes_binomial_test(candidate, target, level) for candidate in candidates
+    )
+    return RuleResult(decisions, float(level), controls_risk=True)
 
 
 def fixed_sequence(candidates, risk_target, failure_rate):
+    level, target = Fraction(str(failure_rate)), Fraction(str(risk_target))
     decisions = []
     for candidate in candidates:
-        passed = candidate["accepted"] > 0 and candidate["pvalue"] <= failure_rate
+        passed = _passes_binomial_test(candidate, target, level)
         decisions.append(passed)
         if not passed:
             break
@@ -92,17 +148,32 @@ def fixed_sequence(candidates, risk_target, failure_rate):
 
 def holm(candidates, risk_target, failure_rate):
     """Test the smallest p-values first at Holm's step-down levels."""
-    order = sorted(
-        range(len(candidates)), key=lambda index: candidates[index]["pvalue"]
-    )
+    error_budget, target = Fraction(str(failure_rate)), Fraction(str(risk_target))
+    remaining = len(candidates)
+
+    def reported_pvalue(index):
+        return candidates[index]["pvalue"]
+
+    order = sorted(range(remaining), key=reported_pvalue)
     decisions = [None] * len(candidates)
-    for rank, index in enumerate(order):
-        candidate = candidates[index]
-        level = failure_rate / (len(candidates) - rank)
-        passed = candidate["accepted"] > 0 and candidate["pvalue"] <= level
-        decisions[index] = passed
-        if not passed:
-            break
+    for _, tied in groupby(order, key=reported_pvalue):
+        pending = list(tied)
+        while pending:
+            level = error_budget / remaining
+            failed = []
+            # Rounded ties may straddle this level. Test every candidate that
+            # can pass before raising the level for the rest of the group.
+            for index in pending:
+                if _passes_binomial_test(candidates[index], target, level):
+                    decisions[index] = True
+                else:
+                    failed.append(index)
+            passed = len(pending) - len(failed)
+            if not passed:
+                decisions[failed[0]] = False
+                return RuleResult(tuple(decisions), controls_risk=True)
+            remaining -= passed
+            pending = failed
     return RuleResult(tuple(decisions), controls_risk=True)
 
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from .registry import Registry
-from .table import read_csv_rows
+from .table import read_table_rows
 
 
 @dataclass(frozen=True)
@@ -16,7 +16,7 @@ class Adapter:
 
 
 def csv_rows(path, options):
-    rows, _ = read_csv_rows(path, **options)
+    rows, _ = read_table_rows(path, **options)
     return rows
 
 

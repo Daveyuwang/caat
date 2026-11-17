@@ -1,0 +1,15 @@
+# Review policy for saved IFEval responses
+predictions = "ifeval_graders.csv"
+score_columns = ["mean_token_logprob", "sequence_logprob"]
+correct_columns = ["strict_pass"]
+check_columns = ["helm_strict_pass"]
+
+seed = 42
+bootstrap = 500
+risk_target = 0.40
+rule = "ltt-bonferroni"
+failure_rate = 0.05
+holdout_confidence = 0.95
+calibrate = "platt"
+queue_budget = 20
+html = "../replay/workflow/ifeval.html"

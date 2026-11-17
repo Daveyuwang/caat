@@ -12,6 +12,7 @@ from typing import Callable, Sequence
 from unicodedata import normalize
 
 from .registry import Registry
+from .table import atomic_output
 
 
 @dataclass(frozen=True)
@@ -275,11 +276,16 @@ def compute_feature(feature, response):
     return score
 
 
-def write_feature_csv(source, output, names):
+def write_feature_csv(source, output, names, *, include_output_key=False):
     if source.resolve() == output.resolve():
         raise ValueError("output would overwrite the input JSONL file")
-    if len(set(names)) != len(names):
-        raise ValueError("feature names must be distinct")
+    names = tuple(names)
+    identity = ("id", "output_sha256") if include_output_key else ("id",)
+    columns = (*identity, *names)
+    if len(set(columns)) != len(columns):
+        raise ValueError(
+            "feature names must be distinct from each other and the identity columns"
+        )
     rows = {}
     with source.open(encoding="utf-8-sig") as stream:
         for line_number, line in enumerate(stream, 1):
@@ -289,16 +295,21 @@ def write_feature_csv(source, output, names):
                 item_id, response = read_response(json.loads(line))
                 if item_id in rows:
                     raise ValueError(f"duplicate id {item_id!r}")
-                rows[item_id] = tuple(
-                    compute_feature(FEATURES[name], response) for name in names
+                key = (
+                    (sha256(response.text.encode("utf-8")).hexdigest(),)
+                    if include_output_key
+                    else ()
+                )
+                rows[item_id] = (
+                    *key,
+                    *(compute_feature(FEATURES[name], response) for name in names),
                 )
             except (ValueError, KeyError, TypeError) as exc:
                 raise ValueError(f"JSONL line {line_number}: {exc}") from exc
     if not rows:
         raise ValueError("at least one saved response is required")
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("w", encoding="utf-8", newline="") as stream:
+    with atomic_output(output, newline="") as stream:
         writer = csv.writer(stream, lineterminator="\n")
-        writer.writerow(("id", *names))
+        writer.writerow(columns)
         writer.writerows((item_id, *scores) for item_id, scores in rows.items())
     return len(rows)

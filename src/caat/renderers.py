@@ -24,7 +24,19 @@ class RenderReport(dict):
         self.curves = curves
 
 
-ALL_REPORTS = ("evaluate", "audit", "select", "policy", "queue", "scores", "plugins")
+ALL_REPORTS = (
+    "evaluate",
+    "audit",
+    "select",
+    "policy",
+    "run",
+    "plan",
+    "queue",
+    "route",
+    "scores",
+    "monitor",
+    "plugins",
+)
 PLOTTED_REPORTS = ("evaluate", "audit", "policy")
 RENDERERS = Registry(
     "renderers",
@@ -46,7 +58,7 @@ RENDERERS = Registry(
                 report, getattr(report, "curve", None), getattr(report, "curves", None)
             ),
             "html",
-            PLOTTED_REPORTS,
+            (*PLOTTED_REPORTS, "run"),
         ),
     },
 )

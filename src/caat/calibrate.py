@@ -12,7 +12,13 @@ from typing import Callable
 
 from .metrics import probability_bin
 from .registry import Registry
-from .table import open_predictions_csv, parse_score
+from .report import read_negated_score_source, read_review_missing_scores
+from .table import (
+    atomic_output,
+    open_selected_predictions,
+    output_fingerprint,
+    parse_score,
+)
 
 
 def sigmoid(value):
@@ -297,32 +303,116 @@ def calibration_transform(mapping):
     return transform
 
 
-def apply_csv(path, output, mapping, score_column, probability_column):
+def apply_csv(
+    path,
+    output,
+    mapping,
+    score_column,
+    probability_column,
+    *,
+    negate_score=False,
+    review_missing_scores=False,
+    selection=None,
+    fit_outputs=None,
+    id_column="id",
+):
     transform = calibration_transform(mapping)
-    with open_predictions_csv(path, {score_column}, None) as (reader, _):
+    required = {score_column}
+    fitted = None
+    if fit_outputs is not None:
+        key_column = fit_outputs["key_column"]
+        fitted = set(fit_outputs["sha256"])
+        required.update((id_column, key_column))
+    with (
+        atomic_output(Path(output).resolve(), newline="") as destination,
+        open_selected_predictions(path, required, None, selection) as (
+            selected,
+            reader,
+            _,
+        ),
+    ):
         fields = reader.fieldnames
         if probability_column in fields or not probability_column:
             raise ValueError("probability output column must be new and nonempty")
-        rows = []
-        for row in reader:
-            if None in row or None in row.values():
-                raise ValueError(
-                    f"incomplete or extra CSV fields at line {reader.line_num}"
-                )
-            row[probability_column] = transform(
-                parse_score(row[score_column], reader.line_num)
-            )
-            rows.append(row)
-    if not rows:
-        raise ValueError("at least one prediction is required")
-    output = Path(output)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("w", newline="", encoding="utf-8") as destination:
         writer = csv.DictWriter(destination, fieldnames=[*fields, probability_column])
         writer.writeheader()
-        writer.writerows(rows)
-    return len(rows)
+        count = 0
+        for row in selected:
+            if fitted is not None:
+                item_id = row[id_column]
+                if output_fingerprint(item_id, row[key_column]) in fitted:
+                    raise ValueError(
+                        f"holdout reuses output from the fit for sample {item_id!r}"
+                    )
+            score = parse_score(
+                row[score_column],
+                reader.line_num,
+                negate=negate_score,
+                review_missing_scores=review_missing_scores,
+            )
+            row[probability_column] = transform(score) if score is not None else None
+            writer.writerow(row)
+            count += 1
+        if not count:
+            raise ValueError("at least one prediction is required")
+    return count
 
 
 def read_calibration(path):
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def read_saved_calibration(path, *, grader=None):
+    source = read_calibration(path)
+    command = source.get("command") if isinstance(source, dict) else None
+    inputs = source.get("input") if isinstance(source, dict) else None
+    if command not in ("policy", "run"):
+        if grader is not None:
+            raise ValueError("--grader requires a policy or run report")
+        if not isinstance(inputs, dict):
+            return source, None, None, None, {}
+        review_missing_scores = read_review_missing_scores(path, source)
+        score_column = inputs.get("score_column")
+        if (score_column is not None or review_missing_scores) and (
+            not isinstance(score_column, str) or not score_column.strip()
+        ):
+            raise ValueError(f"{path}: probability map needs a score column name")
+        return (
+            source,
+            score_column,
+            read_negated_score_source(path, source, score_column),
+            review_missing_scores,
+            inputs,
+        )
+
+    policy = source.get("policy") if command == "run" else source
+    try:
+        maps = policy["probability_calibration"]["graders"]
+    except (KeyError, TypeError):
+        maps = None
+    if not isinstance(maps, dict) or not maps:
+        raise ValueError(f"{path}: {command} report has no fitted probability maps")
+    if grader is None:
+        if len(maps) != 1:
+            raise ValueError(f"{path}: select a map with --grader ({', '.join(maps)})")
+        grader = next(iter(maps))
+    if grader not in maps:
+        raise ValueError(f"{path}: no fitted probability map for grader {grader!r}")
+    try:
+        mapping = maps[grader]["map"]
+        score_column = (
+            source["selected_score"]
+            if command == "run"
+            else source["input"]["score_column"]
+        )
+    except (KeyError, TypeError) as exc:
+        raise ValueError(f"{path}: invalid saved probability map") from exc
+    if not isinstance(score_column, str) or not score_column.strip():
+        raise ValueError(f"{path}: probability map needs a score column name")
+    return (
+        mapping,
+        score_column,
+        read_negated_score_source(path, source, score_column),
+        read_review_missing_scores(path, source),
+        inputs if isinstance(inputs, dict) else {},
+    )

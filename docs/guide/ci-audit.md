@@ -60,40 +60,184 @@ the integration. The walkthrough has one preparation command and one
 audit command. The prediction input needs no filtered copy, renamed
 columns, or manual grader join.
 
+## Route and evaluate the same tier
+
+Use the same `--prediction-filter tier=encoder` to route and evaluate the
+original CSV. The file has 3,000 rows for 750 complaint IDs. CAAT selects
+the encoder rows before checking ID uniqueness. Both reports record the
+filter in `input.prediction_filter`.
+
+```bash
+caat route replay/cfpb/sources/encoder_eval.csv --prediction-filter tier=encoder --id-column complaint_id --score-column confidence --group-column product --output-key-column output_text --threshold 0.7980151891708375 --output replay/cfpb/decisions.csv
+caat evaluate replay/cfpb/sources/encoder_eval.csv --prediction-filter tier=encoder --id-column complaint_id --score-column confidence --group-column product --correct-column correct --threshold 0.7980151891708375 --risk-target 0.10
+```
+
+Add `--batch-decisions replay/cfpb/decisions.csv --holdout-confidence 0.95`
+to the paired audit above to check this fixed batch. Both graders label all
+671 accepted predictions, so the exact batch error rate is 62/671 (9.24%).
+With a 9% assumed error rate and 80% requested power, the label planner
+calls for 599 sampled labels and at most 56 errors at the 10% target.
+The seed-42 sample contains 57 errors under each grader, putting both
+one-sided 95% upper bounds at 10.28%.
+
+The 599 highest-scoring accepted rows contain 32 errors. Treating those
+rows as a random draw gives a 5.96% bound, below the 9.24% census error
+rate. `--sample-seed 42` rejects those rows because their IDs differ from
+the random draw.
+[Fixed-batch walkthrough](queue.md#check-the-error-rate-of-a-fixed-batch)
+
+## Fit a cutoff on the encoder tier
+
+Use the original combined export as input to `policy`. The filter supplies
+750 encoder rows before the default seed-42 split of 150 design, 300
+calibration, and 300 holdout rows.
+
+```bash
+caat policy replay/cfpb/sources/encoder_eval.csv --prediction-filter tier=encoder --id-column complaint_id --score-column confidence --correct-column correct --output-key-column output_text --track-fit-outputs --risk-target 0.10 --holdout-confidence 0.95 --holdout-output replay/cfpb/fitted-holdout.csv --output replay/cfpb/fitted-policy.json
+```
+
+At a 10% risk target, the fitted cutoff accepts 235 of 300 holdout rows
+with 14 errors and a 9.16% one-sided 95% upper bound. The holdout export
+keeps the original columns and contains only the selected tier's holdout
+rows. Use `--prediction-filter tier=encoder` again when routing the original
+mixed export with this cutoff report.
+[Input filters](csv-format.md#select-a-run-from-a-combined-export)
+
+## Send disagreements to review
+
+Use `--disagreements-output` to save one CSV row for each sample whose
+grades differ. The rows follow ID order and carry `id`, `score`,
+`decision`, and `group`. The file includes `output_key` when the audit
+uses a key column, and each grader's binary result appears in a column
+named `grade_<grader>`. `decision` is the result at the frozen cutoff.
+A completed audit writes the file after a pass or a target miss. An
+audit with zero disagreements writes the header.
+
+```bash
+caat audit examples/audit/predictions.csv --threshold 0.75 --risk-target 0.70 --output-key-column output_key --grader-file reference=examples/audit/reference.csv --grader-file rubric=examples/audit/rubric.csv --disagreements-output replay/disagreements.csv
+caat queue replay/disagreements.csv --prediction-filter decision=accept --output-key-column output_key --budget 1 --output replay/disagreement-review.csv
+```
+
+The queue example sends ticket `2` for review with its output key. Set
+the budget to the number of accepted disagreements you can review.
+[Queue options](queue.md) · [Audit report fields](reports.md#audit)
+
 ## Run as a CI check
 
-Add these GitHub Actions steps after checkout and installation.
+Add these GitHub Actions steps after checking out CAAT. The action installs
+the CAAT version from the referenced checkout into its own environment.
 
 ```yaml
 - name: Prepare grader exports
   run: python scripts/prepare_cfpb_audit.py
 - name: Check the frozen review policy
   id: audit
-  shell: bash
-  run: |
-    status=0
-    caat audit replay/cfpb/sources/encoder_eval.csv \
-      --prediction-filter tier=encoder --id-column complaint_id \
-      --score-column confidence --group-column product --output-key-column output_text \
-      --grader-file archived=replay/cfpb/archived.csv --grader-file regraded=replay/cfpb/regraded.csv \
-      --threshold 0.7980151891708375 --risk-target 0.10 --output replay/cfpb/audit.json || status=$?
-    printf 'status=%s\n' "$status" >> "$GITHUB_OUTPUT"
-    exit "$status"
-- name: Keep the audit report
-  if: ${{ always() && (steps.audit.outputs.status == '0' || steps.audit.outputs.status == '1') }}
+  uses: ./
+  with:
+    predictions: replay/cfpb/sources/encoder_eval.csv
+    prediction-filter: tier=encoder
+    id-column: complaint_id
+    score-column: confidence
+    group-column: product
+    output-key-column: output_text
+    grader-files: |
+      archived=replay/cfpb/archived.csv
+      regraded=replay/cfpb/regraded.csv
+    threshold: "0.7980151891708375"
+    risk-target: "0.10"
+    report-path: replay/cfpb/audit.json
+    disagreements-path: replay/cfpb/disagreements.csv
+- name: Keep the audit artifacts
+  if: ${{ always() && steps.audit.outputs.report-path != '' }}
   uses: actions/upload-artifact@v7
   with:
     name: caat-audit
-    path: replay/cfpb/audit.json
+    path: |
+      ${{ steps.audit.outputs.report-path }}
+      ${{ steps.audit.outputs.disagreements-path }}
 ```
 
-The installed CLI passed with a 10% target (exit 0) and reported a target
-miss at 9% (exit 1). Replacing one candidate output key with a different
-tier's output for the same complaint rejected the input (exit 2) and
-identified the grader and complaint. CI keeps the report for the first
-two outcomes. [GitHub artifact action](https://github.com/actions/upload-artifact)
+From another repository, use `Daveyuwang/caat@CAAT_REF` in place of `./`.
+Set `CAAT_REF` to a commit or tag containing the action. Paths resolve from
+the calling repository's checkout. Provide either `grader-files`, with
+one name and CSV or JSONL path per line, or `correct-columns`, with one inline
+correctness column per line. List the reference grader first.
+[Action inputs](../../action.yml)
+
+To check a cutoff chosen by CAAT, set `threshold-report: replay/cutoff.json`
+in the audit step. Give the path to a `select`, `policy`, or `run` report.
+The action reads the full cutoff precision, ID column, score column, risk
+target, and any saved holdout confidence. Explicit options override those
+settings. Set `raw-score-column` to read a renamed original score column
+using the saved direction. With `plan-report`, use the risk target and
+confidence from the plan. For a numeric cutoff, supply `threshold` and
+either `risk-target` or `plan-report`.
+[Saving a cutoff](reports.md#reuse-a-saved-cutoff)
+
+For a numeric cutoff with partially scored predictions, pass
+`review-missing-scores: "true"` in the action's `with` block. The audit
+keeps unscored rows in the coverage denominator and marks their decisions
+as `review` in the disagreements export. A saved cutoff also supplies
+its missing-score rule when it recorded one.
+
+The `status` output preserves the CLI exit code. Both a missed target
+(`1`) and an invalid input (`2`) fail the action. A passing audit (`0`) or
+a target miss writes `report-path` for later steps. The default report
+filename is `caat-audit.json`. Set `disagreements-path` to keep the CSV
+alongside the report. The action exposes its path on status 0 or 1.
+Set `holdout-confidence` to `"0.95"` if
+the gate should use a one-sided upper bound on the accepted-set error rate.
+A statistical check with a tracked cutoff returns status 2 if any holdout
+row reuses a design or calibration output. The action inherits the tracked
+key column when `output-key-column` is omitted.
+[Track fit outputs](reports.md#track-outputs-used-to-choose-the-cutoff) · [Audit report fields](reports.md#audit) · [GitHub artifact action](https://github.com/actions/upload-artifact)
+
+The routing example passes at 10% and misses at 9%. Changing a candidate
+output key to the key from another tier for the same complaint produces
+an input error. The report step keeps both passing and target-miss reports.
 
 For a first run on your own exports, use your existing cutoff and error
 target. Record any field conversions you needed and check one discordant
 ID against its source output. The audit report and those notes are enough
 to identify the next integration change.
+
+### Check a labeled sample from a fixed batch
+
+Set `batch-decisions` to the complete CSV from `caat route`. The action
+counts its accepted rows and verifies the sample against that file.
+Give the action the labeled sample drawn uniformly without replacement
+from those accepted predictions. Pass the cutoff report and the saved
+`plan-report` to reuse the plan's seed, risk target, and confidence level
+and check the label count. The saved plan supplies the ID, score, and key
+headers for the generated sample. Set `sample-seed` for a separate random queue
+draw when the plan has no recorded seed.
+[Sampling and labeling walkthrough](queue.md#check-the-error-rate-of-a-fixed-batch)
+
+```yaml
+- name: Check the labeled sample
+  id: audit
+  uses: ./
+  with:
+    predictions: replay/label-sample.csv
+    threshold-report: cutoff.json
+    grader-files: |
+      primary=primary-labels.csv
+      alternate=alternate-labels.csv
+    batch-decisions: replay/new-decisions.csv
+    plan-report: replay/label-plan.json
+    report-path: replay/batch-audit.json
+    disagreements-path: replay/batch-disagreements.csv
+```
+
+For full Inspect grader exports, add `allow-extra-grades: "true"` and
+`grader-output-key-column: output_sha256` to the inputs above. The gate
+matches each sampled ID and output key to one grade per file.
+Set `grader-id-column` when the grader exports use a different ID header
+from the predictions.
+
+The gate compares each grader's exact upper error bound for the fixed
+batch to the risk target. The JSON includes each upper error count and
+the accepted population size. The same output paths are available when
+a grader misses the target. If you have only the count, use
+`accepted-population` with `overall.accepted` from the routing JSON.
+[Fixed-batch report fields](reports.md#fixed-accepted-batch)

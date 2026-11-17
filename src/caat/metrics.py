@@ -14,11 +14,13 @@ def probability_bin(probability, bins):
     return min(int(probability * bins), bins - 1)
 
 
-def calibration_metrics(probabilities, outcomes, *, bins=10):
+def calibration_metrics(probabilities, outcomes, *, bins=10, allow_empty=False):
     """Measure binary correctness calibration. Keep tied scores together in ACE."""
     if type(bins) is not int or bins < 1:
         raise ValueError("bins must be a positive integer")
     pairs = list(zip(probabilities, outcomes, strict=True))
+    if not pairs and allow_empty:
+        return {"brier_score": None, "ece": None, "ace": None, "reliability_bins": []}
     if not pairs or any(not 0 <= p <= 1 for p, _ in pairs):
         raise ValueError("calibration metrics need probabilities between 0 and 1")
     fixed = [[] for _ in range(bins)]
@@ -78,22 +80,25 @@ class Counts:
 
 
 def threshold_points(
-    scored_errors: Iterable[tuple[float, bool]],
+    scored_errors: Iterable[tuple[float, bool]], *, total: int | None = None
 ) -> list[tuple[float, Counts]]:
     """Count accepted rows and errors at each distinct score threshold."""
     ranked = sorted(scored_errors, key=itemgetter(0), reverse=True)
+    total = len(ranked) if total is None else total
     accepted = errors = 0
     points = []
     for threshold, tied_rows in groupby(ranked, key=itemgetter(0)):
         for _, is_error in tied_rows:
             accepted += 1
             errors += is_error
-        points.append((threshold, Counts(len(ranked), accepted, errors)))
+        points.append((threshold, Counts(total, accepted, errors)))
     return points
 
 
 def ranking_metrics(points: list[tuple[float, Counts]]) -> dict:
     """Use the expected prefix risk under uniform tie-breaking."""
+    if not points:
+        return {"auroc": None, "aurc": None, "normalized_aurc_gain": None}
     total = points[-1][1]
     correct = total.total - total.errors
     previous_accepted = previous_errors = 0
@@ -178,9 +183,12 @@ def ranking_for_rows(rows, *, points=None):
     return ranking_metrics(points)
 
 
-def calibration_for_rows(rows, *, bins=10):
+def calibration_for_rows(rows, *, bins=10, allow_empty=False):
     return calibration_metrics(
-        (row.score for row in rows), (row.outcomes[0] for row in rows), bins=bins
+        (row.score for row in rows),
+        (row.outcomes[0] for row in rows),
+        bins=bins,
+        allow_empty=allow_empty,
     )
 
 
