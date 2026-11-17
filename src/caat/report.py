@@ -128,7 +128,10 @@ def read_threshold_report(path, *, require_confirmed=False):
         and command != "select"
         and policy.get("confirmed") is not True
     ):
-        raise ValueError(f"{path}: routing requires a confirmed {command} report")
+        raise ValueError(
+            f"{path}: routing requires a confirmed {command} report. To route at "
+            "this cutoff anyway, pass it with --threshold"
+        )
     if not _finite_number(cutoff):
         raise ValueError(f"{path}: selected cutoff must be a finite number")
     if type(risk) not in (int, float) or not 0 <= risk <= 1:
@@ -417,15 +420,18 @@ def describe(report):
                 f"{grader}: found {counts['errors_found']} errors. "
                 f"The random queue found {counts['random_errors_found']}."
             )
+        if path := report["input"].get("output"):
+            lines.append(f"Wrote the queue to {path}.")
         return "\n".join(lines)
     if command == "scores":
         recommended = report["recommended_score"]
         split, baseline = report["split"], report["baseline"]
         heldout = split["comparison"] == "heldout"
         lines = [
-            f"Compared scores on {split['reported']} {'held-out ' if heldout else ''}rows "
-            f"against {baseline}."
+            f"Compared scores on {split['reported']} {'held-out ' if heldout else ''}rows. "
+            f"Baseline score: {baseline}."
         ]
+        tied = []
         if heldout:
             if recommended:
                 lines.append(
@@ -469,11 +475,16 @@ def describe(report):
                     if "scored" in score
                     else ""
                 )
-                warning = (
-                    " AUROC no better than random."
-                    if score.get("direction_warning")
-                    else ""
-                )
+                warning = ""
+                if score.get("direction_warning"):
+                    warning = " AUROC no better than random."
+                    if auc is not None and auc < 0.4:
+                        warning = (
+                            " AUROC well below 0.5: the score may point the wrong way. "
+                            f"If smaller values mean more confidence, add --lower-is-better {name}. "
+                            "If it is the probability of one fixed class, convert it to the "
+                            "probability of the predicted label first."
+                        )
                 intervals = [
                     entry.get("risk_delta_95")
                     for entry in score["budgets"]
@@ -487,9 +498,21 @@ def describe(report):
                         f" Tied with {baseline}: every 95% interval for the difference "
                         "includes zero."
                     )
+                    tied.append(name)
                 lines.append(
                     f"  {name}{cost}. AUROC {roc}.{availability} {risks}.{warning}"
                 )
+        if (
+            heldout
+            and recommended
+            and tied.count(recommended) == len(report["graders"])
+        ):
+            # One verdict: the design pick did not hold up as a difference.
+            lines[1] = (
+                f"The {split['design']} design rows favor {recommended} by AURC gain, but "
+                f"it is tied with {baseline} on the held-out rows. Use either, and "
+                "prefer the one that is cheaper to compute."
+            )
         return "\n".join(lines)
     if command == "audit":
         lines = [f"Threshold {report['threshold']!r}."]
@@ -515,7 +538,7 @@ def describe(report):
     if threshold is None:
         return (
             f"No candidate threshold met the {percent(report['risk_target'])} target ({report['rule']})."
-            + lowest_error_summary(report)
+            + lowest_error_summary(report, "--thresholds or --design-grid-size")
         )
     candidate = next(
         row for row in report["candidates"] if row["threshold"] == threshold
@@ -526,13 +549,21 @@ def describe(report):
     )
 
 
-def lowest_error_summary(selection):
+def lowest_error_summary(selection, fewer="--design-grid-size"):
     """Say how close the candidates came when no cutoff qualified."""
     reached = [
         row for row in selection["candidates"] if row["worst_error_rate"] is not None
     ]
     if not reached:
         return " No candidate accepted any calibration row."
+    if selection["rule"] == "ltt-fixed-sequence":
+        first = reached[0]
+        return (
+            f" The strictest candidate (threshold {first['threshold']!r}, "
+            f"{first['accepted']} accepted rows, {percent(first['worst_error_rate'])} "
+            "calibration error) did not pass, and the fixed-sequence rule stops at the "
+            "first failure. `--rule ltt-bonferroni` tests every candidate."
+        )
     best = min(reached, key=lambda row: (row["worst_error_rate"], -row["accepted"]))
     summary = (
         f" The lowest calibration error among the candidates was "
@@ -546,7 +577,8 @@ def lowest_error_summary(selection):
         return summary + (
             f" That rate is under the target, but {best['accepted']} accepted rows "
             f"are too few to show it with {percent(1 - selection['failure_rate'])} "
-            "confidence. Add calibration rows, test fewer candidates, or raise the target."
+            f"confidence. Add calibration rows, test fewer candidates with {fewer}, "
+            "or raise the target."
         )
     return summary + " Compare other scores with `caat scores`, or raise the target."
 
@@ -662,6 +694,7 @@ def describe_policy(report) -> str:
             f"No candidate threshold met the {target} risk target under {graders} ({rule})."
             + lowest_error_summary(selection)
         )
+        lines.extend(split_check_summary(report))
         lines.append("Exit status 1: no cutoff was selected.")
         return "\n".join(lines)
     lines.append(
@@ -678,6 +711,8 @@ def describe_policy(report) -> str:
             "The empirical rule fits the observed calibration rate and gives no "
             "statistical guarantee."
         )
+    lines.extend(next_candidate_summary(selection))
+    bound_above = False
     for name, result in report["heldout"]["graders"].items():
         role = " (check only)" if name in report["check_graders"] else ""
         if result["error_rate"] is None:
@@ -692,6 +727,15 @@ def describe_policy(report) -> str:
         elif result.get("upper_bound_95") is not None:
             rate += f", 95% upper bound {percent(result['upper_bound_95'])}"
             check = f". The observed rate {verdict} the target."
+            if (
+                result["meets_target"]
+                and result["upper_bound_95"] > selection["risk_target"]
+            ):
+                bound_above = True
+                check = (
+                    ". The observed rate meets the target, but the upper bound is "
+                    "above it: these rows are too few to rule out a higher rate."
+                )
         lines.append(
             f"Held-out rows under {name}{role}: accepted {result['accepted']} of {result['total']} "
             f"with {result['errors']} errors ({rate}){check}"
@@ -703,9 +747,82 @@ def describe_policy(report) -> str:
             f"{everything['fitting']} of the {everything['total']} rows were used to "
             "choose the cutoff, so only the held-out rows give the error estimate."
         )
-    lines.append(
-        "The held-out rows confirm the policy."
-        if report["confirmed"]
-        else "The held-out rows do not confirm the policy. Exit status 1."
-    )
+    lines.extend(split_check_summary(report))
+    if not report["confirmed"]:
+        lines.append("The held-out rows do not confirm the policy. Exit status 1.")
+    elif bound_above:
+        lines.append(
+            "The held-out rows confirm the policy by the observed rate. "
+            "Add --holdout-confidence 0.95 to make the upper bound decide."
+        )
+    else:
+        lines.append("The held-out rows confirm the policy.")
     return "\n".join(lines)
+
+
+def next_candidate_summary(selection):
+    """Say why the next looser candidate was not selected."""
+    candidates = selection["candidates"]
+    position = next(
+        index
+        for index, row in enumerate(candidates)
+        if row["threshold"] == selection["selected_threshold"]
+    )
+    if position + 1 == len(candidates):
+        return []
+    looser = candidates[position + 1]
+    rate = looser["worst_error_rate"]
+    if rate > selection["risk_target"]:
+        reason = "above the target"
+    elif selection["rule"] == "empirical":
+        return []
+    elif (level := selection.get("per_candidate_level")) and looser.get("pvalue"):
+        shared = (
+            f", the {percent(selection['failure_rate'])} failure rate shared by "
+            f"{len(candidates)} candidates"
+            if selection["rule"] == "ltt-bonferroni"
+            else ""
+        )
+        reason = (
+            f"under the target but not by enough: its p-value {looser['pvalue']:.3g} "
+            f"had to be at or below {level:.3g}{shared}"
+        )
+    else:
+        reason = (
+            "under the target but not by enough to pass with "
+            f"{percent(1 - selection['failure_rate'])} confidence"
+        )
+    return [
+        f"The next looser candidate (threshold {looser['threshold']!r}, "
+        f"{percent(looser['coverage'])} of calibration rows) had {percent(rate)} "
+        f"calibration error, {reason}."
+    ]
+
+
+def split_check_summary(report):
+    """Say how the accepted count moves when other seeds draw the split."""
+    check = report.get("split_sensitivity")
+    if not check:
+        return []
+    total = sum(report["split"][part] for part in ("design", "calibration", "heldout"))
+    if not check["selected"]:
+        return [
+            f"Split check: none of {check['splits']} other seeds selected a cutoff."
+        ]
+    none = check["splits"] - check["selected"]
+    here = (report.get("all_rows") or {}).get("accepted")
+    outside = ""
+    if here is not None and not check["accepted_min"] <= here <= check["accepted_max"]:
+        side = "below" if here < check["accepted_min"] else "above"
+        outside = (
+            f" This run's {here} is {side} that range. To use another cutoff, choose "
+            "it and confirm it on new labeled rows with `caat plan`."
+        )
+    return [
+        f"Split check: {check['selected']} of {check['splits']} other seeds selected a "
+        f"cutoff{f' and {none} selected none' if none else ''}. Those cutoffs accept "
+        f"{check['accepted_min']} to {check['accepted_max']} of the "
+        f"{total} rows (median {check['accepted_median']:g}). The count depends on which "
+        "rows fall in calibration. Fix the seed before looking, and report that "
+        f"run.{outside}"
+    ]

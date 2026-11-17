@@ -198,6 +198,13 @@
     "coverage": 0.678373382624769,
     "fitting": 324
   },
+  "split_sensitivity": {
+    "splits": 20,
+    "selected": 18,
+    "accepted_min": 284,
+    "accepted_median": 536.5,
+    "accepted_max": 541
+  },
   "command": "policy",
   "caat_version": "0.2.0",
   "input": {

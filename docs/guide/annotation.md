@@ -25,7 +25,7 @@ caat scores results/course/jigsaw_lr_predictions.csv --id-column example_id --sc
 ```
 
 ```text
-Compared scores on 1200 held-out rows against llm_confidence_numeric.
+Compared scores on 1200 held-out rows. Baseline score: llm_confidence_numeric.
 Design-only recommendation: trust_score_calibrated, chosen by AURC gain on 600 design rows.
 gold_label:
   control random. AUROC 0.500. 25% coverage: 22.6% error, 50% coverage: 22.6% error, 75% coverage: 22.6% error.
@@ -52,14 +52,18 @@ Split with seed 42: 600 design, 1200 calibration, and 1200 held-out rows.
 Score ranking under gold_label on the calibration rows: AUROC 0.969.
 Selected threshold 0.9285714285714286 for a 5% risk target under gold_label (ltt-bonferroni).
 The rule keeps accepted error at or below 5% with 95% confidence on new rows like the calibration rows.
+The next looser candidate (threshold 0.12626995645863573, 100% of calibration rows) had 23.3% calibration error, above the target.
 Held-out rows under gold_label: accepted 828 of 1200 with 4 errors (0.483%, 95% upper bound 1.1%). The observed rate meets the target.
 Applied to all 3000 rows, the cutoff accepts 2066 (68.9%). 1800 of the 3000 rows were used to choose the cutoff, so only the held-out rows give the error estimate.
+Split check: 20 of 20 other seeds selected a cutoff. Those cutoffs accept 2016 to 2321 of the 3000 rows (median 2178). The count depends on which rows fall in calibration. Fix the seed before looking, and report that run.
 The held-out rows confirm the policy.
 ```
 
 Keep the model's label when the score is at least 0.9286. On the 1,200
 held-out rows that rule kept 828 labels and 4 disagreed with the human
-label. About 69% of comments need no human review.
+label. About 69% of comments need no human review. Quote the two numbers
+for what they are: 2,066 of 3,000 is the workload, and 4 errors in 828 is
+the error check. Other random splits would keep between 2,016 and 2,321.
 [How to read each line](classifier.md#2-choose-and-check-a-cutoff) ·
 [Terms](glossary.md)
 
@@ -83,6 +87,7 @@ caat queue replay/jigsaw-decisions.csv --prediction-filter decision=review --bud
 
 ```text
 Queued 200 of 934 rows in order of increasing confidence.
+Wrote the queue to replay/jigsaw-queue.csv.
 ```
 
 [Queue guide](queue.md)
@@ -107,14 +112,29 @@ disagrees with the model, the 5% target is certified for that batch.
 
 ## With your own annotations
 
-Use a CSV or JSONL file with an ID, the model's label, the human label on
-the rows that have one, and a confidence column. Rows without a human
-label cannot be used to choose the cutoff. Fit on the labeled rows, save
-the report, and run `caat route` on the full file.
+Use a CSV or JSONL file with an ID, the model's label, the human label,
+and a confidence column. `caat policy` needs a human label on every row it
+reads. If only a sample is labeled, put the labeled rows in their own file,
+fit on that file with `--output policy.json`, and run `caat route` on the
+full file with `--threshold-report policy.json`.
 
 If the stated confidence is the only score and it ranks poorly, as it does
 here, a second signal usually helps: a small classifier's probability of
 the model's label, agreement across repeated samples, or token log
 probabilities. Compare candidates with `caat scores` before choosing a
-cutoff. [Score definitions](features.md) ·
+cutoff.
+
+A score must rise with the chance that the model's label is right. A
+classifier's probability of one fixed class does not: it is high for that
+class and low for the other, whichever label the model gave. `caat scores`
+reports an AUROC well below 0.5 for such a column. Reversing the column
+with `--lower-is-better` is the wrong fix here. Convert it to the
+probability of the label the model chose before using it. For a binary
+task with `p_toxic` and a 0/1 `model_label`:
+
+```python
+score = p_toxic if model_label == 1 else 1 - p_toxic
+```
+
+[Score definitions](features.md) ·
 [Where the trained scorer comes from](../research/method.md)

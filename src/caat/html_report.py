@@ -21,12 +21,26 @@ def table(headers, rows, *, scroll_label=None):
 
 
 def cutoff_table(selection, *, scroll_label=None):
-    return table(
+    """Tabulate the calibration candidates with the test each had to pass."""
+    if selection["rule"] == "empirical":
+        test = "its calibration error is at or below the target"
+    elif level := selection.get("per_candidate_level"):
+        test = f"its p-value is at or below {level:.3g}"
+    else:
+        test = (
+            "its p-value passes the step-down test at a "
+            f"{percent(selection['failure_rate'])} failure rate"
+        )
+    note = (
+        f"<p>Counts are from the calibration rows. A candidate passes when {test}. "
+        "A strict cutoff that accepts few rows can fail while a looser one passes.</p>"
+    )
+    return note + table(
         (
             "Cutoff",
             "Accepted",
             "Coverage",
-            *selection["graders"],
+            *(f"Errors ({name})" for name in selection["graders"]),
             "p-value",
             "Decision",
         ),
@@ -263,6 +277,14 @@ def render_html(report, curve=None, curves=None):
 
     title = "CAAT review workflow" if command == "run" else f"CAAT {command} report"
     main_class = ' class="workflow"' if command == "run" else ""
+    inputs = report.get("input") or {}
+    if command != "run" and inputs.get("path"):
+        source = f"Input: {inputs['path']}"
+        if inputs.get("score_column"):
+            source += f". Score column: {inputs['score_column']}"
+        sections.insert(
+            0, f"<p>{escape(source)}. CAAT {escape(report['caat_version'])}.</p>"
+        )
     body = "\n".join(sections)
     return f"""<!doctype html>
 <html lang="en">

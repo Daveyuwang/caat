@@ -424,6 +424,13 @@ def inspect_options(parser):
     )
     external_score_options(join)
     join.add_argument(
+        "--scores-id-column",
+        metavar="COLUMN",
+        help="Match scores on the sample ID in this column alone. The score files "
+        "then need no evaluation ID, epoch, or output hash, and CAAT cannot check "
+        "that the scores were computed for the completions in this log.",
+    )
+    join.add_argument(
         "--grader",
         action="append",
         required=True,
@@ -449,9 +456,15 @@ def run_inspect(args):
             args.output,
             graders=args.grader,
             epoch=args.epoch,
+            scores_id_column=args.scores_id_column,
             **external_score_settings(args),
         )
     print(f"Wrote {count} rows to {args.output}.")
+    if args.inspect_command == "join" and args.scores_id_column is not None:
+        print(
+            f"Scores were matched on {args.scores_id_column} alone. The output hash "
+            "was not checked against the completions in the log."
+        )
     return 0
 
 
@@ -857,7 +870,10 @@ def plan_options(parser):
         "--output-key-column", help="Sample source output key (default output_sha256)."
     )
     parser.add_argument(
-        "--power", type=float, default=0.8, help="Required chance of certification."
+        "--power",
+        type=float,
+        default=0.8,
+        help="Required chance of certification. Defaults to %(default)s.",
     )
     parser.add_argument(
         "--max-accepted",
@@ -1075,6 +1091,14 @@ def policy_options(parser):
     holdout_confidence_option(parser)
     parser.add_argument(
         "--seed", type=int, default=42, help="Split seed. Defaults to 42."
+    )
+    parser.add_argument(
+        "--split-checks",
+        type=int,
+        default=20,
+        metavar="N",
+        help="Refit on the next N seeds and report how the accepted count moves. "
+        "Defaults to 20. Use 0 to skip.",
     )
     parser.add_argument(
         "--check-column", action="append", help="Repeat for each held-out-only grader."
@@ -1397,6 +1421,8 @@ def run_queue(args):
         meta["review_missing_scores"] = True
     if args.output is None:
         result["sample_path"] = str(args.random_output)
+    else:
+        meta["output"] = str(args.output)
     emit(make_report("queue", meta, result), json_output=args.json)
     return 0
 
@@ -2122,6 +2148,7 @@ def run(args, *, staged, fit_outputs=None, label_plan=None):
             calibration_input=args.calibration_input,
             design_grid_size=grid_size,
             review_missing_scores=review_missing_scores,
+            split_checks=args.split_checks,
         )
         exit_code = int(not result["confirmed"])
         if html or source_rows is not None or track_fit:

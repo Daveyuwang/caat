@@ -1,7 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
+- Refit `caat policy` on the next 20 seeds and report how many rows those cutoffs would accept, with `--split-checks` to change or skip it.
+- Name the next looser candidate in the `caat policy` summary and say why it was not selected.
+- Say when a held-out error rate meets the target while its 95% upper bound does not.
+- Match Inspect scores on the sample ID alone with `caat inspect join --scores-id-column`.
+- Warn when a score's AUROC is well below 0.5, and give one verdict when the recommended score ties with the baseline.
+- Print the queue path from `caat queue`, and the input file and score column in HTML reports.
+- State the test each candidate had to pass above the HTML candidate table, and label its error columns.
 - State the selection rule's guarantee in the `caat policy` summary, show a 95% upper bound next to the held-out error rate, and name the exit status when it is 1.
 - When no cutoff qualifies although a candidate's error is under the target, say that too few rows were accepted to show it.
 - Name the split behind each number in `caat scores`, and call two scores tied when every interval for their difference includes zero.

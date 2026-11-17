@@ -406,6 +406,9 @@ that column for selection and validation.
 | `heldout.accepted_comparisons` | Directional shifts when two or more graders are listed. |
 | `all_rows.accepted` | Rows at or above the selected cutoff in the whole input, with `total` and `coverage`. Present when a cutoff is selected. |
 | `all_rows.fitting` | Design and calibration rows. They chose the cutoff, so the held-out rows give the error estimate. |
+| `split_sensitivity.splits` | Number of other seeds refitted, set with `--split-checks`. Absent with `--split-checks 0`. |
+| `split_sensitivity.selected` | How many of those splits selected a cutoff. |
+| `split_sensitivity.accepted_min` | Fewest rows of the whole input that one of those cutoffs accepts. The entry also has `accepted_median` and `accepted_max`. |
 | `confirmed` | True if a cutoff is selected and all graders meet the selected holdout check. |
 
 `heldout` is null when selection finds no cutoff. Without

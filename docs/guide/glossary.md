@@ -75,9 +75,48 @@ the time when the true error is 40%, so a 40% target is not shown. The
 summary reports this case and names the count. More calibration rows or
 fewer candidates raise the chance of selecting a cutoff.
 
+**p-value and test level.** Each candidate's p-value measures how
+surprising its calibration counts would be if its true error were at the
+target. A candidate passes when the p-value is at or below its test level.
+With `ltt-bonferroni` and ten candidates, the level is the 5% failure rate
+divided by ten, or 0.005. The summary names the next looser candidate and
+why it was not selected, which explains a result well under the target.
+
 **No cutoff selected.** The command exits with status 1 and reports the
 lowest calibration error any candidate reached. A stronger score, a larger
 target, or more calibration rows are the ways forward.
+
+## Settings that move the result
+
+The rule, the number of candidates, and the split seed all change which
+cutoff is selected, sometimes by a wide margin on a file of a few hundred
+or a thousand rows. Decide them before looking at results.
+
+| Setting | Default | What changing it does |
+| --- | --- | --- |
+| `--rule` | `ltt-bonferroni` | `ltt-holm` accepts slightly more with the same guarantee. `empirical` accepts the most and guarantees nothing. |
+| `--design-grid-size` | 10 | More candidates allow a cutoff closer to the target, but each must pass a stricter test level. |
+| `--seed` | 42 | A different seed puts different rows in calibration and moves the cutoff. |
+
+**Split check.** `caat policy` refits on the next 20 seeds and reports how
+many selected a cutoff and the range of rows they would accept in the whole
+file. A wide range means the file is small for the target. The check is a
+description of spread and takes no part in the result. When this run falls
+outside the range, the summary says so. A cutoff chosen any other way is
+still usable once fresh labels confirm it: `caat plan` gives the number of
+labels and `caat evaluate --holdout-confidence 0.95` runs the check. Use
+`--split-checks 0` to skip it.
+
+**Trying several settings.** The guarantee covers one run whose settings
+were fixed first. Running several rules or seeds against the same held-out
+rows and reporting the best one is no longer a held-out check. If you
+compare settings, pick one for a stated reason and confirm it on new
+labeled rows with `caat plan` and `caat evaluate`.
+
+**Which number to report.** "Accepted N of all rows" is the workload: how
+many rows the cutoff passes in the whole file. The held-out counts are the
+evidence: errors among accepted rows the cutoff never saw. Report both and
+say which is which.
 
 ## The held-out check
 
@@ -91,7 +130,15 @@ unlikely given these rows.
 **Holdout confidence.** By default the verdict compares the observed rate
 with the target. With `--holdout-confidence 0.95`, the verdict compares the
 upper bound with the target, which is stricter. The summary names the
-number that decided the verdict.
+number that decided the verdict. When the observed rate meets the target
+and the bound is above it, the summary says so: the held-out rows are too
+few to rule out a higher rate.
+
+**Two statements at 95%.** The rule's 95% confidence comes from the
+calibration rows and covers the cutoff's error on new rows. The 95% upper
+bound comes from the held-out rows and describes how high the error could
+plausibly be given what was observed there. They are separate checks on
+separate rows.
 
 **Certify.** To show, with the stated confidence, that the accepted error
 is at or below the target using fresh labels on accepted rows. `caat plan`
@@ -111,7 +158,10 @@ check. `caat policy` exits with status 0 when the policy is confirmed and
 **AUROC.** The chance that a randomly chosen correct prediction has a
 higher score than a randomly chosen wrong one. 0.5 is random ordering and
 1.0 is perfect ordering. AUROC measures ranking, so it does not change
-under calibration.
+under calibration. In the bundled examples, a score with AUROC 0.60
+supports a 40% target, and scores at 0.95 and above support 2% to 5%
+targets at about 70% coverage. A value well below 0.5 means the score
+points the wrong way.
 
 **Risk–coverage curve.** Accepted error at each coverage, from the most
 confident rows down to all rows.
