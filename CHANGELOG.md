@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0rc1
+
+- Route, evaluate, audit and monitor a saved fitted policy using its named features. Explicit score-column overrides still accept precomputed scores.
+- Calibrate one frozen score with preset cutoffs or unlabeled reference predictions and independent labeled calibration and holdout sets.
+- Replay the BoolQ verifier and label-budget comparisons on CPU. At 75% coverage the verifier combination improved on the best single score. An exploratory answer-aware native score had the lowest accepted error.
+
 ## 0.4.0rc1
 
 - Fit standardized logistic confidence scorers on design data and reuse their JSON parameters on unlabeled batches. Fitting uses the optional scorer extra.
