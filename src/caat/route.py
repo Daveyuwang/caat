@@ -23,6 +23,15 @@ class BatchDecision(NamedTuple):
     output_key: str | None
 
 
+def accepted_population_digest(records):
+    hasher = sha256()
+    for item_id, score, key in sorted(records):
+        # Encode the parsed score so formatting differences preserve identity.
+        encoded = json.dumps((item_id, (score + 0.0).hex(), key), separators=(",", ":"))
+        hasher.update(encoded.encode("ascii") + b"\n")
+    return hasher.hexdigest()
+
+
 def iter_batch_decisions(path, *, threshold=None, require_output_key=False):
     """Yield ID, score, acceptance, group, and output key in decision order."""
     if threshold is not None and not isfinite(threshold):
@@ -132,14 +141,7 @@ def read_batch_decisions(
             if accepted_rows is None
             else ((row.id, row.score, row.output_key) for row in accepted_rows)
         )
-        hasher = sha256()
-        for item_id, score, key in sorted(records):
-            # Encode the parsed score so formatting differences preserve identity.
-            encoded = json.dumps(
-                (item_id, (score + 0.0).hex(), key), separators=(",", ":")
-            )
-            hasher.update(encoded.encode("ascii") + b"\n")
-        digest = hasher.hexdigest()
+        digest = accepted_population_digest(records)
     return accepted, digest, not scores_match
 
 

@@ -309,6 +309,13 @@ def describe(report):
         inputs = report["input"]
         target = report["risk_target"]
         population = report.get("accepted_population")
+        if "batch_predictions" in inputs:
+            return (
+                f"At the saved cutoff, {population} of {report['total']} rows would qualify "
+                f"and {report['review']} would go to review. "
+                f"Wrote {report['accepted']} rows to {report['sample_path']} "
+                f"for the {percent(target)} target (seed {inputs['sample_seed']})."
+            )
         batch = (
             f" The plan assumes {report['expected_population_errors']} errors among "
             f"{population} accepted rows in the fixed batch."

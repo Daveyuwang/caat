@@ -230,6 +230,14 @@ records this count.
 ## Plan
 
 `caat plan` sizes an independent check of one frozen acceptance policy.
+
+With `--batch-predictions` and `--label-budget`, the plan keeps the saved
+risk target and samples from raw predictions. `total` counts selected input
+rows, `accepted_population` counts eligible rows, `review` counts the rest
+and `accepted` is the number sampled. The input metadata records the batch
+path, requested label cap, cutoff, confidence, seed, and the digest of the
+eligible IDs, oriented scores and output keys. This sampling mode produces
+no certification probability. [Draw a fixed-budget sample](queue.md#draw-an-audit-sample-after-a-policy-misses-its-target)
 Each required label comes from an independently sampled accepted row.
 The command computes certification power from the exact binomial count
 of errors at the assumed rate. Check the collected labels with the same

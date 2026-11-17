@@ -34,7 +34,12 @@ from .features import DEFAULT_FEATURES, FEATURES, write_feature_csv
 from .inspect_log import export_for_scoring, export_grades, join_scores
 from .metrics import METRICS, Counts, threshold_points
 from .monitor import monitor_risk
-from .plan import DEFAULT_MAX_ACCEPTED, check_label_plan, plan_labels
+from .plan import (
+    DEFAULT_MAX_ACCEPTED,
+    check_label_plan,
+    plan_labels,
+    read_candidate_batch,
+)
 from .plots import reliability_diagram, write_svg
 from .plugins import catalog
 from .policy import policy, split_rows
@@ -578,7 +583,7 @@ def holdout_confidence_option(parser):
     )
 
 
-def accepted_population_options(parser, *, check_sample=False):
+def accepted_population_options(parser, *, check_sample=False, raw_batch=False):
     population = parser.add_mutually_exclusive_group()
     population.add_argument(
         "--accepted-population",
@@ -592,6 +597,13 @@ def accepted_population_options(parser, *, check_sample=False):
         metavar="FILE",
         help="Read the full fixed batch from a caat route decision table.",
     )
+    if raw_batch:
+        population.add_argument(
+            "--batch-predictions",
+            type=Path,
+            metavar="CSV_OR_JSONL",
+            help="Score a new batch for a fixed-budget audit sample.",
+        )
     if check_sample:
         parser.add_argument(
             "--plan-report",
@@ -852,12 +864,19 @@ def plan_options(parser):
         metavar="LEVEL",
         help="Confidence level. Uses the threshold report's level or 0.95 by default.",
     )
-    accepted_population_options(parser)
+    accepted_population_options(parser, raw_batch=True)
+    prediction_filter_option(parser)
+    parser.add_argument(
+        "--label-budget",
+        type=int,
+        metavar="N",
+        help="Sample up to N eligible rows at the saved risk target.",
+    )
     parser.add_argument(
         "--sample-output",
         type=Path,
         metavar="CSV",
-        help="Write the planned uniform sample from --batch-decisions.",
+        help="Write the uniform label sample for the fixed batch.",
     )
     parser.add_argument(
         "--sample-seed",
@@ -884,14 +903,12 @@ def plan_options(parser):
     parser.add_argument(
         "--power",
         type=float,
-        default=0.8,
-        help="Required chance of certification. Defaults to %(default)s.",
+        help="Required chance of certification when sizing a plan (default 0.8).",
     )
     parser.add_argument(
         "--max-accepted",
         type=int,
-        default=DEFAULT_MAX_ACCEPTED,
-        help="Label search limit. Defaults to %(default)s.",
+        help=f"Label search limit when sizing a plan (default {DEFAULT_MAX_ACCEPTED}).",
     )
     parser.add_argument("--json", action="store_true", help="Print the JSON report.")
     parser.add_argument(
@@ -903,7 +920,30 @@ def run_plan(args):
     seed = args.sample_seed
     if args.sample_output is not None and seed is None:
         seed = 42
-    if seed is not None and args.batch_decisions is None:
+    fixed = args.batch_predictions is not None
+    if fixed:
+        if (
+            args.threshold_report is None
+            or args.label_budget is None
+            or args.sample_output is None
+        ):
+            raise ValueError(
+                "--batch-predictions requires --threshold-report, --label-budget and --sample-output"
+            )
+        if args.label_budget < 1:
+            raise ValueError("--label-budget must be positive")
+        if any(
+            value is not None
+            for value in (args.expected_error, args.power, args.max_accepted)
+        ):
+            raise ValueError(
+                "--expected-error, --power and --max-accepted apply to label sizing"
+            )
+    elif args.label_budget is not None or args.prediction_filter is not None:
+        raise ValueError(
+            "--label-budget and --prediction-filter require --batch-predictions"
+        )
+    elif seed is not None and args.batch_decisions is None:
         raise ValueError("--sample-output and --sample-seed require --batch-decisions")
     sample_columns = tuple(args.sample_column or ())
     if args.sample_source is not None:
@@ -926,6 +966,7 @@ def run_plan(args):
         raise ValueError("plan and sample output paths must be distinct")
     for path, name in (
         (args.batch_decisions, "batch decisions"),
+        (args.batch_predictions, "batch predictions"),
         (args.threshold_report, "threshold report"),
         (args.sample_source, "sample source"),
     ):
@@ -939,45 +980,33 @@ def run_plan(args):
     confidence = args.holdout_confidence
     if confidence is None:
         confidence = saved.get("holdout_confidence") or 0.95
-    expected = args.expected_error
-    if expected is None:
-        expected = saved.get("heldout_error_rate")
-        if expected is None:
-            raise ValueError(
-                "give --expected-error, or a policy or run report whose held-out "
-                "check accepted rows"
-            )
-    options = {
-        "expected_error": expected,
-        "holdout_confidence": confidence,
-        "power": args.power,
-    }
-    population = args.accepted_population
-    digest = None
-    accepted_rows = [] if args.sample_output is not None else None
-    if args.batch_decisions is not None:
-        population, digest, _ = read_batch_decisions(
-            args.batch_decisions,
-            threshold=saved.get("threshold"),
-            fingerprint=True,
-            accepted_rows=accepted_rows,
+    if fixed:
+        if not 0 < confidence < 1:
+            raise ValueError("holdout confidence must be strictly between 0 and 1")
+        accepted_rows, total, digest, key = read_candidate_batch(
+            args.batch_predictions, saved, selection=args.prediction_filter
         )
-    if population is not None:
-        options["accepted_population"] = population
-    if args.accepted is not None:
-        options["accepted"] = args.accepted
+        population = len(accepted_rows)
+        result = {
+            "total": total,
+            "accepted_population": population,
+            "review": total - population,
+            "accepted": min(args.label_budget, population),
+            "risk_target": saved["risk_target"],
+        }
+        options = {
+            "batch_predictions": str(args.batch_predictions),
+            "label_budget": args.label_budget,
+            "accepted_population_sha256": digest,
+            "output_key_column": key,
+            "fit_outputs_checked": saved["fit_outputs"] is not None,
+            "holdout_confidence": confidence,
+        }
+        if args.prediction_filter is not None:
+            column, value = args.prediction_filter
+            options["prediction_filter"] = {"column": column, "value": value}
     else:
-        options.update(
-            risk_target=saved.get("risk_target", args.risk_target),
-            max_accepted=args.max_accepted,
-        )
-    result = plan_labels(**options)
-    if args.expected_error is None:
-        options["expected_error_source"] = "threshold_report"
-    if args.batch_decisions is not None:
-        options.update(
-            batch_decisions=str(args.batch_decisions), accepted_population_sha256=digest
-        )
+        result, options, accepted_rows = size_label_plan(args, saved, confidence)
     if args.threshold_report is not None:
         options.update(
             threshold_report=str(args.threshold_report), threshold=saved["threshold"]
@@ -1016,12 +1045,59 @@ def run_plan(args):
             write_queue(
                 staged[sample_path],
                 sample,
-                include_output_key=sample[0].output_key is not None,
+                include_output_key=options["output_key_column"] is not None
+                if fixed
+                else sample[0].output_key is not None,
                 extra_columns=sample_columns,
                 extra_values=extra_values,
             )
     print(serialized if args.json else render_report("text", report))
-    return int(budget is None)
+    return int(not budget)
+
+
+def size_label_plan(args, saved, confidence):
+    expected = args.expected_error
+    if expected is None:
+        expected = saved.get("heldout_error_rate")
+        if expected is None:
+            raise ValueError(
+                "give --expected-error, or a policy or run report whose held-out "
+                "check accepted rows"
+            )
+    options = {
+        "expected_error": expected,
+        "holdout_confidence": confidence,
+        "power": 0.8 if args.power is None else args.power,
+    }
+    population = args.accepted_population
+    digest = None
+    accepted_rows = [] if args.sample_output is not None else None
+    if args.batch_decisions is not None:
+        population, digest, _ = read_batch_decisions(
+            args.batch_decisions,
+            threshold=saved.get("threshold"),
+            fingerprint=True,
+            accepted_rows=accepted_rows,
+        )
+    if population is not None:
+        options["accepted_population"] = population
+    if args.accepted is not None:
+        options["accepted"] = args.accepted
+    else:
+        options.update(
+            risk_target=saved.get("risk_target", args.risk_target),
+            max_accepted=DEFAULT_MAX_ACCEPTED
+            if args.max_accepted is None
+            else args.max_accepted,
+        )
+    result = plan_labels(**options)
+    if args.expected_error is None:
+        options["expected_error_source"] = "threshold_report"
+    if args.batch_decisions is not None:
+        options.update(
+            batch_decisions=str(args.batch_decisions), accepted_population_sha256=digest
+        )
+    return result, options, accepted_rows
 
 
 def grader_source_options(parser, *, multiple=True, labels=False):

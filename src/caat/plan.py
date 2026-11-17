@@ -14,10 +14,56 @@ from .finite import (
     validate_population,
 )
 from .metrics import Counts
+from .report import check_fit_overlap
+from .route import accepted_population_digest
 from .rules import binomial_upper_bound
+from .scorer import LinearScorer
+from .table import (
+    accepted_at,
+    iter_validated_rows,
+    open_prediction_table,
+    open_table_rows,
+)
 
 
 DEFAULT_MAX_ACCEPTED = 100_000
+
+
+def read_candidate_batch(path, saved, *, selection=None):
+    """Apply a saved cutoff for sampling. Keep only the rows eligible for labels."""
+    key = saved["output_key_column"]
+    fit_outputs = saved["fit_outputs"]
+    if fit_outputs is None:
+        with open_prediction_table(path, set(), None) as (reader, _):
+            if (key or "output_sha256") in reader.fieldnames:
+                key = key or "output_sha256"
+            else:
+                key = None
+    source = saved.get("negated_score_source")
+    review_missing = bool(saved["review_missing_scores"])
+    with open_table_rows(
+        path,
+        id_column=saved["id_column"],
+        score_column=source or saved["score_column"],
+        output_key_column=key,
+        scorer=LinearScorer.from_dict(saved["scorer"]) if "scorer" in saved else None,
+        negate_score=source is not None,
+        review_missing_scores=review_missing,
+        require_labels=False,
+        selection=selection,
+    ) as (rows, _):
+        batch = list(
+            iter_validated_rows(
+                rows, (), minimum_graders=0, review_missing_scores=review_missing
+            )
+        )
+    if fit_outputs is not None:
+        check_fit_overlap(batch, fit_outputs, cohort="audit batch")
+    candidates = [row for row in batch if accepted_at(row, saved["threshold"])]
+    digest = accepted_population_digest(
+        (r.id, r.score, r.output_key) for r in candidates
+    )
+    return candidates, len(batch), digest, key
 
 
 def check_label_plan(plan, *, threshold, accepted, accepted_population):
