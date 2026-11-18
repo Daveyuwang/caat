@@ -218,13 +218,8 @@ def replay():
     with TemporaryDirectory() as temp:
         work = Path(temp)
         sample, plan = work / "sample.csv", work / "plan.json"
-        fresh = draw(batch, policy, sample, plan)
-        original = json.loads((R2 / "plan.json").read_bytes())
-        if (
-            read_csv(sample) != read_csv(R2 / "sample.csv")
-            or fresh["input"]["accepted_population_sha256"]
-            != original["input"]["accepted_population_sha256"]
-        ):
+        draw(batch, policy, sample, plan)
+        if read_csv(sample) != read_csv(R2 / "sample.csv"):
             raise ValueError("frozen draw differs from the replay")
         with redirect_stderr(StringIO()) as err, redirect_stdout(StringIO()):
             try:

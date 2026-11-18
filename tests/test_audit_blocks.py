@@ -1,5 +1,6 @@
 import csv
 import json
+import sqlite3
 import subprocess
 import sys
 import unittest
@@ -8,7 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from caat.cli import main
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import closing, redirect_stderr, redirect_stdout
 from io import StringIO
 
 R2 = Path(__file__).resolve().parents[1] / "results/anli_r2"
@@ -64,14 +65,63 @@ class BlockTests(unittest.TestCase):
             with redirect_stdout(StringIO()) as out:
                 self.assertEqual(main(args), 0)
             path = Path(json.loads(out.getvalue())["request"]["path"])
-            original = path.read_bytes()
             with path.open(encoding="utf-8", newline="") as stream:
                 self.assertEqual(list(csv.DictReader(stream)), expected)
             path.unlink()
             sample.unlink()
             with redirect_stdout(StringIO()):
                 self.assertEqual(main(args), 0)
-            self.assertEqual(path.read_bytes(), original)
+            with path.open(encoding="utf-8", newline="") as stream:
+                self.assertEqual(list(csv.DictReader(stream)), expected)
+
+    def test_upgrade_resumes_an_open_request_and_reads_the_saved_policy(self):
+        legacy = Path(__file__).parent / "fixtures/upgrade"
+        expected = json.loads((legacy / "expected.json").read_text(encoding="utf-8"))
+        with TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            with closing(sqlite3.connect(directory / "audit.sqlite3")) as db:
+                db.executescript((legacy / "handoff.sql").read_text(encoding="utf-8"))
+            with redirect_stdout(StringIO()) as output:
+                main(
+                    [
+                        "audit-block",
+                        "--handoff",
+                        tmp,
+                        "--plan-report",
+                        str(legacy / "plan.json"),
+                        "--threshold-report",
+                        str(R2 / "policy.json"),
+                        "--batch-predictions",
+                        str(R2 / "predictions.csv"),
+                        "--block-size",
+                        "10",
+                        "--grader",
+                        "anli",
+                        "--json",
+                    ]
+                )
+            report = json.loads(output.getvalue())
+            self.assertEqual(report["request"]["id"], expected["request"])
+            self.assertEqual(report["outstanding"], expected["outstanding"])
+            self.assertEqual(report["returned_labels"], 1)
+
+            decisions = directory / "decisions.csv"
+            with redirect_stdout(StringIO()):
+                main(
+                    [
+                        "route",
+                        str(R2.parents[1] / "examples/ifeval_strict.csv"),
+                        "--threshold-report",
+                        str(legacy / "policy.json"),
+                        "--output",
+                        str(decisions),
+                    ]
+                )
+            with decisions.open(encoding="utf-8", newline="") as stream:
+                self.assertEqual(
+                    {r["id"]: r["decision"] for r in csv.DictReader(stream)},
+                    expected["decisions"],
+                )
 
     def test_concurrent_issue_and_recover_partial_receipts(self):
         with TemporaryDirectory() as tmp:

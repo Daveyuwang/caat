@@ -11,23 +11,9 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 SEED = 42
-ARCHIVES = {
-    "ifeval_qwen": ("ifeval", 541, ("strict_pass", "helm_strict_pass")),
-    "ifeval_llama": ("ifeval_llama", 541, ("strict_pass", "helm_strict_pass")),
-    "mmlu_pro_qwen": ("mmlu_pro", 1000, ("correct", "tiger_correct")),
-    "mmlu_pro_llama": ("mmlu_pro_llama", 1000, ("correct", "tiger_correct")),
-}
 SCENARIOS = {
     "wildbench": ("score", "wildbench_score_rescaled"),
     "omni_math": ("equivalence_judgement", "omni_math_accuracy"),
-}
-JUDGES = ("gpt", "llama", "claude")
-MATCHED_TOKEN_TEXT = {
-    "literal",
-    "terminal_marker",
-    "byte_level",
-    "final_channel",
-    "byte_level_final_channel",
 }
 
 

@@ -2,15 +2,12 @@
   "prior": {
     "total": 1165,
     "population": 1081,
-    "population_sha256": "f5416e98e74228a5f3cd93f58c7c8729fcf3bf8989d9ba9973aa81e78ea6c4c1",
-    "policy_sha256": "5624e547f5a68e1cb0955a8c5c0f363e769a2d71ab99875314107cd9168bdbc8",
     "sample_seed": 42,
     "risk_target": 0.2,
     "one_sided_confidence": 0.95,
     "required_directional_power": 0.8,
     "request_cost": 1,
     "cap": 299,
-    "sample_sha256": "5f6c41fb00cbb0f608d4e4f0dd2dcda0a50d1fadc9a91b299a35df396c9fb38e",
     "interim": 250,
     "single_stage": {
       "max_errors_to_meet": 49,
@@ -73,11 +70,5 @@
         "expected_requests": 1.683004292145167
       }
     ]
-  },
-  "sample_sha256": {
-    "smallest-cap": "5f6c41fb00cbb0f608d4e4f0dd2dcda0a50d1fadc9a91b299a35df396c9fb38e",
-    "lowest-cost": "eed438762aa040ffa185d067c25c56e1b8dacbac65d673d4c8c47b613b796f3f",
-    "prior-two-stage": "5f6c41fb00cbb0f608d4e4f0dd2dcda0a50d1fadc9a91b299a35df396c9fb38e",
-    "prior-fixed": "5f6c41fb00cbb0f608d4e4f0dd2dcda0a50d1fadc9a91b299a35df396c9fb38e"
   }
 }

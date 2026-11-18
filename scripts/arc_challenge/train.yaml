@@ -1,3 +1,0 @@
-include: test.yaml
-task: caat_arc_train
-test_split: train

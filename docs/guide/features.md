@@ -31,11 +31,7 @@ scores first. Use `shorter_response` when shorter answers should rank ahead
 of longer ones. Choose a ranking direction on design data, then freeze it
 before selecting a threshold on calibration data.
 
-Add `--include-output-key` to include `output_sha256`, the SHA-256 of
-the UTF-8 response text. Keep the saved text and its whitespace when
-grading. `select`, `policy`, and `audit` can then align separate grader
-files with the scores using the ID and output key.
-[Separate grader exports](csv-format.md#separate-grader-exports)
+Use `--include-output-key` to export a stable key for each saved response. [Separate grader exports](csv-format.md#separate-grader-exports)
 
 ## Saved black-box signals
 

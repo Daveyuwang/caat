@@ -1,15 +1,12 @@
 {
   "total": 1500,
   "population": 1276,
-  "population_sha256": "8c0f166a68dddc421f9cc6c7c430a3d7a6201d9ca9b30aaf8dd5b7528545075e",
-  "policy_sha256": "5624e547f5a68e1cb0955a8c5c0f363e769a2d71ab99875314107cd9168bdbc8",
   "sample_seed": 42,
   "risk_target": 0.2,
   "one_sided_confidence": 0.95,
   "required_directional_power": 0.8,
   "request_cost": 1,
   "cap": 321,
-  "sample_sha256": "d8cfa9e51e1474e1677c37a38dbe03e2e22cb631d5fd49b9ed185ad3fd16f8da",
   "interim": 250,
   "single_stage": {
     "max_errors_to_meet": 53,

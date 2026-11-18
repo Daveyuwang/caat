@@ -1,7 +1,0 @@
-dataset,model,samples_per_answer,prompt_evaluations,model_invocations,sampling_seconds
-triviaqa,qwen2_5_7b,10,10000,157,460.33965120007633
-triviaqa,phi4_mini,10,10000,157,96.13820340001257
-triviaqa,smollm2,10,10000,157,64.09410949991434
-mmlu_pro,qwen2_5_7b,10,10000,625,625.6153213004873
-mmlu_pro,phi4_mini,10,10000,625,248.82467009976972
-mmlu_pro,smollm2,10,10000,625,143.08605379986693

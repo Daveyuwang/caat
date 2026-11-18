@@ -24,14 +24,11 @@ calibration set's correctness rate as a constant probability baseline.
 from statistics import mean
 from caat.calibrate import Calibrator
 
-
 def fit(scores, outcomes, *, bins=10):
     return {"rate": mean(outcomes)}
 
-
 def restore(parameters):
     return lambda score: parameters["rate"]
-
 
 calibrator = Calibrator(fit, restore, monotone=True)
 ```
@@ -83,10 +80,8 @@ The result appears under `extra_metrics` in the evaluation report.
 ```python
 from caat.rules import Rule, empirical
 
-
 def half_target(candidates, risk_target, failure_rate):
     return empirical(candidates, risk_target / 2, failure_rate)
-
 
 rule = Rule(half_target)
 ```
@@ -105,17 +100,14 @@ import json
 from caat import GradedRow
 from caat.adapters import Adapter
 
-
 def read(path, options):
     for row in json.loads(path.read_text(encoding="utf-8")):
         yield GradedRow(row["id"], float(row["score"]), (row["correct"],))
-
 
 def fixture(directory):
     path = directory / "rows.json"
     path.write_text('[{"id":"1","score":0.9,"correct":true}]', encoding="utf-8")
     return path, {}
-
 
 adapter = Adapter(read, source_format="json-array", source_version="1",
                   fixture=fixture)

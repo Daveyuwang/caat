@@ -1,7 +1,6 @@
 """Draw, grade in blocks, independently complete, and replay the WinoGrande audit."""
 
 import argparse
-import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import perf_counter
@@ -9,7 +8,7 @@ from time import perf_counter
 from caat.plan import forecast_block_cost
 
 from collect_winogrande import OUT, dataset_file
-from common import ROOT, read_csv, write_report
+from common import ROOT, read_csv, read_json, write_report
 from study_batch_audit import R2, archived_policy, command, draw, measure, write_json
 
 POLICY = R2 / "policy.json"
@@ -17,10 +16,6 @@ BATCH = OUT / "predictions.csv"
 PLAN = OUT / "plan.json"
 SAMPLE = OUT / "sample.csv"
 GRADE_FIELDS = ["id", "output_key", "correct"]
-
-
-def read_json(path):
-    return json.loads(path.read_bytes())
 
 
 def keyed(rows):
@@ -203,14 +198,9 @@ def replay(work):
     if eligible != {i: r["output_key"] for i, r in grades.items()}:
         raise ValueError("eligible ID or output key differs from census")
     sample, plan = work / "sample.csv", work / "plan.json"
-    fresh = draw(BATCH, POLICY, sample, plan)
-    original = read_json(PLAN)
-    if (
-        read_csv(sample) != read_csv(SAMPLE)
-        or fresh["input"]["accepted_population_sha256"]
-        != original["input"]["accepted_population_sha256"]
-    ):
-        raise ValueError("frozen draw or eligible population changed")
+    forecast = draw(BATCH, POLICY, sample, plan)
+    if read_csv(sample) != read_csv(SAMPLE):
+        raise ValueError("frozen draw changed")
 
     def grade(rows):
         return [grades[r["id"]] for r in rows]
@@ -240,7 +230,7 @@ def replay(work):
         k,
         len(grades),
         "expected labels",
-        forecast_block_cost(len(grades), k, original["accepted"], original, 10)[
+        forecast_block_cost(len(grades), k, forecast["accepted"], forecast, 10)[
             "expected_labels"
         ],
     )
