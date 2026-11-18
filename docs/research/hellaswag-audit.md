@@ -5,13 +5,14 @@ predictions. At a common cap of 321 labels, two checkpoints reduced the
 higher expected cost across the two design scenarios by **8.00%**, from
 318.37 to 292.90 label-equivalents. The optimized CAAT 1.1 baseline issued
 blocks of 314. Each request cost one label-equivalent in this comparison.
-[Frozen design](../../results/hellaswag/design.json)
+The two-stage workflow from milestone 1.2 ships in the 1.1 series supplement.
+[Frozen design](../../results/hellaswag/design.json) · [Installation](https://github.com/Daveyuwang/caat/releases/tag/v1.1.0)
 
 | Seed 42, same ordered draw | Labels issued | Requests | Errors returned | Verdict |
 | --- | ---: | ---: | ---: | --- |
 | Bulk | 321 | 1 | 46 | Meets |
-| Best fixed block at the design price (1.1) | 314 | 1 | 46 | Meets |
-| Two checkpoints (1.2) | 321 | 2 | 46 | Meets |
+| Best fixed block at the design price | 314 | 1 | 46 | Meets |
+| Two checkpoints | 321 | 2 | 46 | Meets |
 
 After 125 receipts, the grader restarted with the same request ID and
 the other 125 rows outstanding. The first 250 labels contained 40 errors.
@@ -23,7 +24,7 @@ audit could settle after 314 because even seven further errors would leave
 it at 53. The saved policy still withholds routing.
 [Issued outcomes](../../results/hellaswag/audit.json) · [Shared draw](../../results/hellaswag/sample.csv)
 
-| Assumed eligible error | Correct verdict probability, 1.1 / 1.2 | Expected labels, 1.1 / 1.2 | Expected requests, 1.1 / 1.2 |
+| Assumed eligible error | Correct verdict probability, fixed / two-stage | Expected labels, fixed / two-stage | Expected requests, fixed / two-stage |
 | --- | ---: | ---: | ---: |
 | 15% (192 errors) | 82.63% / 82.81% | 316.95 / 291.32 | 1.42 / 1.58 |
 | 25% (319 errors) | 80.37% / 80.55% | 315.59 / 290.32 | 1.23 / 1.57 |
