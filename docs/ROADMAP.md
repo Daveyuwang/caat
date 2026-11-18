@@ -6,7 +6,7 @@ A label lead should be able to enter a hard budget and see two executable
 offers. One minimizes the qualifying cap in the search. The other
 minimizes expected cost under that ceiling. The two-stage HellaSwag study needed a custom
 Python loop to choose its cap and first checkpoint. CAAT already knows how
-to grade either design. [1.3 milestone](https://github.com/Daveyuwang/caat/milestone/2) · [Current selection loop](../scripts/study_hellaswag.py)
+to grade either design. [1.3 milestone](https://github.com/Daveyuwang/caat/milestone/2) · [Current selection loop](https://github.com/Daveyuwang/caat/blob/9f598e1c13f01032a66f12af8b0a4aa11ff79b65/scripts/study_hellaswag.py)
 
 ### What changes when the cap can vary?
 
