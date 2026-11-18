@@ -1,0 +1,136 @@
+{
+  "total": 1165,
+  "accepted_population": 1081,
+  "review": 84,
+  "risk_target": 0.2,
+  "qualifies": true,
+  "caps_tested": [
+    200,
+    225,
+    250,
+    275,
+    299,
+    300,
+    325,
+    350,
+    375,
+    400,
+    425,
+    450,
+    475,
+    500
+  ],
+  "minimum_single_stage_cap": 299,
+  "offers": {
+    "smallest-cap": {
+      "mode": "two-stage",
+      "cap": 299,
+      "worst_cost": 285.15021460725836,
+      "stages": [
+        {
+          "labels": 250,
+          "max_errors_to_meet": 35,
+          "min_errors_to_exceed": 66
+        },
+        {
+          "labels": 299,
+          "max_errors_to_meet": 49,
+          "min_errors_to_exceed": 70
+        }
+      ],
+      "scenarios": [
+        {
+          "rate": 0.15,
+          "errors": 163,
+          "cost": 284.3632539578066,
+          "meets": 0.8004861854753987,
+          "exceeds": 3.577840880990193e-06,
+          "inconclusive": 0.19951023668372023,
+          "expected_labels": 282.69598887865044,
+          "expected_requests": 1.6672650791561319
+        },
+        {
+          "rate": 0.25,
+          "errors": 271,
+          "cost": 285.15021460725836,
+          "meets": 2.0552291074690855e-05,
+          "exceeds": 0.8036419448300374,
+          "inconclusive": 0.19633750287888788,
+          "expected_labels": 283.46721031511316,
+          "expected_requests": 1.683004292145167
+        }
+      ],
+      "near_target": {
+        "errors": 216,
+        "expected_labels": 298.6702566791818,
+        "expected_requests": 1.993270544473099
+      }
+    },
+    "lowest-cost": {
+      "mode": "two-stage",
+      "cap": 325,
+      "worst_cost": 259.4283304273112,
+      "stages": [
+        {
+          "labels": 200,
+          "max_errors_to_meet": 30,
+          "min_errors_to_exceed": 50
+        },
+        {
+          "labels": 325,
+          "max_errors_to_meet": 53,
+          "min_errors_to_exceed": 77
+        }
+      ],
+      "scenarios": [
+        {
+          "rate": 0.15,
+          "errors": 163,
+          "cost": 259.4283304273112,
+          "meets": 0.8219438927962631,
+          "exceeds": 2.8285322502244803e-05,
+          "inconclusive": 0.17802782188123464,
+          "expected_labels": 257.964613519158,
+          "expected_requests": 1.4637169081532637
+        },
+        {
+          "rate": 0.25,
+          "errors": 271,
+          "cost": 258.6669204242009,
+          "meets": 0.00011532398423149172,
+          "exceeds": 0.8038312058764023,
+          "inconclusive": 0.1960534701393662,
+          "expected_labels": 257.20924645258026,
+          "expected_requests": 1.457673971620642
+        }
+      ],
+      "near_target": {
+        "errors": 216,
+        "expected_labels": 317.21618213137106,
+        "expected_requests": 1.9377294570509684
+      }
+    }
+  },
+  "extra_reserve": 26,
+  "schema_version": 2,
+  "command": "budget-comparison",
+  "caat_version": "1.3.0.dev0",
+  "input": {
+    "threshold_report_sha256": "5624e547f5a68e1cb0955a8c5c0f363e769a2d71ab99875314107cd9168bdbc8",
+    "batch_predictions": "results/arc_challenge/predictions.csv",
+    "accepted_population_sha256": "f5416e98e74228a5f3cd93f58c7c8729fcf3bf8989d9ba9973aa81e78ea6c4c1",
+    "output_key_column": "output_sha256",
+    "fit_outputs_checked": true,
+    "holdout_confidence": 0.95,
+    "forecast": true,
+    "budget_ceiling": 500,
+    "error_scenarios": [
+      0.15,
+      0.25
+    ],
+    "power": 0.8,
+    "request_cost": 1.0,
+    "threshold_report": "results/anli_r2/policy.json",
+    "threshold": 4.75
+  }
+}

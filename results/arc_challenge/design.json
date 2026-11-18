@@ -1,0 +1,83 @@
+{
+  "prior": {
+    "total": 1165,
+    "population": 1081,
+    "population_sha256": "f5416e98e74228a5f3cd93f58c7c8729fcf3bf8989d9ba9973aa81e78ea6c4c1",
+    "policy_sha256": "5624e547f5a68e1cb0955a8c5c0f363e769a2d71ab99875314107cd9168bdbc8",
+    "sample_seed": 42,
+    "risk_target": 0.2,
+    "one_sided_confidence": 0.95,
+    "required_directional_power": 0.8,
+    "request_cost": 1,
+    "cap": 299,
+    "sample_sha256": "5f6c41fb00cbb0f608d4e4f0dd2dcda0a50d1fadc9a91b299a35df396c9fb38e",
+    "interim": 250,
+    "single_stage": {
+      "max_errors_to_meet": 49,
+      "min_errors_to_exceed": 70,
+      "block_size": 292,
+      "scenarios": [
+        {
+          "rate": 0.15,
+          "errors": 163,
+          "meets": 0.800048793463157,
+          "exceeds": 3.572342420296383e-06,
+          "inconclusive": 0.19994763419442263,
+          "cost": 296.7128547719625,
+          "expected_labels": 295.24874792546717,
+          "expected_requests": 1.4641068464953086
+        },
+        {
+          "rate": 0.25,
+          "errors": 271,
+          "meets": 2.0134848857962448e-05,
+          "exceeds": 0.8036046924272229,
+          "inconclusive": 0.19637517272391922,
+          "cost": 294.8917084600406,
+          "expected_labels": 293.6552449025355,
+          "expected_requests": 1.2364635575050735
+        }
+      ]
+    },
+    "stages": [
+      {
+        "labels": 250,
+        "max_errors_to_meet": 35,
+        "min_errors_to_exceed": 66
+      },
+      {
+        "labels": 299,
+        "max_errors_to_meet": 49,
+        "min_errors_to_exceed": 70
+      }
+    ],
+    "scenarios": [
+      {
+        "rate": 0.15,
+        "errors": 163,
+        "cost": 284.3632539578066,
+        "meets": 0.8004861854753987,
+        "exceeds": 3.577840880990193e-06,
+        "inconclusive": 0.19951023668372023,
+        "expected_labels": 282.69598887865044,
+        "expected_requests": 1.6672650791561319
+      },
+      {
+        "rate": 0.25,
+        "errors": 271,
+        "cost": 285.15021460725836,
+        "meets": 2.0552291074690855e-05,
+        "exceeds": 0.8036419448300374,
+        "inconclusive": 0.19633750287888788,
+        "expected_labels": 283.46721031511316,
+        "expected_requests": 1.683004292145167
+      }
+    ]
+  },
+  "sample_sha256": {
+    "smallest-cap": "5f6c41fb00cbb0f608d4e4f0dd2dcda0a50d1fadc9a91b299a35df396c9fb38e",
+    "lowest-cost": "eed438762aa040ffa185d067c25c56e1b8dacbac65d673d4c8c47b613b796f3f",
+    "prior-two-stage": "5f6c41fb00cbb0f608d4e4f0dd2dcda0a50d1fadc9a91b299a35df396c9fb38e",
+    "prior-fixed": "5f6c41fb00cbb0f608d4e4f0dd2dcda0a50d1fadc9a91b299a35df396c9fb38e"
+  }
+}

@@ -31,14 +31,20 @@ def prompts():
         choices = row["choices"]["text"]
         if len(choices) != 4:
             continue
-        meta = dict(id=row["id"], source_row=str(i), question_sha256=digest(row["question"]))
+        meta = dict(
+            id=row["id"], source_row=str(i), question_sha256=digest(row["question"])
+        )
         lines = [row["question"]]
         for c, option in zip(CHOICES, choices, strict=True):
             meta[c + "_sha256"] = digest(option)
             lines.append(f"{c}: {option}")
         lines.append("Reply with exactly A, B, C or D.")
         rows.append((meta, "\n".join(lines)))
-    if len(source) != 1172 or len({m["id"] for m, _ in rows}) != len(rows) or len(rows) != 1165:
+    if (
+        len(source) != 1172
+        or len({m["id"] for m, _ in rows}) != len(rows)
+        or len(rows) != 1165
+    ):
         raise ValueError("pinned ARC cohort changed")
     return rows
 
@@ -56,4 +62,6 @@ if __name__ == "__main__":
     else:
         if manifest != read_csv(path):
             raise ValueError("ARC source differs from frozen cohort")
-        collect_choices(rows, CHOICES, OUT, REVISION, checkpoint=ROOT / "replay/arc-collection.json")
+        collect_choices(
+            rows, CHOICES, OUT, REVISION, checkpoint=ROOT / "replay/arc-collection.json"
+        )
