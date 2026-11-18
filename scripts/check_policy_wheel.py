@@ -87,6 +87,51 @@ def check_batch(cli, handoff, commands, expected):
     return decisions
 
 
+def check_block_handoff(cli, root, fixtures, plan_path):
+    args = [
+        "audit-block",
+        "--handoff",
+        "handoff-state",
+        "--block-size",
+        "10",
+        "--grader",
+        "anli",
+        "--threshold-report",
+        str(fixtures / "policy.json"),
+        "--batch-predictions",
+        str(fixtures / "predictions.csv"),
+        "--plan-report",
+        plan_path,
+        "--json",
+    ]
+
+    def call(*extra):
+        return json.loads(command(cli, root, *args, *extra))
+
+    report = call()
+    if report != call():
+        raise ValueError("retry changed the initial block")
+    with (root / fixtures / "sample-grades.csv").open(
+        encoding="utf-8", newline=""
+    ) as stream:
+        known = {r["id"]: r for r in csv.DictReader(stream)}
+    returned = root / "returned.csv"
+    while request := report["request"]:
+        with (root / request["path"]).open(encoding="utf-8", newline="") as stream:
+            issued = list(csv.DictReader(stream))
+        with returned.open("w", encoding="utf-8", newline="") as stream:
+            writer = csv.DictWriter(stream, ["id", "output_key", "correct"])
+            writer.writeheader()
+            writer.writerows(known[r["id"]] for r in reversed(issued))
+        report = call("--request", request["id"], "--grader-file", "anli=returned.csv")
+    if (
+        report["unique_requested"],
+        report["returned_labels"],
+        report["graders"]["anli"]["batch_verdict"],
+    ) != (60, 60, "exceeds"):
+        raise ValueError("packaged block audit differs from the R2 verdict")
+
+
 def check_withheld_batch(cli, root):
     cmds = documented_commands("README.md", "Audit a withheld policy on a new batch")
     fixtures = Path("results/anli_r2")
@@ -119,6 +164,9 @@ def check_withheld_batch(cli, root):
     )
     if (root / "blocked.csv").exists():
         raise ValueError("withheld policy produced decisions")
+    check_block_handoff(
+        cli, root, fixtures, cmds["plan"][cmds["plan"].index("--output") + 1]
+    )
     return counts["batch_verdict"]
 
 

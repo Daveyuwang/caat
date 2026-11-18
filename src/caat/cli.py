@@ -13,6 +13,7 @@ from . import eee_log, helm_log, lm_eval_log
 from .adapters import ADAPTERS
 from .artifacts import staged_outputs
 from .audit import audit, write_disagreements
+from .audit_blocks import block_options, run_block
 from .calibrate import (
     CALIBRATORS,
     apply_csv,
@@ -2579,6 +2580,10 @@ def main(argv=None):
         "plan", help="Plan independent labels for a frozen policy."
     )
     plan_options(commands["plan"])
+    commands["audit-block"] = subcommands.add_parser(
+        "audit-block", help="Issue or resume one block of a frozen audit."
+    )
+    block_options(commands["audit-block"], named_file)
     commands["run"] = subcommands.add_parser(
         "run", help="Run a review workflow from a TOML file."
     )
@@ -2638,6 +2643,8 @@ def main(argv=None):
             return 0
         if args.command == "monitor":
             return run_monitor(args)
+        if args.command == "audit-block":
+            return run_block(args)
         if args.command == "plan":
             return run_plan(args)
         if args.command == "scorer":

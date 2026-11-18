@@ -66,6 +66,8 @@ def evaluate_partial(args, plan):
         "output_dir",
         "render",
         "render_output",
+        "plot",
+        "html",
         "prediction_filter",
         "allow_extra_grades",
         "raw_score_column",

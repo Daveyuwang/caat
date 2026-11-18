@@ -27,6 +27,7 @@ class RenderReport(dict):
 ALL_REPORTS = (
     "evaluate",
     "audit",
+    "audit-block",
     "select",
     "policy",
     "run",

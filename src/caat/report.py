@@ -407,6 +407,15 @@ def describe(report):
             f"The chance of certification is {chance} at the assumed error rate{source}. "
             f"The label count grows quickly as the assumed rate nears the target.{batch}"
         )
+    if command == "audit-block":
+        if request := report["request"]:
+            return (
+                f"Request {request['id']} for {', '.join(request['graders'])}: {request['path']}. "
+                f"{report['returned_labels']}/{report['requested_labels']} issued labels returned."
+            )
+        return "Audit finished. " + ", ".join(
+            f"{name}: {r['batch_verdict']}" for name, r in report["graders"].items()
+        )
     if command == "evaluate" and "decision_status" in report:
         lines = []
         for name, counts in report["graders"].items():

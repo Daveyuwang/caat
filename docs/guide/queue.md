@@ -205,3 +205,15 @@ caat evaluate replay/r2-sample.csv --partial --grader-file anli=returned.csv --t
 ```
 
 The report shows grades returned, observed errors and the range of possible error counts at the original cap. If both ends give the same verdict, grading can stop. For example, the frozen R2 draw reached its 27th error at grade 59, which settled the 100-label verdict at `exceeds`. A pending decision calls for more grades. A settled `inconclusive` means that additional grades in this draw cannot settle the risk question. Fixed-sample risk limits appear after all planned grades return. An empty eligible population yields a settled inconclusive result. Exit status is 0 if every grader supports the target, 1 for other valid outcomes and 2 for invalid inputs.
+
+## Issue audit labels in blocks
+
+Create the 0.7 sample plan and give graders only the CSV that `audit-block` issues. The handoff directory keeps a SQLite journal and one CSV per request. Use a local directory shared by the processes running this audit. This example uses the archived R2 plan.
+
+```bash
+caat audit-block --plan-report results/anli_r2/plan.json --threshold-report results/anli_r2/policy.json --batch-predictions results/anli_r2/predictions.csv --block-size 10 --grader anli --handoff replay/r2-handoff --json
+```
+
+For each response with a `request`, give its CSV to the named graders once using `request.id` as the job identifier. Return CSV or JSONL rows with `id`, `output_key` and binary `correct`. Repeat the command with `--request REQUEST_ID --grader-file anli=returned.csv`. Repeating a receipt is safe. Late returns and rows arriving out of order keep the same request open until its outstanding grades arrive. A retry may return an already issued request. An external queue should deduplicate on the request ID and grader name.
+
+Repeat `--grader` for each grader. Each sees new blocks until their verdict is settled. The report counts distinct rows in `unique_requested`, assignments to graders in `requested_labels`, and receipts in `returned_labels`. A null `request` marks completion. The command exits 0 for a successful handoff operation, including an audit that finds excess risk. Read the per-grader verdict to act on the result.
