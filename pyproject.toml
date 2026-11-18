@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "caat-annotation"
-version = "0.7.0rc1"
+version = "0.7.0"
 description = "Score, calibrate, evaluate, and use model confidence to decide what to accept or review"
 readme = "README.md"
 license = "MIT"

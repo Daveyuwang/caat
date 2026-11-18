@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.7.0rc1
+## 0.7.0
 
 - Draw a reproducible, fixed-budget audit sample from new predictions with
   `caat plan --batch-predictions --label-budget`. A withheld policy keeps its
