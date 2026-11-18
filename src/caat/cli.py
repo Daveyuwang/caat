@@ -14,6 +14,7 @@ from .adapters import ADAPTERS
 from .artifacts import staged_outputs
 from .audit import audit, write_disagreements
 from .audit_blocks import block_options, run_block
+from .budget import compare_budgets
 from .calibrate import (
     CALIBRATORS,
     apply_csv,
@@ -865,6 +866,11 @@ def run_monitor(args):
 
 def plan_options(parser):
     parser.add_argument(
+        "--budget-ceiling",
+        type=int,
+        help="Compare qualifying audit designs up to this many labels.",
+    )
+    parser.add_argument(
         "--interim-labels", type=int, help="First checkpoint of a two-stage audit."
     )
     parser.add_argument(
@@ -961,7 +967,30 @@ def plan_options(parser):
 
 def run_plan(args):
     two_stage = args.interim_labels is not None
-    if two_stage:
+    compare = args.budget_ceiling is not None
+    if compare:
+        if (
+            not args.forecast
+            or not args.batch_predictions
+            or args.error_scenarios is None
+        ):
+            raise ValueError(
+                "--budget-ceiling requires --forecast, --batch-predictions and --error-scenarios"
+            )
+        if any(
+            value is not None
+            for value in (
+                args.label_budget,
+                args.interim_labels,
+                args.block_size,
+                args.expected_error,
+            )
+        ):
+            raise ValueError(
+                "a ceiling comparison chooses its own cap, schedule and scenario forecasts"
+            )
+        args.label_budget = args.budget_ceiling
+    elif two_stage:
         if not args.batch_predictions or args.error_scenarios is None:
             raise ValueError(
                 "--interim-labels requires --batch-predictions and --error-scenarios"
@@ -981,7 +1010,7 @@ def run_plan(args):
         seed = 42
     fixed = args.batch_predictions is not None
     if args.forecast:
-        if not fixed or (not two_stage and args.expected_error is None):
+        if not fixed or (not (two_stage or compare) and args.expected_error is None):
             raise ValueError(
                 "--forecast requires --batch-predictions and --expected-error"
             )
@@ -1000,7 +1029,9 @@ def run_plan(args):
             )
         if args.label_budget < 1:
             raise ValueError("--label-budget must be positive")
-        if (args.power is not None and not two_stage) or args.max_accepted is not None:
+        if (
+            args.power is not None and not (two_stage or compare)
+        ) or args.max_accepted is not None:
             raise ValueError("--power and --max-accepted apply to label sizing")
         if args.expected_error is not None and not args.forecast:
             raise ValueError(
@@ -1063,7 +1094,7 @@ def run_plan(args):
             "accepted": min(args.label_budget, population),
             "risk_target": saved["risk_target"],
         }
-        if population and not two_stage:
+        if population and not (compare or two_stage):
             result.update(
                 sample_error_limits(
                     population, result["accepted"], saved["risk_target"], confidence
@@ -1081,7 +1112,27 @@ def run_plan(args):
         if args.prediction_filter is not None:
             column, value = args.prediction_filter
             options["prediction_filter"] = {"column": column, "value": value}
-        if two_stage:
+        if compare:
+            options.pop("label_budget")
+            options.update(
+                forecast=True,
+                budget_ceiling=args.budget_ceiling,
+                error_scenarios=args.error_scenarios,
+                power=0.8 if args.power is None else args.power,
+                request_cost=1 if args.request_cost is None else args.request_cost,
+            )
+            result.update(
+                compare_budgets(
+                    population,
+                    args.budget_ceiling,
+                    saved["risk_target"],
+                    confidence,
+                    args.error_scenarios,
+                    options["power"],
+                    options["request_cost"],
+                )
+            )
+        elif two_stage:
             options.update(
                 forecast=args.forecast,
                 interim_labels=args.interim_labels,
@@ -1151,7 +1202,12 @@ def run_plan(args):
                 sample_source_id_column=source_id,
                 sample_source_output_key_column=source_key,
             )
-    report = make_report("two-stage-plan" if two_stage else "plan", options, result)
+    if compare:
+        result.pop("accepted")
+    command = (
+        "budget-comparison" if compare else "two-stage-plan" if two_stage else "plan"
+    )
+    report = make_report(command, options, result)
     serialized = render_report("json", report)
     paths = [path for path in (args.output, sample_path) if path is not None]
     with staged_outputs(paths) as staged:
