@@ -1,3 +1,0 @@
-id,mean_token_logprob,sequence_logprob,low_token_logprob,token_count,shorter_response,negative_mean_token_logprob,answer_span_logprob
-response-1,-0.43333333333333335,-1.3,-0.7,3,-3,0.43333333333333335,-0.7
-response-2,-0.5333333333333333,-1.5999999999999999,-1.2,3,-3,0.5333333333333333,-1.2

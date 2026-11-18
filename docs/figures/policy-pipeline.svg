@@ -1,64 +1,84 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 454" width="840" height="454" role="img" aria-labelledby="title desc">
-  <title id="title">How CAAT builds and uses a review policy</title>
-  <desc id="desc">Design rows choose a confidence score, calibration rows select a cutoff, and held-out rows check accepted error. The saved policy and a new batch share the same score and cutoff. A confirmed policy can route predictions. A selected cutoff can also define a sample for a batch audit, even if routing was withheld.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="404" viewBox="0 0 800 404"
+     role="img" aria-labelledby="title desc">
+  <title id="title">Fit a review policy and reuse its cutoff on a new batch</title>
+  <desc id="desc">Design rows determine the score, calibration rows select a cutoff, and
+    held-out rows check the error among accepted predictions. On a new batch, scores
+    at or above the saved cutoff are eligible. A confirmed policy accepts eligible
+    predictions and sends the rest to review. A confirmed or withheld policy with a
+    selected cutoff can supply eligible predictions for a budgeted audit.</desc>
   <defs>
-    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M1 1 L7 4 L1 7" fill="none" stroke="#45616c" stroke-width="1.3"/>
-    </marker>
     <style>
-      text {font-family: "DejaVu Sans", Arial, sans-serif; fill: #172e38}
-      .heading {font-size: 20px; font-weight: 700}
-      .stage {font-size: 17px; font-weight: 700}
-      .note {font-size: 15px; fill: #37545f}
-      .cmd {font-family: ui-monospace, Consolas, monospace; font-size: 14px; fill: #315563}
-      .wire {fill: none; stroke: #45616c; stroke-width: 1.8; marker-end: url(#arrow)}
+      text { font-family: Arial, Helvetica, sans-serif; fill: #163b33 }
+      .heading { font-family: Georgia, 'Times New Roman', serif; font-size: 27px }
+      .label { font-size: 14px; font-weight: 700; letter-spacing: .65px }
+      .action { font-size: 18px; font-weight: 600; fill: #fffdf5 }
+      .body { font-size: 16px }
+      .upper-label { fill: #c4dcd0 }
+      .line { fill: none; stroke: #4c6e61; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round }
+      .light { stroke: #b7d4c5 }
     </style>
+    <marker id="arrow" viewBox="0 0 8 10" refX="7" refY="5" markerWidth="6" markerHeight="7" orient="auto">
+      <path d="m1 1 6 4-6 4" fill="none" stroke="#4c6e61" stroke-width="1.4" stroke-linejoin="round"/>
+    </marker>
+    <marker id="light-arrow" viewBox="0 0 8 10" refX="7" refY="5" markerWidth="6" markerHeight="7" orient="auto">
+      <path d="m1 1 6 4-6 4" fill="none" stroke="#b7d4c5" stroke-width="1.4" stroke-linejoin="round"/>
+    </marker>
   </defs>
-  <rect width="840" height="454" rx="10" fill="white"/>
-  <g id="fit">
-    <text class="heading" x="20" y="31">Fit on labeled predictions</text>
-    <g fill="#f0f5f6" stroke="#acc1c7">
-      <rect x="20" y="52" width="245" height="85" rx="7"/>
-      <rect x="298" y="52" width="245" height="85" rx="7"/>
-      <rect x="576" y="52" width="244" height="85" rx="7"/>
-    </g>
-    <text class="note" x="36" y="81">Design rows</text>
-    <text class="stage" x="36" y="111">Choose a score</text>
-    <path class="wire" d="M265 95 H294"/>
-    <text class="note" x="314" y="81">Calibration rows</text>
-    <text class="stage" x="314" y="111">Select a cutoff</text>
-    <path class="wire" d="M543 95 H572"/>
-    <text class="note" x="592" y="81">Held-out rows</text>
-    <text class="stage" x="592" y="111">Check accepted error</text>
-    <path class="wire" d="M698 137 V185"/>
+
+  <rect x=".5" y=".5" width="799" height="403" rx="10" fill="#faf9f3" stroke="#d4dcd2"/>
+  <path d="M0 146V10Q0 0 10 0h780q10 0 10 10v136Z" fill="#163e34"/>
+
+  <g aria-label="Fit on labeled predictions">
+    <text x="26" y="46" class="heading" style="fill:#fffdf5">Fit on labeled predictions</text>
+
+    <text x="26" y="85" class="label upper-label">DESIGN ROWS</text>
+    <text x="26" y="112" class="action">Choose a score</text>
+    <path d="M172 106h18" class="line light" marker-end="url(#light-arrow)"/>
+
+    <text x="207" y="85" class="label upper-label">CALIBRATION ROWS</text>
+    <text x="207" y="112" class="action">Select a cutoff</text>
+    <path d="M340 106h18" class="line light" marker-end="url(#light-arrow)"/>
+
+    <text x="375" y="85" class="label upper-label">HELD-OUT ROWS</text>
+    <text x="375" y="112" class="action">Check accepted error</text>
+    <path d="M568 106h19" class="line light" marker-end="url(#light-arrow)"/>
+
+    <path d="M598 25h158l18 18v84H598Z" fill="#deecdf"/>
+    <path d="M756 25v18h18" fill="#a7c8b4" stroke="#7fa58e" stroke-width="1"/>
+    <text x="613" y="62" class="heading" style="font-size:25px">Saved policy</text>
+    <text x="613" y="89" class="body">Score and cutoff</text>
+    <text x="613" y="111" class="body">Held-out result</text>
   </g>
-  <g id="apply">
-    <text class="heading" x="20" y="177">Use on a new batch</text>
-    <rect x="20" y="190" width="245" height="77" rx="7" fill="#fff" stroke="#8ba4af"/>
-    <text class="stage" x="36" y="222">New predictions</text>
-    <text class="note" x="36" y="248">IDs and scoring inputs</text>
-    <path class="wire" d="M265 228 H294"/>
-    <rect x="298" y="190" width="245" height="77" rx="7" fill="#e3f2f0" stroke="#60978f"/>
-    <text class="stage" x="420.5" y="222" text-anchor="middle">Apply the saved cutoff</text>
-    <text class="note" x="420.5" y="248" text-anchor="middle">Identify eligible outputs</text>
-    <rect x="576" y="190" width="244" height="77" rx="7" fill="#174b55"/>
-    <text x="592" y="222" style="fill:white" class="stage">Saved policy report</text>
-    <text x="592" y="248" style="fill:#e3f2f0" class="note">Score, cutoff and check</text>
-    <path class="wire" d="M576 228 H547"/>
+
+  <g aria-label="Score a new batch">
+    <path d="M685 127v19" class="line light"/>
+    <path d="M685 146v23" class="line" marker-end="url(#arrow)"/>
+    <text x="26" y="212" class="heading">New predictions</text>
+    <text x="27" y="239" class="body">IDs and scoring inputs</text>
+    <path d="M224 217h65" class="line" marker-end="url(#arrow)"/>
+
+    <rect x="300" y="175" width="474" height="94" rx="6" fill="#eef3ea" stroke="#a9beb0"/>
+    <text x="319" y="205" class="heading" style="font-size:25px">Apply the saved cutoff</text>
+    <path d="M320 226H493" stroke="#94a79a" stroke-width="2"/>
+    <path d="M493 226H754" stroke="#316c52" stroke-width="5"/>
+    <path d="M493 217v18" stroke="#163b33" stroke-width="2"/>
+    <text x="319" y="254" class="body">Below cutoff</text>
+    <text x="505" y="254" class="body">Eligible at or above cutoff</text>
   </g>
-  <g id="decisions">
-    <path d="M420.5 267 V289" fill="none" stroke="#45616c" stroke-width="1.8"/>
-    <path class="wire" d="M420.5 289 H212 V311"/>
-    <path class="wire" d="M420.5 289 H628 V311"/>
-    <rect x="20" y="316" width="383" height="122" rx="7" fill="#fff" stroke="#8ba4af"/>
-    <text class="stage" x="36" y="346">Route with a confirmed policy</text>
-    <text class="note" x="36" y="376">Accept eligible outputs and send the rest</text>
-    <text class="note" x="36" y="397">for review.</text>
-    <text class="cmd" x="36" y="423">caat route</text>
-    <rect x="437" y="316" width="383" height="122" rx="7" fill="#fff" stroke="#8ba4af"/>
-    <text class="stage" x="453" y="346">Audit a selected cutoff</text>
-    <text class="note" x="453" y="376">Sample eligible outputs and grade them</text>
-    <text class="note" x="453" y="397">to check the error target on this batch.</text>
-    <text class="cmd" x="453" y="423">caat plan · caat audit-block</text>
+
+  <g aria-label="Uses of the scored batch">
+    <path d="M537 269v19" class="line"/>
+    <path d="M537 288H202v14" class="line" marker-end="url(#arrow)"/>
+    <path d="M537 288h56v14" class="line" marker-end="url(#arrow)"/>
+
+    <path d="M26 312h352" stroke="#377358" stroke-width="3"/>
+    <text x="26" y="337" class="label" style="fill:#286447">CONFIRMED POLICY</text>
+    <text x="26" y="366" class="heading">Route predictions</text>
+    <text x="26" y="389" class="body">Accept eligible rows and review the rest.</text>
+
+    <path d="M412 312h362" stroke="#a95e37" stroke-width="3"/>
+    <text x="412" y="337" class="label" style="fill:#8e4929">ANY SELECTED CUTOFF</text>
+    <text x="412" y="366" class="heading">Audit batch error</text>
+    <text x="412" y="389" class="body">Draw a budgeted sample of eligible rows.</text>
   </g>
 </svg>

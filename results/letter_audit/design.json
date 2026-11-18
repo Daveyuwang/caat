@@ -1,9 +1,6 @@
 {
-  "source_sha256": "2b89f3602cf768d3c8355267d2f13f2417809e101fc2b5ceee10db19a60de6e2",
   "sklearn": "1.9.1",
   "accepted_population": 1458,
-  "accepted_population_sha256": "4b8fb7b8cfc841ce322c209e3c4c131b59854b6137e9ef0e0167862b0210bfb3",
-  "threshold_report_sha256": "5793e7972ea294ca3f4e94503d481d2690dcc75ed8a47fbb5ff65e65df472e7a",
   "scenarios": [
     {
       "budget": 50,
@@ -98,9 +95,5 @@
       }
     }
   ],
-  "qualifying_budget": 300,
-  "sample_sha256": {
-    "300": "a1110195c503050f9261f6048cb31d56a53a176105ad01a528de1a0b13d9c224",
-    "100": "8ad04add9fcef0daa645b923e7b71ce0a46d20203b84ee546261341e49b86768"
-  }
+  "qualifying_budget": 300
 }

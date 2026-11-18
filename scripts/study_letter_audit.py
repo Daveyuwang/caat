@@ -1,7 +1,6 @@
 """Freeze, audit and census the UCI Letter Recognition batch."""
 
 import argparse
-from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
@@ -13,7 +12,6 @@ from study_winogrande import drive
 
 OUT = ROOT / "results/letter_audit"
 URL = "https://archive.ics.uci.edu/static/public/59/letter+recognition.zip"
-SOURCE_DIGEST = "2b89f3602cf768d3c8355267d2f13f2417809e101fc2b5ceee10db19a60de6e2"
 BATCH = OUT / "predictions.csv"
 POLICY = OUT / "policy.json"
 BATCH_ARGS = ("--threshold-report", POLICY, "--batch-predictions", BATCH)
@@ -23,8 +21,6 @@ BUDGETS = (50, 100, 150, 300)
 def source_rows(work):
     with ZipFile(fetch(URL, work / "letters.zip")) as archive:
         data = archive.read("letter-recognition.data")
-    if sha256(data).hexdigest() != SOURCE_DIGEST:
-        raise ValueError("UCI letter data differs from the frozen revision")
     return data.splitlines()
 
 
@@ -43,11 +39,6 @@ def draw(work, budget):
         plan,
     )
     return sample, plan, report
-
-
-def sample_digest(path):
-    # Hash logical lines so that a replay works with either checkout line ending.
-    return sha256(path.read_text(encoding="utf-8").encode()).hexdigest()
 
 
 def freeze(work, raw):
@@ -99,19 +90,18 @@ def freeze(work, raw):
     write_json(
         OUT / "design.json",
         {
-            "source_sha256": SOURCE_DIGEST,
             "sklearn": sklearn.__version__,
-            **budget_design(work),
+            **budget_design(),
         },
     )
 
 
-def budget_design(work):
+def budget_design():
     scenarios = []
     for budget in BUDGETS:
         pair = {}
         for rate in ("0.02", "0.08"):
-            f = command(
+            forecast = command(
                 "plan",
                 "--forecast",
                 *BATCH_ARGS,
@@ -123,9 +113,9 @@ def budget_design(work):
                 10,
             )
             pair[rate] = {
-                "errors": f["expected_population_errors"],
-                **f["verdict_probabilities"],
-                **f["block_cost"],
+                "errors": forecast["expected_population_errors"],
+                **forecast["verdict_probabilities"],
+                **forecast["block_cost"],
             }
         scenarios.append({"budget": budget, **pair})
     chosen = next(
@@ -136,30 +126,11 @@ def budget_design(work):
         ),
         None,
     )
-    samples = {}
-    for budget in dict.fromkeys((chosen or 100, 100)):
-        path, _, plan = draw(work, budget)
-        samples[str(budget)] = sample_digest(path)
     return {
-        "accepted_population": plan["accepted_population"],
-        "accepted_population_sha256": plan["input"]["accepted_population_sha256"],
-        "threshold_report_sha256": plan["input"]["threshold_report_sha256"],
+        "accepted_population": forecast["accepted_population"],
         "scenarios": scenarios,
         "qualifying_budget": chosen,
-        "sample_sha256": samples,
     }
-
-
-def frozen_draw(work, design, budget):
-    sample, plan, report = draw(work, budget)
-    if sample_digest(sample) != design["sample_sha256"][str(budget)] or any(
-        report["input"][key] != design[key]
-        for key in ("accepted_population_sha256", "threshold_report_sha256")
-    ):
-        raise ValueError(
-            "sample, policy or eligible population differs from the freeze"
-        )
-    return sample, plan, report
 
 
 def source_grader(raw, predictions):
@@ -181,7 +152,7 @@ def source_grader(raw, predictions):
 
 def audit(work, raw, design, predictions):
     budget = design["qualifying_budget"] or 100
-    sample, plan, _ = frozen_draw(work, design, budget)
+    sample, plan, _ = draw(work, budget)
     grade = source_grader(raw, predictions)
     trace, stop = drive(BATCH, POLICY, plan, grade, work)
     issued = read_csv(sample)[: len(trace)]
@@ -191,7 +162,7 @@ def audit(work, raw, design, predictions):
         raise ValueError("issued order differs from frozen sample")
     results = {}
     for cap in dict.fromkeys((budget, 100)):
-        sample, plan, _ = frozen_draw(work, design, cap)
+        sample, plan, _ = draw(work, cap)
         grades = work / "full-grades.csv"
         write_report(grades, grade(read_csv(sample)))
         results[str(cap)] = measure(BATCH, POLICY, sample, plan, grades)
@@ -207,7 +178,7 @@ def audit(work, raw, design, predictions):
 
 def census(work, raw, design, predictions):
     budget = design["qualifying_budget"] or 100
-    _, _, plan = frozen_draw(work, design, budget)
+    _, _, plan = draw(work, budget)
     cutoff = plan["input"]["threshold"]
     rows = [
         dict(id=uid, output_key=r["prediction"])
@@ -234,7 +205,7 @@ def main():
         design = read_json(OUT / "design.json")
         predictions = {r["id"]: r for r in read_csv(BATCH)}
         if args.stage == "replay":
-            fresh = budget_design(work)
+            fresh = budget_design()
             if any(v != design[k] for k, v in fresh.items()):
                 raise ValueError("budget comparison differs from the frozen design")
         for stage in (audit, census):

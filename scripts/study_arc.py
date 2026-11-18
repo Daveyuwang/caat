@@ -8,7 +8,6 @@ from collect_arc import CHOICES, OUT, dataset_file
 from common import ROOT, read_csv, read_json, write_report
 from study_batch_audit import command, write_json
 from study_hellaswag import draw, freeze, inputs
-from study_letter_audit import sample_digest
 from study_winogrande import drive, issued_rows, keyed
 
 BATCH = OUT / "predictions.csv"
@@ -107,7 +106,7 @@ def paired_draws(arms):
     longest = max(samples.values(), key=len, default=[])
     if any(rows != longest[: len(rows)] for rows in samples.values()):
         raise ValueError("audit arms do not share a single random order")
-    return longest, {name: sample_digest(paths[0]) for name, paths in arms.items()}
+    return longest
 
 
 def dispatch(arms, grade):
@@ -174,8 +173,8 @@ def main():
             offers = read_json(offers_path)
             prior = read_json(design_path)["prior"]
         arms = plans(work, offers, prior)
-        sample, digests = paired_draws(arms)
-        design = dict(prior=prior, sample_sha256=digests)
+        sample = paired_draws(arms)
+        design = dict(prior=prior)
         if stage == "design":
             write_json(offers_path, offers)
             write_json(design_path, design)

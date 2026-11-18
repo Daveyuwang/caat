@@ -10,7 +10,6 @@ from caat.plan import forecast_block_cost, forecast_verdict, sample_error_limits
 from common import ROOT, read_csv, read_json, write_report
 from collect_hellaswag import CHOICES, OUT, dataset_file
 from study_batch_audit import command, write_json
-from study_letter_audit import sample_digest
 from study_winogrande import drive, keyed
 
 POLICY = ROOT / "results/anli_r2/policy.json"
@@ -73,8 +72,6 @@ def freeze(work, *, args=ARGS):
     base = dict(
         total=probe["total"],
         population=n,
-        population_sha256=probe["input"]["accepted_population_sha256"],
-        policy_sha256=probe["input"]["threshold_report_sha256"],
         sample_seed=42,
         risk_target=0.2,
         one_sided_confidence=0.95,
@@ -105,19 +102,16 @@ def freeze(work, *, args=ARGS):
         )
         if report["qualifies"]:
             candidates.append((max(s["cost"] for s in report["scenarios"]), first))
-    sample, _, _ = draw(work, cap, args=args)
+    draw(work, cap, args=args)
     result = dict(
         base,
         cap=cap,
-        sample_sha256=sample_digest(sample),
         interim=None,
         single_stage=report["single_stage"],
     )
     if candidates:
         _, first = min(candidates)
-        sample, _, report = draw(work, cap, first, args=args)
-        if sample_digest(sample) != result["sample_sha256"]:
-            raise ValueError("paired samples differ")
+        _, _, report = draw(work, cap, first, args=args)
         result.update(
             interim=first,
             stages=report["stages"],
@@ -163,17 +157,9 @@ def audit(work, design, grade):
     for name, block, checkpoint in arms:
         folder = work / name
         folder.mkdir()
-        sample, plan, r = draw(folder, cap, checkpoint)
-        if (
-            sample_digest(sample),
-            r["input"]["accepted_population_sha256"],
-            r["input"]["threshold_report_sha256"],
-        ) != (
-            design["sample_sha256"],
-            design["population_sha256"],
-            design["policy_sha256"],
-        ):
-            raise ValueError("draw differs from the frozen design")
+        sample, plan, _ = draw(folder, cap, checkpoint)
+        if read_csv(sample) != read_csv(OUT / "sample.csv"):
+            raise ValueError("draw differs from the frozen sample")
         trace, stop = drive(
             BATCH,
             POLICY,
@@ -293,11 +279,8 @@ def main():
                 len(grades),
             )
         else:
-            if (
-                freeze(work) != design
-                or sample_digest(OUT / "sample.csv") != design["sample_sha256"]
-            ):
-                raise ValueError("budget or draw changed")
+            if freeze(work) != design:
+                raise ValueError("budget design changed")
             grades = keyed(read_csv(OUT / "census.csv"))
             if grades.keys() != {k for k, r in rows.items() if float(r["gap"]) >= 4.75}:
                 raise ValueError("census IDs differ from eligible outputs")

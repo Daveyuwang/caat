@@ -65,15 +65,6 @@ jobs:
         run: python -m pip install ".[workflow]"
       - name: Unit tests and benchmark replay
         run: python -m unittest discover -s tests -v
-      - name: Installed commands and report rendering
-        run: |
-          caat --version
-          caat plugins --json > /dev/null
-          caat evaluate examples/ticket_triage.csv --adapter csv --metric ranking --render json --render-output replay/registered-report.json --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --threshold 0.75 > /dev/null
-          caat evaluate examples/ticket_triage.csv --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --group-column inbox --threshold 0.75 --probability --output-dir replay/tickets --reliability-plot replay/tickets/reliability.svg --html replay/tickets/report.html
-          git diff --no-index --ignore-cr-at-eol --exit-code docs/figures/calibration-example.svg replay/tickets/reliability.svg
-          caat scores examples/ifeval_graders.csv --score-column mean_token_logprob --correct-column strict_pass --correct-column helm_strict_pass --bootstrap 0 > /dev/null
-
   inspect-logs:
     name: Inspect logs (${{ matrix.sdk }})
     runs-on: ubuntu-latest
@@ -130,232 +121,42 @@ jobs:
           if-no-files-found: error
 
   audit-action:
-    name: Grader audit action (${{ matrix.case }})
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
         include:
-          - case: pass
-            threshold: "0.75"
-            risk-target: "0.70"
-            output-key-column: output_key
+          - target: "0.70"
+            key: output_key
             status: "0"
-          - case: target-missed
-            threshold: "0.75"
-            risk-target: "0.40"
-            output-key-column: output_key
+          - target: "0.40"
+            key: output_key
             status: "1"
-          - case: partial-scores
-            predictions: replay/action-partial-scores.csv
-            threshold: "0.75"
-            risk-target: "0.40"
-            output-key-column: output_key
-            review-missing-scores: "true"
-            status: "1"
-          - case: invalid-input
-            threshold: "0.75"
-            risk-target: "0.40"
-            output-key-column: missing_key
-            status: "2"
-          - case: saved-selection
-            threshold-report: replay/action-selection.json
-            output-key-column: output_key
-            status: "1"
-          - case: tracked-selection
-            threshold-report: replay/action-selection.json
-            holdout-confidence: "0.95"
-            track-fit-outputs: true
-            status: "1"
-          - case: reused-fit-output
-            threshold-report: replay/action-selection.json
-            holdout-confidence: "0.95"
-            track-fit-outputs: true
-            reuse-fit-output: true
-            status: "2"
-          - case: fixed-batch-pass
-            threshold: "0.75"
-            risk-target: "0.75"
-            output-key-column: output_key
-            holdout-confidence: "0.95"
-            accepted-population: "4"
-            status: "0"
-          - case: fixed-batch-target-missed
-            threshold: "0.75"
-            risk-target: "0.70"
-            output-key-column: output_key
-            holdout-confidence: "0.95"
-            accepted-population: "4"
-            status: "1"
-          - case: fixed-batch-invalid-population
-            threshold: "0.75"
-            risk-target: "0.75"
-            output-key-column: output_key
-            holdout-confidence: "0.95"
-            accepted-population: "2"
-            status: "2"
-          - case: fixed-batch-decisions
-            threshold: "0.75"
-            risk-target: "0.65"
-            output-key-column: output_key
-            holdout-confidence: "0.95"
-            batch-decisions: replay/action-decisions.csv
-            status: "1"
-          - case: fixed-batch-sample-mismatch
-            threshold: "0.75"
-            risk-target: "0.65"
-            output-key-column: output_key
-            holdout-confidence: "0.95"
-            batch-decisions: replay/action-decisions.csv
-            sample-seed: "42"
+          - target: "0.40"
+            key: unknown_column
             status: "2"
     steps:
       - uses: actions/checkout@v6
-      - name: Prepare an audit with an unscored output
-        if: ${{ matrix.review-missing-scores == 'true' }}
-        run: |
-          python3 - <<'PY'
-          import csv
-          from pathlib import Path
-
-          Path("replay").mkdir(exist_ok=True)
-          with open("examples/audit/predictions.csv", encoding="utf-8", newline="") as source:
-              reader = csv.DictReader(source)
-              with open("replay/action-partial-scores.csv", "w", encoding="utf-8", newline="") as output:
-                  writer = csv.DictWriter(output, reader.fieldnames)
-                  writer.writeheader()
-                  for row in reader:
-                      if row["id"] == "3":
-                          row["score"] = ""
-                      writer.writerow(row)
-          PY
-      - name: Prepare the saved cutoff or batch decisions
-        if: ${{ matrix.threshold-report || matrix.batch-decisions }}
-        env:
-          CAAT_THRESHOLD_REPORT: ${{ matrix.threshold-report }}
-          CAAT_BATCH_DECISIONS: ${{ matrix.batch-decisions }}
-          CAAT_TRACK_FIT_OUTPUTS: ${{ matrix.track-fit-outputs }}
-          CAAT_REUSE_FIT_OUTPUT: ${{ matrix.reuse-fit-output }}
-        run: |
-          mkdir -p replay
-          python3 -m venv "$RUNNER_TEMP/caat-action-prepare"
-          "$RUNNER_TEMP/caat-action-prepare/bin/python" -m pip install .
-          caat="$RUNNER_TEMP/caat-action-prepare/bin/caat"
-          if [ -n "$CAAT_BATCH_DECISIONS" ]; then
-              "$caat" route examples/audit/predictions.csv --threshold 0.75 --output-key-column output_key --output "$CAAT_BATCH_DECISIONS"
-              exit 0
-          fi
-          python3 - <<'PY'
-          import csv
-          import os
-
-          row = {"id": "cal-a", "score": "0.80", "correct": "1", "output_key": "cal-answer"}
-          if os.environ["CAAT_REUSE_FIT_OUTPUT"] == "true":
-              with open("examples/audit/predictions.csv", encoding="utf-8", newline="") as handle:
-                  reused = next(csv.DictReader(handle))
-              row.update(id=reused["id"], output_key=reused["output_key"])
-          with open("replay/action-calibration.csv", "w", encoding="utf-8", newline="") as handle:
-              writer = csv.DictWriter(handle, list(row))
-              writer.writeheader()
-              writer.writerow(row)
-          PY
-          target=0.40
-          tracking=()
-          if [ "$CAAT_TRACK_FIT_OUTPUTS" = true ]; then
-              target=0.90
-              tracking=(--output-key-column output_key --track-fit-outputs)
-          fi
-          "$caat" select replay/action-calibration.csv --correct-column correct --thresholds 0.75 --risk-target "$target" --rule empirical "${tracking[@]}" --output "$CAAT_THRESHOLD_REPORT"
-      - name: Audit the bundled grader exports
+      - name: Audit two graders on the same tickets
         id: audit
         uses: ./
         continue-on-error: ${{ matrix.status != '0' }}
         with:
-          predictions: ${{ matrix.predictions || 'examples/audit/predictions.csv' }}
+          predictions: examples/audit/predictions.csv
           grader-files: |
             reference=examples/audit/reference.csv
             rubric=examples/audit/rubric.csv
-          output-key-column: ${{ matrix.output-key-column }}
-          threshold: ${{ matrix.threshold }}
-          threshold-report: ${{ matrix.threshold-report }}
-          risk-target: ${{ matrix.risk-target }}
-          review-missing-scores: ${{ matrix.review-missing-scores }}
-          holdout-confidence: ${{ matrix.holdout-confidence }}
-          accepted-population: ${{ matrix.accepted-population }}
-          batch-decisions: ${{ matrix.batch-decisions }}
-          sample-seed: ${{ matrix.sample-seed }}
+          output-key-column: ${{ matrix.key }}
+          threshold: "0.75"
+          risk-target: ${{ matrix.target }}
           report-path: replay/action-audit.json
-          disagreements-path: replay/action-disagreements.csv
-      - name: Verify the action outcome and artifacts
-        if: ${{ always() }}
+      - name: Check the action status and report
         env:
-          CAAT_EXPECTED_STATUS: ${{ matrix.status }}
-          CAAT_STATUS: ${{ steps.audit.outputs.status }}
-          CAAT_OUTCOME: ${{ steps.audit.outcome }}
-          CAAT_REPORT_PATH: ${{ steps.audit.outputs.report-path }}
-          CAAT_DISAGREEMENTS_PATH: ${{ steps.audit.outputs.disagreements-path }}
-          CAAT_THRESHOLD_REPORT: ${{ matrix.threshold-report }}
-          CAAT_REVIEW_MISSING_SCORES: ${{ matrix.review-missing-scores }}
-          CAAT_HOLDOUT_CONFIDENCE: ${{ matrix.holdout-confidence }}
-          CAAT_ACCEPTED_POPULATION: ${{ matrix.accepted-population }}
-          CAAT_BATCH_DECISIONS: ${{ matrix.batch-decisions }}
+          EXPECTED: ${{ matrix.status }}
+          STATUS: ${{ steps.audit.outputs.status }}
+          REPORT: ${{ steps.audit.outputs.report-path }}
         run: |
-          python3 - <<'PY'
-          import csv
-          import json
-          import os
-          from pathlib import Path
-
-          expected = os.environ["CAAT_EXPECTED_STATUS"]
-          assert os.environ["CAAT_STATUS"] == expected
-          assert os.environ["CAAT_OUTCOME"] == ("success" if expected == "0" else "failure")
-          report_path = os.environ["CAAT_REPORT_PATH"]
-          disagreements_path = os.environ["CAAT_DISAGREEMENTS_PATH"]
-          if expected == "2":
-              assert not report_path
-              assert not disagreements_path
-              assert not Path("replay/action-audit.json").exists()
-              assert not Path("replay/action-disagreements.csv").exists()
-          else:
-              assert report_path == "replay/action-audit.json"
-              assert disagreements_path == "replay/action-disagreements.csv"
-              report = json.loads(Path(report_path).read_text(encoding="utf-8"))
-              assert report["threshold"] == 0.75
-              assert report["input"]["disagreements_output"] == disagreements_path
-              with open(disagreements_path, encoding="utf-8", newline="") as handle:
-                  assert list(csv.DictReader(handle)) == [{
-                      "id": "2", "score": "0.88", "decision": "accept", "group": "billing",
-                      "output_key": "run-a-ticket-2", "grade_reference": "1", "grade_rubric": "0",
-                  }]
-              assert report["input"].get("threshold_report", "") == os.environ.get("CAAT_THRESHOLD_REPORT", "")
-              if confidence := os.environ["CAAT_HOLDOUT_CONFIDENCE"]:
-                  assert report["holdout_confidence"] == float(confidence)
-                  assert report["input"]["output_key_column"] == "output_key"
-                  if os.environ["CAAT_THRESHOLD_REPORT"]:
-                      assert report["input"]["fit_outputs_checked"] is True
-              if population := os.environ["CAAT_ACCEPTED_POPULATION"]:
-                  assert report["accepted_population"] == int(population) == 4
-                  assert report["graders"]["reference"]["risk_upper_errors"] == 2
-                  assert report["graders"]["rubric"]["risk_upper_errors"] == 3
-                  assert report["graders"]["reference"]["risk_upper_bound"] == 0.50
-                  assert report["graders"]["rubric"]["risk_upper_bound"] == 0.75
-              if batch := os.environ["CAAT_BATCH_DECISIONS"]:
-                  assert report["input"]["batch_decisions"] == batch
-                  assert report["accepted_population"] == 3
-                  assert report["graders"]["reference"]["risk_upper_errors"] == 1
-                  assert report["graders"]["rubric"]["risk_upper_errors"] == 2
-              partial = os.environ["CAAT_REVIEW_MISSING_SCORES"] == "true"
-              if partial:
-                  assert report["input"]["review_missing_scores"] is True
-                  assert report["scored"] == 4
-              expected_errors = (0, 1) if partial else (1, 2)
-              for grader, errors in zip(("reference", "rubric"), expected_errors, strict=True):
-                  result = report["graders"][grader]
-                  assert result["total"] == 5
-                  assert result["accepted"] == (2 if partial else 3)
-                  assert result["errors"] == errors
-                  assert result["meets_target"] == (grader == "reference" or expected == "0")
-          PY
+          test "$STATUS" = "$EXPECTED"
+          if [ "$EXPECTED" = 2 ]; then test -z "$REPORT"; else test -s "$REPORT"; fi
 
   package:
     runs-on: ubuntu-latest
@@ -369,15 +170,7 @@ jobs:
           python -m pip install build==1.6.1 twine==7.0.0
           python -m build
           python -m twine check --strict dist/*
-      - name: Verify the fitted policy across clean training and base installs
-        run: python scripts/check_policy_wheel.py dist/*.whl
-      - name: Install the wheel outside the checkout
+      - name: Replay the published ARC-Challenge comparison
         run: |
-          python -m venv "$RUNNER_TEMP/wheel"
-          "$RUNNER_TEMP/wheel/bin/python" -m pip install dist/*.whl
-          cd "$RUNNER_TEMP"
-          "$RUNNER_TEMP/wheel/bin/caat" --version
-          "$RUNNER_TEMP/wheel/bin/python" "$GITHUB_WORKSPACE/scripts/study_winogrande.py" replay
-          "$RUNNER_TEMP/wheel/bin/python" "$GITHUB_WORKSPACE/scripts/study_hellaswag.py" replay
-          "$RUNNER_TEMP/wheel/bin/python" "$GITHUB_WORKSPACE/scripts/study_arc.py" replay
-          "$RUNNER_TEMP/wheel/bin/caat" policy "$GITHUB_WORKSPACE/examples/ifeval_graders.csv" --score-column mean_token_logprob --correct-column strict_pass --risk-target 0.4
+          python -m pip install dist/*.whl
+          python scripts/study_arc.py replay

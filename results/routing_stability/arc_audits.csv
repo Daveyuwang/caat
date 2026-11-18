@@ -1,7 +1,0 @@
-case,score,feature,grid,cutoff,holdout,accepted,errors,risk,upper_95,fit_seconds
-arc_challenge,single,loglikelihood_margin,ten,,1172,0,0,,,0.0
-arc_challenge,single,loglikelihood_margin,three,,1172,0,0,,,0.0
-arc_challenge,single,loglikelihood_margin,shortlist,,1172,0,0,,,0.0
-arc_challenge,fitted,logistic,ten,,1172,0,0,,,0.00553969998145476
-arc_challenge,fitted,logistic,three,,1172,0,0,,,0.00553969998145476
-arc_challenge,fitted,logistic,shortlist,,1172,0,0,,,0.00553969998145476

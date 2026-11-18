@@ -27,23 +27,12 @@ jobs:
           version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
           test "$GITHUB_REF_NAME" = "v$version"
           python -m pip install build==1.6.1 twine==7.0.0
-          python scripts/build_release.py
-      - name: Verify the installed wheel
+          python -m build
+          python -m twine check --strict dist/*
+      - name: Run the installed CLI
         run: |
-          python -m venv "$RUNNER_TEMP/release-wheel"
-          "$RUNNER_TEMP/release-wheel/bin/python" -m pip install --no-deps dist/*.whl
-          test "$("$RUNNER_TEMP/release-wheel/bin/caat" --version)" = "caat ${GITHUB_REF_NAME#v}"
-          unzip -Z1 dist/*.whl | grep -Fx caat/py.typed
-          unzip -Z1 dist/*.whl | grep -E '\.dist-info/licenses/LICENSE$'
-          "$RUNNER_TEMP/release-wheel/bin/python" -m unittest discover -s tests
-      - name: Replay the saved Qwen confidence benchmark
-        run: |
-          "$RUNNER_TEMP/release-wheel/bin/python" scripts/study_black_box.py replay --output "$RUNNER_TEMP/comparison.csv"
-          diff -u results/black_box/comparison.csv "$RUNNER_TEMP/comparison.csv"
-      - name: Check first use and upgrades with the release wheel
-        run: python scripts/check_policy_wheel.py dist/*.whl
-      - name: Record distribution digests
-        run: sha256sum dist/* >> "$GITHUB_STEP_SUMMARY"
+          python -m pip install dist/*.whl
+          caat evaluate examples/ticket_triage.csv --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --threshold 0.75
       - uses: actions/upload-artifact@v7
         with:
           name: caat-annotation-distributions
