@@ -60,6 +60,7 @@ from .report import (
     fit_outputs_metadata,
     make_report,
     read_fit_outputs,
+    read_budget_offer,
     read_label_plan,
     read_threshold_report,
     write_curve,
@@ -866,6 +867,14 @@ def run_monitor(args):
 
 def plan_options(parser):
     parser.add_argument(
+        "--from-comparison", type=Path, help="Draw from a saved budget comparison."
+    )
+    parser.add_argument(
+        "--choose",
+        choices=("smallest-cap", "lowest-cost"),
+        help="Offer to draw from the comparison.",
+    )
+    parser.add_argument(
         "--budget-ceiling",
         type=int,
         help="Compare qualifying audit designs up to this many labels.",
@@ -966,6 +975,45 @@ def plan_options(parser):
 
 
 def run_plan(args):
+    comparison = None
+    if args.choose or args.from_comparison:
+        if not all(
+            (
+                args.from_comparison,
+                args.choose,
+                args.batch_predictions,
+                args.threshold_report,
+                args.sample_output,
+                args.output,
+            )
+        ):
+            raise ValueError(
+                "selecting an offer requires --from-comparison, --choose, the policy and batch, --sample-output and --output"
+            )
+        if args.forecast or any(
+            value is not None
+            for value in (
+                args.label_budget,
+                args.power,
+                args.error_scenarios,
+                args.holdout_confidence,
+                args.expected_error,
+                args.budget_ceiling,
+                args.interim_labels,
+                args.block_size,
+                args.request_cost,
+                args.prediction_filter,
+            )
+        ):
+            raise ValueError(
+                "the selected offer fixes the audit settings and prediction filter"
+            )
+        comparison = read_budget_offer(args.from_comparison, args.choose)
+        settings = comparison["input"]
+        args.label_budget = comparison["offers"][args.choose]["cap"]
+        args.holdout_confidence = settings["holdout_confidence"]
+        if selection := settings.get("prediction_filter"):
+            args.prediction_filter = (selection["column"], selection["value"])
     two_stage = args.interim_labels is not None
     compare = args.budget_ceiling is not None
     if compare:
@@ -1067,6 +1115,7 @@ def run_plan(args):
         (args.batch_predictions, "batch predictions"),
         (args.threshold_report, "threshold report"),
         (args.sample_source, "sample source"),
+        (args.from_comparison, "budget comparison"),
     ):
         if path is not None and path.resolve() in destinations:
             raise ValueError(f"output would overwrite the {name}")
@@ -1094,6 +1143,42 @@ def run_plan(args):
             "accepted": min(args.label_budget, population),
             "risk_target": saved["risk_target"],
         }
+        if comparison:
+            if (
+                settings.get("threshold_report_sha256")
+                != saved["threshold_report_sha256"]
+                or settings.get("accepted_population_sha256") != digest
+                or comparison.get("total") != total
+                or comparison.get("accepted_population") != population
+                or comparison.get("risk_target") != saved["risk_target"]
+            ):
+                raise ValueError(
+                    "saved comparison belongs to a different policy or batch"
+                )
+            verified = compare_budgets(
+                population,
+                settings["budget_ceiling"],
+                saved["risk_target"],
+                confidence,
+                settings["error_scenarios"],
+                settings["power"],
+                settings["request_cost"],
+            )
+            offer = verified["offers"].get(args.choose)
+            frozen = comparison["offers"][args.choose]
+            if offer is None or any(
+                offer.get(k) != frozen.get(k)
+                for k in ("mode", "cap", "limits", "block_size", "stages")
+            ):
+                raise ValueError(
+                    "selected offer differs from its budget comparison settings"
+                )
+            two_stage = offer["mode"] == "two-stage"
+            if two_stage:
+                args.interim_labels = offer["stages"][0]["labels"]
+                args.error_scenarios = settings["error_scenarios"]
+                args.power = settings["power"]
+                args.request_cost = settings["request_cost"]
         if population and not (compare or two_stage):
             result.update(
                 sample_error_limits(
@@ -1112,6 +1197,21 @@ def run_plan(args):
         if args.prediction_filter is not None:
             column, value = args.prediction_filter
             options["prediction_filter"] = {"column": column, "value": value}
+        if comparison:
+            options.update(
+                selected_offer=args.choose,
+                **{
+                    k: settings[k]
+                    for k in (
+                        "budget_ceiling",
+                        "error_scenarios",
+                        "power",
+                        "request_cost",
+                    )
+                },
+            )
+            if not two_stage:
+                options["block_size"] = offer["block_size"]
         if compare:
             options.pop("label_budget")
             options.update(
@@ -1207,6 +1307,8 @@ def run_plan(args):
     command = (
         "budget-comparison" if compare else "two-stage-plan" if two_stage else "plan"
     )
+    if comparison and not two_stage:
+        command = "fixed-block-plan"
     report = make_report(command, options, result)
     serialized = render_report("json", report)
     paths = [path for path in (args.output, sample_path) if path is not None]

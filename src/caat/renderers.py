@@ -34,6 +34,7 @@ ALL_REPORTS = (
     "plan",
     "two-stage-plan",
     "budget-comparison",
+    "fixed-block-plan",
     "queue",
     "route",
     "scores",

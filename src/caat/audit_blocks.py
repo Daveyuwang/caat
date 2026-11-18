@@ -139,6 +139,10 @@ def run_block(args):
             raise ValueError(
                 "two-stage plans issue at their saved checkpoints; omit --block-size"
             )
+    elif "block_size" in plan:
+        if args.block_size is not None and args.block_size != plan["block_size"]:
+            raise ValueError("block size differs from the selected offer")
+        args.block_size = plan["block_size"]
     elif args.block_size is None or args.block_size < 1:
         raise ValueError("use a positive --block-size for a fixed-cap audit")
     if "threshold_report_sha256" not in plan:
