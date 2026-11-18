@@ -47,6 +47,23 @@ def streamed_qwen(name, revision, torch, device):
     return model.eval(), tokenizer, meta
 
 
+def formatted_prompts(tokenizer, rows):
+    return sorted(
+        [
+            (
+                m,
+                tokenizer.apply_chat_template(
+                    [{"role": "user", "content": text}],
+                    tokenize=False,
+                    add_generation_prompt=True,
+                ),
+            )
+            for m, text in rows
+        ],
+        key=lambda pair: len(pair[1]),
+    )
+
+
 def collect_choices(
     rows,
     choices,
@@ -86,20 +103,7 @@ def collect_choices(
         raise ValueError(
             "collection requires the frozen choice tokens and BF16 weights"
         )
-    formatted = sorted(
-        [
-            (
-                m,
-                tokenizer.apply_chat_template(
-                    [{"role": "user", "content": text}],
-                    tokenize=False,
-                    add_generation_prompt=True,
-                ),
-            )
-            for m, text in rows
-        ],
-        key=lambda pair: len(pair[1]),
-    )
+    formatted = formatted_prompts(tokenizer, rows)
     results = []
     total_tokens = 0
     elapsed = 0.0

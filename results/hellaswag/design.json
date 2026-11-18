@@ -1,0 +1,75 @@
+{
+  "total": 1500,
+  "population": 1276,
+  "population_sha256": "8c0f166a68dddc421f9cc6c7c430a3d7a6201d9ca9b30aaf8dd5b7528545075e",
+  "policy_sha256": "5624e547f5a68e1cb0955a8c5c0f363e769a2d71ab99875314107cd9168bdbc8",
+  "sample_seed": 42,
+  "risk_target": 0.2,
+  "one_sided_confidence": 0.95,
+  "required_directional_power": 0.8,
+  "request_cost": 1,
+  "cap": 321,
+  "sample_sha256": "d8cfa9e51e1474e1677c37a38dbe03e2e22cb631d5fd49b9ed185ad3fd16f8da",
+  "interim": 250,
+  "single_stage": {
+    "max_errors_to_meet": 53,
+    "min_errors_to_exceed": 75,
+    "block_size": 314,
+    "scenarios": [
+      {
+        "rate": 0.15,
+        "errors": 192,
+        "meets": 0.8262675607306551,
+        "exceeds": 2.572163369654933e-06,
+        "inconclusive": 0.17372986710597524,
+        "cost": 318.3726783078855,
+        "expected_labels": 316.9510935193998,
+        "expected_requests": 1.4215847884856863
+      },
+      {
+        "rate": 0.25,
+        "errors": 319,
+        "meets": 2.049932710340339e-05,
+        "exceeds": 0.8037341095314307,
+        "inconclusive": 0.19624539114146597,
+        "cost": 316.81949247195456,
+        "expected_labels": 315.59205591296023,
+        "expected_requests": 1.2274365589943161
+      }
+    ]
+  },
+  "stages": [
+    {
+      "labels": 250,
+      "max_errors_to_meet": 36,
+      "min_errors_to_exceed": 64
+    },
+    {
+      "labels": 321,
+      "max_errors_to_meet": 53,
+      "min_errors_to_exceed": 75
+    }
+  ],
+  "scenarios": [
+    {
+      "rate": 0.15,
+      "errors": 192,
+      "cost": 292.9025917501784,
+      "meets": 0.8281479284539542,
+      "exceeds": 2.984181359490318e-06,
+      "inconclusive": 0.17184908736468626,
+      "expected_labels": 291.3206113092037,
+      "expected_requests": 1.5819804409746998
+    },
+    {
+      "rate": 0.25,
+      "errors": 319,
+      "cost": 291.88434109937833,
+      "meets": 2.3679939255511666e-05,
+      "exceeds": 0.8055041422914153,
+      "inconclusive": 0.19447217776932918,
+      "expected_labels": 290.31650302855365,
+      "expected_requests": 1.5678380708246995
+    }
+  ]
+}

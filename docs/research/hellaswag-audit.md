@@ -49,5 +49,7 @@ GPU allocator at 2.25 GiB and saves progress after each batch of eight.
 Repeating `collect` resumes from the last completed batch. Use `--device cpu`
 to continue with two CPU threads. The collection report records each device
 and its last row in scoring order. Use `--stop-after` to repeat a segment.
+After a mixed-device run, use `scripts/collect_hellaswag.py confirm-gpu`
+to reproduce the single-device predictions used here.
 Run `scripts/study_hellaswag.py` with `design`, `audit` and `census` in
 that order. The dataset supplies the reference ending for each issued row.

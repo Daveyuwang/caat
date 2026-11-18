@@ -1,9 +1,13 @@
 """Select one prompt per HellaSwag source and score the four original endings."""
 
 import argparse
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from collect_choice_logits import collect_choices
-from common import ROOT, read_csv, write_report
+from caat.artifacts import staged_outputs
+from collect_choice_logits import collect_choices, formatted_prompts
+from common import ROOT, read_csv, read_json, write_report
 from prepare_boolq import digest
 
 OUT = ROOT / "results/hellaswag"
@@ -51,9 +55,71 @@ def prompts():
     return [families[k] for k in sorted(families)[:1500]]
 
 
+def confirm_gpu(rows):
+    from transformers import AutoTokenizer
+
+    path = OUT / "collection.json"
+    meta = read_json(path)
+    if "gpu_confirmation" in meta or not any(
+        r["device"] == "cpu" for r in meta["scoring_runs"]
+    ):
+        return
+    tokenizer = AutoTokenizer.from_pretrained(meta["model"], revision=meta["revision"])
+    ordered = [m["id"] for m, _ in formatted_prompts(tokenizer, rows)]
+    by_id = {m["id"]: (m, text) for m, text in rows}
+    first, selected = 0, []
+    for run in meta["scoring_runs"]:
+        if run["device"] == "cpu":
+            selected.extend(by_id[k] for k in ordered[first : run["end"]])
+        first = run["end"]
+    with TemporaryDirectory() as temp:
+        folder = Path(temp)
+        collect_choices(
+            selected,
+            CHOICES,
+            folder,
+            REVISION,
+            batch_size=8,
+            memory_gib=2.25,
+            checkpoint=ROOT / "replay" / "hellaswag-gpu-confirmation.json",
+        )
+        verified = read_csv(folder / "predictions.csv")
+        timing = read_json(folder / "collection.json")
+    predictions = OUT / "predictions.csv"
+    scored = {r["id"]: r for r in read_csv(predictions)}
+    changed_choices = changed_eligibility = 0
+    max_delta = 0.0
+    for new in verified:
+        old = scored[new["id"]]
+        if old["prompt_sha256"] != new["prompt_sha256"]:
+            raise ValueError("GPU confirmation used a different prompt")
+        changed_choices += old["answer"] != new["answer"]
+        changed_eligibility += (float(old["gap"]) >= 4.75) != (
+            float(new["gap"]) >= 4.75
+        )
+        max_delta = max(
+            max_delta, *(abs(float(new[c]) - float(old[c])) for c in CHOICES)
+        )
+        scored[new["id"]] = new
+    meta["gpu_confirmation"] = dict(
+        rows=len(verified),
+        ordered_ids_sha256=digest("\n".join(m["id"] for m, _ in selected)),
+        changed_choices=changed_choices,
+        changed_eligibility=changed_eligibility,
+        max_logit_difference=max_delta,
+        wall_seconds=timing["wall_seconds"],
+        input_tokens=timing["input_tokens"],
+        device=timing["device"],
+    )
+    with staged_outputs([predictions, path]) as draft:
+        write_report(draft[predictions], list(scored.values()))
+        draft[path].write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+    print(meta["gpu_confirmation"])
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=("freeze", "collect"))
+    parser.add_argument("stage", choices=("freeze", "collect", "confirm-gpu"))
     parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     parser.add_argument(
         "--stop-after", type=int, help="pause after the batch containing this many rows"
@@ -70,6 +136,9 @@ if __name__ == "__main__":
     else:
         if read_csv(path) != [{k: str(v) for k, v in m.items()} for m in manifest]:
             raise ValueError("HellaSwag cohort differs from the frozen manifest")
+        if args.stage == "confirm-gpu":
+            confirm_gpu(rows)
+            raise SystemExit(0)
         collect_choices(
             rows,
             CHOICES,
