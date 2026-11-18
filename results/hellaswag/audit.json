@@ -1,0 +1,21 @@
+{
+  "two_stage": {
+    "labels": 321,
+    "requests": 2,
+    "errors": 46,
+    "verdict": "meets",
+    "decision_stage": 2
+  },
+  "single_stage": {
+    "labels": 314,
+    "requests": 1,
+    "errors": 46,
+    "verdict": "meets"
+  },
+  "bulk": {
+    "labels": 321,
+    "requests": 1,
+    "errors": 46,
+    "verdict": "meets"
+  }
+}
