@@ -8,10 +8,10 @@ A review queue prioritizes low-confidence predictions for correction. A random a
 caat route examples/audit/predictions.csv --threshold 0.75 --output-key-column output_key --output replay/decisions.csv --json
 ```
 
-The decision CSV contains each ID, score and `accept` or `review`. Use `--keep-column` to include a source field. The following command queues up to 50 flagged predictions.
+The decision CSV contains each ID, score and `accept` or `review`. Use `--keep-column` to include a source field. Two tickets fall below this cutoff. Queue both for review.
 
 ```bash
-caat queue replay/decisions.csv --prediction-filter decision=review --budget 50 --output replay/queue.csv
+caat queue replay/decisions.csv --prediction-filter decision=review --budget 2 --output replay/queue.csv
 ```
 
 ## Draw an audit sample after a policy misses its target
