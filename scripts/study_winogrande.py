@@ -2,11 +2,11 @@
 
 import argparse
 import json
-from fractions import Fraction
-from math import comb
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import perf_counter
+
+from caat.plan import forecast_block_cost
 
 from collect_winogrande import OUT, dataset_file
 from common import ROOT, read_csv, write_report
@@ -175,28 +175,6 @@ def verify_full():
     print(full)
 
 
-def expected_labels(n, k, plan):
-    cap = plan["accepted"]
-
-    def outcome(x):
-        low, high = plan["max_errors_to_meet"], plan["min_errors_to_exceed"]
-        if low is not None and x <= low:
-            return "meets"
-        if high is not None and x >= high:
-            return "exceeds"
-        return "inconclusive"
-
-    expected = Fraction(0)
-    for t in range(0, cap, 10):
-        count = sum(
-            comb(k, x) * comb(n - k, t - x)
-            for x in range(max(0, t - n + k), min(t, k) + 1)
-            if outcome(x) != outcome(x + cap - t)
-        )
-        expected += min(10, cap - t) * Fraction(count, comb(n, t))
-    return float(expected)
-
-
 def census():
     full = read_json(OUT / "full-result.json")
     if full != measure(BATCH, POLICY, SAMPLE, PLAN, OUT / "full-grades.csv"):
@@ -253,7 +231,9 @@ def replay(work):
         k,
         len(grades),
         "expected labels",
-        expected_labels(len(grades), k, original),
+        forecast_block_cost(len(grades), k, original["accepted"], original, 10)[
+            "expected_labels"
+        ],
     )
 
 

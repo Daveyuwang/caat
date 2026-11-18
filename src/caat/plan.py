@@ -162,6 +162,50 @@ def forecast_verdict(size, labels, rate, limits):
     }
 
 
+def verdict_ranges(cap, limits):
+    """Inclusive ranges of final sample errors for each possible verdict."""
+    meet = limits.get("max_errors_to_meet")
+    exceed = limits.get("min_errors_to_exceed")
+    low = -1 if meet is None else meet
+    high = cap + 1 if exceed is None else exceed
+    return [
+        (verdict, first, last)
+        for verdict, first, last in (
+            ("meets", 0, low),
+            ("inconclusive", low + 1, high - 1),
+            ("exceeds", high, cap),
+        )
+        if first <= last
+    ]
+
+
+def forecast_block_cost(size, errors, cap, limits, block_size):
+    """Expected work issued to one grader at the fixed-cap verdict boundaries."""
+    if block_size < 1:
+        raise ValueError("--block-size must be positive")
+    ranges = verdict_ranges(cap, limits)
+    labels = requests = 0.0
+    for graded in range(0, cap, block_size):
+        remaining = cap - graded
+        # The draw is settled if the possible final counts all fit in one range.
+        settled = 0.0
+        for _, first, last in ranges:
+            upper = last - remaining
+            if first <= upper:
+                settled += hypergeometric_cdf_float(size, errors, graded, upper) - (
+                    hypergeometric_cdf_float(size, errors, graded, first - 1)
+                )
+        pending = max(0.0, 1.0 - settled)
+        requests += pending
+        labels += min(block_size, remaining) * pending
+    return {
+        "expected_labels": labels,
+        "expected_requests": requests,
+        "bulk_labels": cap,
+        "bulk_requests": int(cap > 0),
+    }
+
+
 def batch_verdict(counts, size, target, confidence):
     labels, errors = counts["accepted"], counts["errors"]
     level = 1 - Fraction(str(confidence))

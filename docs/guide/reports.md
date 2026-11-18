@@ -249,6 +249,16 @@ than the eligible population uses the whole population. An empty population
 gives an inconclusive verdict and exit status 1. To issue a sample, replace
 `--forecast --expected-error RATE` with `--sample-output sample.csv`.
 
+Add `--block-size 10` to compare sending ten rows at a time with sending
+the full sample in one request. For one grader, `block_cost.expected_labels`
+and `expected_requests` average over random draws, including the final short
+block. A block is issued only while at least two full-budget outcomes remain
+possible. `bulk_labels` and `bulk_requests` count the work of sending the
+whole sample at once. At an assumed 215 errors among 667 eligible rows
+(`--expected-error 0.3223`), blocks of ten average 86.84 labels and 8.68
+requests for a budget of 100. Changing the block size preserves the three
+verdict probabilities. Multiple graders can stop at different times.
+
 With `--batch-predictions` and `--label-budget`, the plan keeps the saved
 risk target and samples from raw predictions. `total` counts selected input
 rows, `accepted_population` counts eligible rows, `review` counts the rest
