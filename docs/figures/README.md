@@ -1,5 +1,7 @@
 # Benchmark figures
 
+The [policy pipeline](policy-pipeline.svg) illustrates the [module design](../research/method.md#module-design).
+
 Run `python scripts/figures.py` after installing Matplotlib 3.10.7 and producing the WildBench judge replay. The script reads the saved tables and exports SVG and PDF. [Judge replay instructions](../research/judge-study.md)
 
 ## When can a labeler stop?

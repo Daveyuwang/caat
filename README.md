@@ -4,6 +4,10 @@
 
 CAAT is a Python toolkit for deciding which model predictions to accept or send for review. Fit a cutoff on labeled examples, check its error on held-out data, then use the saved policy to route or audit a new batch.
 
+![CAAT uses separate labeled splits to select and check a cutoff. A saved policy can route new predictions or define a batch audit.](https://github.com/Daveyuwang/caat/raw/main/docs/figures/policy-pipeline.svg)
+
+A confirmed policy can route predictions immediately. If a selected cutoff misses its held-out target, you can still draw a label sample to check that cutoff on a new batch. [How the modules work](https://github.com/Daveyuwang/caat/blob/main/docs/research/method.md#module-design)
+
 ## Try CAAT on five predictions
 
 From an empty directory, install the base CLI (Python 3.10 or later) and download the five-row ticket example.

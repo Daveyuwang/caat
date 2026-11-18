@@ -1,11 +1,18 @@
-# Offline evaluation of confidence-based review policies
+# How CAAT builds and uses a review policy
 
-CAAT evaluates a review policy on saved model outputs. The evaluator takes
-an item ID, a score for the saved output, and a binary correctness outcome.
-A task-specific grader can supply the outcome, or CAAT can compare a
-predicted label to a reference label. The policy accepts outputs with scores
-at or above a fixed threshold and defers the rest for review. This contract
-supports replay when the original model is unavailable.
+A review policy answers two questions. Which predictions score high enough to accept? How often are those accepted predictions wrong? CAAT learns a cutoff from labeled examples and checks it on held-out rows. The saved report carries the score definition, cutoff, error target and check result to the next batch.
+
+![Design rows choose a score, calibration rows select a cutoff, and held-out rows check accepted error. A new batch and the saved report feed routing or a label audit.](../figures/policy-pipeline.svg)
+
+## Module design
+
+**Scoring.** Start with a CSV or JSONL row per prediction and a unique ID. Use a model's existing confidence score, derive a feature such as the top-two logit gap, or fit a scorer on labeled design rows. Orient the score so larger values mean greater confidence. To estimate a probability of correctness, fit a separate calibration map. The cutoff can operate directly on the score. [Score comparison](../guide/scores.md) · [Probability calibration](../guide/calibration.md)
+
+**Policy selection.** The default workflow uses design rows to compare scores and propose cutoffs. On separate calibration rows, it tests candidate cutoffs against the error target and selects the lowest one that qualifies. Held-out grades then measure coverage and accepted error at that cutoff. A `policy` or `run` report is confirmed when every required grader passes the held-out check. The separate splits let a reader distinguish the evidence used to choose a cutoff from the evidence used to check it. [Workflow](../guide/workflow.md)
+
+**Routing and evaluation.** On a new batch, `route` reads the confirmed report, computes or reads the saved score, and accepts rows at or above the cutoff. When grades arrive, `evaluate` measures error among accepted rows, `audit` compares graders on the same outputs, and `monitor` tracks accepted error over time. Each command can read the same report, including fitted scorer parameters. [Policy walkthrough](../../README.md#reuse-one-fitted-policy-from-routing-through-audit) · [Monitoring](../guide/monitor.md)
+
+**Budgeted audit.** A selected cutoff also defines the outputs to sample when routing is withheld. For a fixed batch, `plan` compares fixed blocks and two-checkpoint designs at two assumed error rates. It prices each design in labels and requests, then draws a uniform sample without replacement for the chosen offer. `audit-block` records issued rows and returned grades so a partial request can resume. The result applies to the batch. On ARC-Challenge the lower-cost plan reached its first checkpoint with 11 errors in 200 labels, below its boundary of 30 errors for a `meets` verdict. [Planning criteria](../guide/reports.md#plan) · [ARC-Challenge results](arc-challenge-audit.md)
 
 ## Definition
 
