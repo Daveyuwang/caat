@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+Compare audit designs under a hard label ceiling, draw the selected offer and resume grading from its frozen schedule. The ARC-Challenge replay reproduces budget selection, requests and verdicts using the base package. [Budget comparison](docs/guide/reports.md#plan) · [ARC-Challenge results](docs/research/arc-challenge-audit.md)
+
 ## 1.1 series
 
 ### Two-stage audit supplement

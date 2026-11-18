@@ -59,7 +59,7 @@ The policy accepts `new-a` and sends `new-b` to review. One accepted example giv
 
 ## Audit a withheld policy on a new batch
 
-Before requesting labels, use `caat plan --forecast` to compare the chances of meeting or exceeding the risk target at a proposed budget. Add `--block-size` to estimate how many labels and requests one grader will receive. [Budget forecast](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md#plan)
+With a hard label ceiling, `caat plan --forecast --budget-ceiling` compares the smallest qualifying cap and the lowest expected grading cost. Choose either offer and issue its saved schedule with `caat audit-block`. On ARC-Challenge, the lower-cost offer reserved 26 more labels and used 50 fewer on the frozen draw. [Compare budgets](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md#plan) · [ARC-Challenge results](https://github.com/Daveyuwang/caat/blob/main/docs/research/arc-challenge-audit.md)
 
 The ANLI policy missed its target on R1. Draw 100 of the outputs its cutoff would accept on R2, then evaluate the saved grades for those exact outputs.
 

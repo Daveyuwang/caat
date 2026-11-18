@@ -1,0 +1,38 @@
+{
+  "smallest-cap": {
+    "labels": 250,
+    "requests": 1,
+    "errors": 12,
+    "verdict": "meets",
+    "request_sizes": [
+      250
+    ]
+  },
+  "lowest-cost": {
+    "labels": 200,
+    "requests": 1,
+    "errors": 11,
+    "verdict": "meets",
+    "request_sizes": [
+      200
+    ]
+  },
+  "prior-two-stage": {
+    "labels": 250,
+    "requests": 1,
+    "errors": 12,
+    "verdict": "meets",
+    "request_sizes": [
+      250
+    ]
+  },
+  "prior-fixed": {
+    "labels": 292,
+    "requests": 1,
+    "errors": 14,
+    "verdict": "meets",
+    "request_sizes": [
+      292
+    ]
+  }
+}

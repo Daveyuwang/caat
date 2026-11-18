@@ -20,9 +20,9 @@ RATES = (0.15, 0.25)
 SCENARIOS = ("--error-scenarios", *RATES, "--power", 0.8)
 
 
-def inputs():
-    manifest = keyed(read_csv(OUT / "manifest.csv"))
-    rows = keyed(read_csv(BATCH))
+def inputs(batch=BATCH, manifest_path=OUT / "manifest.csv"):
+    manifest = keyed(read_csv(manifest_path))
+    rows = keyed(read_csv(batch))
     if manifest.keys() != rows.keys():
         raise ValueError("scored IDs differ from the frozen sources")
     for uid, r in rows.items():
@@ -38,13 +38,13 @@ def inputs():
     return rows, manifest
 
 
-def draw(work, cap, first=None):
+def draw(work, cap, first=None, *, args=ARGS):
     sample = work / "sample.csv"
     path = work / ("single.json" if first is None else "two-stage.json")
     extra = () if first is None else ("--interim-labels", first, *SCENARIOS)
     report = command(
         "plan",
-        *ARGS,
+        *args,
         "--label-budget",
         cap,
         *extra,
@@ -58,11 +58,11 @@ def draw(work, cap, first=None):
     return sample, path, report
 
 
-def freeze(work):
+def freeze(work, *, args=ARGS):
     probe = command(
         "plan",
         "--forecast",
-        *ARGS,
+        *args,
         "--label-budget",
         500,
         "--expected-error",
@@ -95,7 +95,7 @@ def freeze(work):
         report = command(
             "plan",
             "--forecast",
-            *ARGS,
+            *args,
             "--label-budget",
             cap,
             "--interim-labels",
@@ -105,7 +105,7 @@ def freeze(work):
         )
         if report["qualifies"]:
             candidates.append((max(s["cost"] for s in report["scenarios"]), first))
-    sample, _, _ = draw(work, cap)
+    sample, _, _ = draw(work, cap, args=args)
     result = dict(
         base,
         cap=cap,
@@ -115,7 +115,7 @@ def freeze(work):
     )
     if candidates:
         _, first = min(candidates)
-        sample, _, report = draw(work, cap, first)
+        sample, _, report = draw(work, cap, first, args=args)
         if sample_digest(sample) != result["sample_sha256"]:
             raise ValueError("paired samples differ")
         result.update(

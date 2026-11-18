@@ -56,6 +56,7 @@ nav:
       - Fixed-budget batch audit: docs/research/fixed-batch-audit.md
       - Blockwise audit on WinoGrande: docs/research/winogrande-results.md
       - Choosing a letter audit budget: docs/research/letter-audit.md
+      - Choosing an ARC-Challenge audit: docs/research/arc-challenge-audit.md
       - Two-stage audit on HellaSwag: docs/research/hellaswag-audit.md
       - WinoGrande protocol: docs/research/winogrande-protocol.md
       - ANLI protocol: docs/research/anli-protocol.md
