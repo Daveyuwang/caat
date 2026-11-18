@@ -4,7 +4,7 @@
 
 Take a saved batch from scoring through a routing decision, then use the same policy to audit the next labeled batch. When a cutoff misses its target, a labeler can still draw a fixed-budget audit sample and stop once every possible completion gives the same verdict. [Policy walkthrough](../README.md#reuse-one-fitted-policy-from-routing-through-audit) · [Audit handoff](guide/queue.md#issue-audit-labels-in-blocks)
 
-For 1.0, freeze the documented CLI flags, exit statuses, Python imports, plugin contracts and report fields. [Public interface](../CONTRIBUTING.md#public-interface) Replay existing saved policies from the installed wheel and verify the distribution from a clean checkout. Keep benchmark data, protocols and generated figures linked from the [benchmark guide](research/benchmarks.md).
+[1.x compatibility](../CONTRIBUTING.md#public-interface) · [Release notes](../CHANGELOG.md)
 
 ## After 1.0
 

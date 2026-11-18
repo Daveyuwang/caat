@@ -157,8 +157,8 @@ the CAAT version from the referenced checkout into its own environment.
       ${{ steps.audit.outputs.disagreements-path }}
 ```
 
-From another repository, use `Daveyuwang/caat@CAAT_REF` in place of `./`.
-Set `CAAT_REF` to a commit or tag containing the action. Paths resolve from
+From another repository, use `Daveyuwang/caat@v1.0.0` in place of `./`,
+or pin the commit identified by the release tag. Paths resolve from
 the calling repository's checkout. Provide either `grader-files`, with
 one name and CSV or JSONL path per line, or `correct-columns`, with one inline
 correctness column per line. List the reference grader first.

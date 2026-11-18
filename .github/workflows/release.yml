@@ -32,11 +32,18 @@ jobs:
         run: |
           python -m venv "$RUNNER_TEMP/release-wheel"
           "$RUNNER_TEMP/release-wheel/bin/python" -m pip install --no-deps dist/*.whl
+          test "$("$RUNNER_TEMP/release-wheel/bin/caat" --version)" = "caat ${GITHUB_REF_NAME#v}"
+          unzip -Z1 dist/*.whl | grep -Fx caat/py.typed
+          unzip -Z1 dist/*.whl | grep -E '\.dist-info/licenses/LICENSE$'
           "$RUNNER_TEMP/release-wheel/bin/python" -m unittest discover -s tests
       - name: Replay the saved Qwen confidence benchmark
         run: |
           "$RUNNER_TEMP/release-wheel/bin/python" scripts/study_black_box.py replay --output "$RUNNER_TEMP/comparison.csv"
           diff -u results/black_box/comparison.csv "$RUNNER_TEMP/comparison.csv"
+      - name: Check first use and upgrades with the release wheel
+        run: python scripts/check_policy_wheel.py dist/*.whl
+      - name: Record distribution digests
+        run: sha256sum dist/* >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
           name: caat-annotation-distributions

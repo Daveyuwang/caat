@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "caat-annotation"
-version = "0.8.0rc1"
+version = "1.0.0"
 description = "Score, calibrate, evaluate, and use model confidence to decide what to accept or review"
 readme = "README.md"
 license = "MIT"
@@ -12,7 +12,7 @@ license-files = ["LICENSE"]
 requires-python = ">=3.10"
 keywords = ["selective prediction", "risk control", "LLM evaluation", "human review", "calibration"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",

@@ -53,8 +53,6 @@ def stage_sources(directory, repo_url):
     for pattern in SOURCES:
         for source in ROOT.glob(pattern):
             relative = source.relative_to(ROOT)
-            if relative.parts[:2] == ("docs", "archive"):
-                continue
             target = directory / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             if relative == Path("README.md"):

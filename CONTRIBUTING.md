@@ -70,11 +70,18 @@ data before evaluating held-out rows.
 
 ## Public interface
 
-CAAT versions the names exported from `caat`, the six plugin contracts,
-CLI flags, exit codes, and documented report fields. A flag or report
-field stays available through at least one minor release after
-deprecation. A reporting change that alters the meaning of an existing
-field increments `schema_version`. Keep the [report guide](docs/guide/reports.md),
+CAAT 1.x supports these interfaces.
+
+- The documented CLI commands, flags and exit statuses
+- The Python exports `GradedRow`, `load_csv`, `evaluate`, `select`, `policy` and `audit`
+- The [six plugin contracts](docs/guide/plugins.md) and documented JSON report fields
+- The [GitHub Action inputs, outputs and status](action.yml)
+
+Incompatible changes to these interfaces require a
+new major version. A deprecated CLI flag or report field stays available
+through at least one subsequent minor release. A change in field meaning
+also increments `schema_version`. Saved reports retain their original
+producer and schema versions. Keep the [report guide](docs/guide/reports.md),
 [golden reports](https://github.com/Daveyuwang/caat/tree/main/tests/golden), and [changelog](CHANGELOG.md) aligned.
 
 ## Build a release
@@ -104,3 +111,5 @@ from the version tag with `publish` enabled. Then install the exact version
 in a fresh environment with `python -m pip install caat-annotation==VERSION`
 and run the README examples.
 [Create a PyPI project with a Trusted Publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)
+
+Yu Wang and La Alsulaim contributed to CAAT before the 1.0 release.
