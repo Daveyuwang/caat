@@ -195,3 +195,13 @@ plan by adding `--grader-output-key-column output_sha256` and
 `--allow-extra-grades` to the audit. CAAT checks that every sampled output
 has exactly one grade in each file.
 [Separate grader exports](csv-format.md#separate-grader-exports)
+
+## Stop when the fixed-budget verdict is determined
+
+Use the sample exported by `caat plan` and return keyed grades for a prefix of its seeded order. A grader export may list those IDs in any order. Each named grader can return a different prefix. A CSV containing only the grader header checks the decision before any labels are requested.
+
+```bash
+caat evaluate replay/r2-sample.csv --partial --grader-file anli=returned.csv --threshold-report results/anli_r2/policy.json --batch-predictions results/anli_r2/predictions.csv --plan-report replay/r2-plan.json
+```
+
+The report shows grades returned, observed errors and the range of possible error counts at the original cap. If both ends give the same verdict, grading can stop. For example, the frozen R2 draw reached its 27th error at grade 59, which settled the 100-label verdict at `exceeds`. A pending decision calls for more grades. A settled `inconclusive` means that additional grades in this draw cannot settle the risk question. Fixed-sample risk limits appear after all planned grades return. An empty eligible population yields a settled inconclusive result. Exit status is 0 if every grader supports the target, 1 for other valid outcomes and 2 for invalid inputs.

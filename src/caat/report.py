@@ -190,7 +190,7 @@ def read_threshold_report(path, *, require_confirmed=False, fingerprint=False):
     return options
 
 
-def read_label_plan(path):
+def read_label_plan(path, *, allow_empty=False):
     report = _read_json_report(path)
     if (
         not isinstance(report, dict)
@@ -206,7 +206,8 @@ def read_label_plan(path):
     digest = report["input"].get("accepted_population_sha256")
     sample_seed = report["input"].get("sample_seed")
     sample_path = report.get("sample_path")
-    if type(labels) is not int or labels < 1:
+    minimum = 0 if allow_empty and "batch_predictions" in report["input"] else 1
+    if type(labels) is not int or labels < minimum:
         raise ValueError(f"{path}: label plan needs a positive accepted label count")
     if population is not None and (type(population) is not int or population < labels):
         raise ValueError(f"{path}: invalid accepted population in label plan")
@@ -240,6 +241,7 @@ def read_label_plan(path):
             or population is None
             or total < population
             or type(budget) is not int
+            or budget < 1
             or labels != min(budget, population)
             or sample_seed is None
             or threshold is None
@@ -255,6 +257,7 @@ def read_label_plan(path):
         ):
             raise ValueError(f"{path}: invalid prediction filter in plan")
         fixed = {
+            "label_budget": budget,
             "threshold_report_sha256": fingerprint,
             "selection": (selection["column"], selection["value"])
             if selection
@@ -404,6 +407,16 @@ def describe(report):
             f"The chance of certification is {chance} at the assumed error rate{source}. "
             f"The label count grows quickly as the assumed rate nears the target.{batch}"
         )
+    if command == "evaluate" and "decision_status" in report:
+        lines = []
+        for name, counts in report["graders"].items():
+            possible = counts["possible_final_errors"]
+            action = counts["batch_verdict"] or "request more labels"
+            lines.append(
+                f"{name}: {counts['graded']}/{report['planned_labels']} graded, "
+                f"{counts['errors']} errors, {possible[0]} to {possible[1]} possible at cap. {action}."
+            )
+        return "\n".join(lines)
     if command == "evaluate":
         counts = report["overall"]
         summary = f"Threshold {report['threshold']!r}. {counts_summary(counts)}"

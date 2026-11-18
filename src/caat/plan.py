@@ -80,7 +80,7 @@ def check_label_plan(plan, *, threshold, accepted, accepted_population):
         )
 
 
-def check_candidate_sample(path, saved, plan, labeled):
+def candidate_draw(path, saved, plan):
     if (
         saved["threshold_report_sha256"] != plan["threshold_report_sha256"]
         or saved["risk_target"] != plan["risk_target"]
@@ -93,16 +93,29 @@ def check_candidate_sample(path, saved, plan, labeled):
     )
     if total != plan["total"] or digest != plan["accepted_population_sha256"]:
         raise ValueError("batch population does not match the fixed-budget plan")
-    draw = shuffled_by_id(eligible, plan["sample_seed"], key=attrgetter("id"))[
+    check_label_plan(
+        plan,
+        threshold=saved["threshold"],
+        accepted=min(plan["label_budget"], len(eligible)),
+        accepted_population=len(eligible),
+    )
+    return shuffled_by_id(eligible, plan["sample_seed"], key=attrgetter("id"))[
         : plan["accepted"]
     ]
+
+
+def check_draw_rows(draw, labeled):
     expected = {r.id: (r.score, r.output_key) for r in draw}
     actual = {r.id: (r.score, r.output_key) for r in labeled}
     if len(labeled) != len(draw) or expected != actual:
         raise ValueError(
             "labeled IDs, scores or output keys do not match the fixed-budget draw"
         )
-    return len(eligible)
+
+
+def check_candidate_sample(path, saved, plan, labeled):
+    check_draw_rows(candidate_draw(path, saved, plan), labeled)
+    return plan["accepted_population"]
 
 
 def sample_error_limits(size, labels, target, confidence):

@@ -43,6 +43,7 @@ from .plan import (
     read_candidate_batch,
     sample_error_limits,
 )
+from .partial import evaluate_partial
 from .plots import reliability_diagram, write_svg
 from .plugins import catalog
 from .policy import policy, split_rows
@@ -330,6 +331,11 @@ def threshold_input_paths(args):
 
 
 def evaluate_options(parser):
+    parser.add_argument(
+        "--partial",
+        action="store_true",
+        help="Check whether a prefix of a fixed-budget draw determines its final verdict.",
+    )
     threshold_options(parser)
     prediction_filter_option(parser)
     parser.add_argument(
@@ -2052,7 +2058,9 @@ def load_label_plan(args):
                 "--batch-predictions requires a fixed-budget --plan-report"
             )
         return None
-    plan = read_label_plan(args.plan_report)
+    plan = read_label_plan(
+        args.plan_report, allow_empty=getattr(args, "partial", False)
+    )
     if "threshold_report_sha256" in plan:
         if args.batch_predictions is None or args.threshold_report is None:
             raise ValueError(
@@ -2644,6 +2652,8 @@ def main(argv=None):
         fit_outputs = label_plan = candidate_policy = None
         if args.command in {"evaluate", "audit"}:
             label_plan = load_label_plan(args)
+            if getattr(args, "partial", False):
+                return evaluate_partial(args, label_plan)
             saved = load_threshold_options(args, label_plan=label_plan)
             if args.batch_predictions is not None:
                 candidate_policy = saved
