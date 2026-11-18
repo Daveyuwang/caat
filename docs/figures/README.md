@@ -29,4 +29,4 @@ The AUROC matrices show how five scores rank passes for each model under three j
 
 Compare each raw score (top) with its Platt calibration (bottom) on the same held-out archive. Each circle represents an occupied bin. Larger circles contain more rows. The diagonal marks perfect agreement. Rebuild these panels with `python scripts/figures.py --calibration-only`. [SVG](calibration-replay.svg) · [PDF](calibration-replay.pdf) · [Source bins](../../results/calibration/reliability.csv)
 
-The ticket example shows one dot per occupied bin on equal probability and accuracy scales. Add `--reliability-plot FILE.svg` to the README’s evaluate command to generate it. [Ticket diagram](calibration-example.svg) · [Example](../../README.md#evaluate-or-calibrate-probabilities)
+The ticket example shows one dot per occupied bin on equal probability and accuracy scales. Add `--reliability-plot FILE.svg` to the README’s evaluate command to generate it. [Ticket diagram](calibration-example.svg) · [Example](../../README.md#try-caat-on-five-predictions)

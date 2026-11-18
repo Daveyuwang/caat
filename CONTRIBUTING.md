@@ -16,6 +16,12 @@ fixtures, and replay the three bundled CPU benchmarks. A change to a report
 or a numerical method needs the corresponding test and an explanation of
 the affected fields or results.
 
+The installed-wheel check also replays an upgrade. The PyPI 0.7.0 wheel
+produced the IFEval policy, routed IDs and ANLI R2 plan in
+`tests/fixtures/upgrade/`. The 0.8.0rc1 wheel built from `03311b2` issued
+the first ten R2 rows and recorded one returned grade. The SQL dump
+restores that journal so the candidate can finish the original draw.
+
 The installed wheel includes `caat/py.typed`. CI type-checks the public
 imports and verifies that invalid arguments still produce diagnostics.
 Python report payloads use dictionaries with the fields documented in

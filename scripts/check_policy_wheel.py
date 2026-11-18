@@ -6,6 +6,8 @@ import json
 import os
 from pathlib import Path
 import shlex
+import sqlite3
+from contextlib import closing
 from shutil import copyfile
 from subprocess import run
 from tempfile import TemporaryDirectory
@@ -87,11 +89,11 @@ def check_batch(cli, handoff, commands, expected):
     return decisions
 
 
-def check_block_handoff(cli, root, fixtures, plan_path):
+def check_block_handoff(cli, root, fixtures, plan_path, *, resume=None):
     args = [
         "audit-block",
         "--handoff",
-        "handoff-state",
+        "legacy-state" if resume else "handoff-state",
         "--block-size",
         "10",
         "--grader",
@@ -111,6 +113,12 @@ def check_block_handoff(cli, root, fixtures, plan_path):
     report = call()
     if report != call():
         raise ValueError("retry changed the initial block")
+    if resume and (
+        report["request"]["id"] != resume["request"]
+        or report["outstanding"] != resume["outstanding"]
+        or report["returned_labels"] != 1
+    ):
+        raise ValueError("upgrade changed a pending request or its recorded receipt")
     with (root / fixtures / "sample-grades.csv").open(
         encoding="utf-8", newline=""
     ) as stream:
@@ -125,12 +133,16 @@ def check_block_handoff(cli, root, fixtures, plan_path):
     while request := report["request"]:
         with (root / request["path"]).open(encoding="utf-8", newline="") as stream:
             issued = list(csv.DictReader(stream))
-        if any(r["answer"] != answers[r["id"], r["output_key"]] for r in issued):
+        if not resume and any(
+            r["answer"] != answers[r["id"], r["output_key"]] for r in issued
+        ):
             raise ValueError("issued answers differ from the saved predictions")
         with returned.open("w", encoding="utf-8", newline="") as stream:
             writer = csv.DictWriter(stream, ["id", "output_key", "correct"])
             writer.writeheader()
-            writer.writerows(known[r["id"]] for r in reversed(issued))
+            writer.writerows(
+                known[uid] for uid in reversed(report["outstanding"]["anli"])
+            )
         report = call("--request", request["id"], "--grader-file", "anli=returned.csv")
     if (
         report["unique_requested"],
@@ -187,6 +199,29 @@ def check_withheld_batch(cli, root):
     check_block_handoff(
         cli, root, fixtures, cmds["plan"][cmds["plan"].index("--output") + 1]
     )
+    legacy = ROOT / "tests/fixtures/upgrade"
+    expected = json.loads((legacy / "expected.json").read_text(encoding="utf-8"))
+    state = root / "legacy-state"
+    state.mkdir()
+    with closing(sqlite3.connect(state / "audit.sqlite3")) as db:
+        db.executescript((legacy / "handoff.sql").read_text(encoding="utf-8"))
+    check_block_handoff(cli, root, fixtures, str(legacy / "plan.json"), resume=expected)
+    decisions = root / "legacy-decisions.csv"
+    command(
+        cli,
+        root,
+        "route",
+        ROOT / "examples/ifeval_strict.csv",
+        "--threshold-report",
+        legacy / "policy.json",
+        "--output",
+        decisions,
+    )
+    with decisions.open(encoding="utf-8", newline="") as stream:
+        if {r["id"]: r["decision"] for r in csv.DictReader(stream)} != expected[
+            "decisions"
+        ]:
+            raise ValueError("routed IDs differ from the 0.7.0 wheel")
     return counts["batch_verdict"]
 
 
@@ -225,6 +260,16 @@ def verify(wheel):
         )
         handoff = root / "handoff"
         (handoff / "examples").mkdir(parents=True)
+        example = Path("examples/ticket_triage.csv")
+        copyfile(ROOT / example, handoff / example)
+        quickstart = documented_commands("README.md", "Try CAAT on five predictions")[
+            "evaluate"
+        ]
+        ticket = json.loads(command(base, handoff, "evaluate", *quickstart, "--json"))[
+            "overall"
+        ]
+        if (ticket["total"], ticket["accepted"], ticket["errors"]) != (5, 3, 1):
+            raise ValueError("ticket quickstart differs from the documented result")
         for name in (
             "fitted_batch.csv",
             "fitted_batch_graded.csv",

@@ -1,0 +1,25 @@
+{
+  "total": 879,
+  "accepted_population": 580,
+  "review": 299,
+  "accepted": 100,
+  "risk_target": 0.2,
+  "max_errors_to_meet": 13,
+  "min_errors_to_exceed": 27,
+  "sample_path": "sample.csv",
+  "schema_version": 2,
+  "command": "plan",
+  "caat_version": "0.7.0",
+  "input": {
+    "threshold_report_sha256": "5624e547f5a68e1cb0955a8c5c0f363e769a2d71ab99875314107cd9168bdbc8",
+    "batch_predictions": "results\\anli_r2\\predictions.csv",
+    "label_budget": 100,
+    "accepted_population_sha256": "4f8c708d4c928256610bb3ff87627566527a1c74e3808a8b55390b6d5df65ccf",
+    "output_key_column": "output_sha256",
+    "fit_outputs_checked": true,
+    "holdout_confidence": 0.95,
+    "threshold_report": "results\\anli_r2\\policy.json",
+    "threshold": 4.75,
+    "sample_seed": 42
+  }
+}

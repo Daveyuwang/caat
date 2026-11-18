@@ -4,9 +4,21 @@
 
 CAAT helps you decide which classifier or LLM predictions to accept and which to send for review. Give it saved predictions, confidence scores and a labeled sample. It fits a cutoff, reports the error among accepted outputs on held-out data, and applies the saved policy to the next batch.
 
-Install the CLI with `python -m pip install caat-annotation`. The base package runs on a CPU with Python 3.10 or later and uses the standard library. For the examples below, install from the checkout.
+## Try CAAT on five predictions
+
+From an empty directory, install the base CLI (Python 3.10 or later) and download the five-row ticket example.
+
+```bash
+python -m pip install caat-annotation
+curl --fail --location --create-dirs --output examples/ticket_triage.csv https://raw.githubusercontent.com/Daveyuwang/caat/v1.0.0/examples/ticket_triage.csv
+caat evaluate examples/ticket_triage.csv --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --group-column inbox --threshold 0.75 --probability --output-dir replay/tickets
+```
+
+At a cutoff of 0.75, CAAT accepts three tickets and makes one error. The output directory contains the risk–coverage curve, Brier score and calibration bins. [Report fields](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md) · [Reliability diagram](https://github.com/Daveyuwang/caat/raw/main/docs/figures/calibration-example.svg)
 
 ## Try a review policy
+
+Run the remaining examples from a checkout.
 
 ```bash
 git clone https://github.com/Daveyuwang/caat.git
@@ -82,14 +94,6 @@ CAAT joins separate grader exports by ID and output identity. Here the graders f
 
 ```bash
 caat audit examples/audit/predictions.csv --output-key-column output_key --grader-file reference=examples/audit/reference.csv --grader-file rubric=examples/audit/rubric.csv --threshold 0.75 --risk-target 0.4
-```
-
-## Evaluate or calibrate probabilities
-
-The ticket example accepts three of five predictions and makes one error. The report includes the risk–coverage curve, Brier score and calibration bins. [Report fields](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md) · [Reliability diagram](https://github.com/Daveyuwang/caat/raw/main/docs/figures/calibration-example.svg)
-
-```bash
-caat evaluate examples/ticket_triage.csv --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --group-column inbox --threshold 0.75 --probability --output-dir replay/tickets
 ```
 
 ## Benchmarks and development
