@@ -379,6 +379,33 @@ def describe(report):
                 f"Wrote the HTML report to {report['input']['html']}.",
             )
         )
+    if command == "budget-comparison":
+        caps = report["caps_tested"]
+        if not report["qualifies"]:
+            span = f"{caps[0]} to {caps[-1]} labels" if caps else "no eligible labels"
+            return f"No qualifying audit among the tested caps ({span})."
+        lines = []
+        for name, offer in report["offers"].items():
+            low, high = offer["scenarios"]
+            near = offer["near_target"]
+            schedule = (
+                f"blocks of {offer['block_size']}"
+                if offer["mode"] == "fixed-block"
+                else "checkpoints "
+                + "/".join(str(s["labels"]) for s in offer["stages"])
+            )
+            lines.append(
+                f"{name}: reserve {offer['cap']} labels, {schedule}, worst expected cost {offer['worst_cost']:.2f}. "
+                f"Low/high power {percent(low['meets'])}/{percent(high['exceeds'])}, "
+                f"expected requests {low['expected_requests']:.2f}/{high['expected_requests']:.2f}. "
+                f"At {near['errors']} population errors expect {near['expected_labels']:.2f} labels."
+            )
+        return "\n".join(
+            [
+                *lines,
+                f"Extra reserve for lowest cost: {report['extra_reserve']} labels.",
+            ]
+        )
     if command == "two-stage-plan":
         lines = [
             "Two-stage audit: "
