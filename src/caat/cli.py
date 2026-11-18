@@ -40,6 +40,7 @@ from .plan import (
     batch_verdict,
     check_candidate_sample,
     check_label_plan,
+    forecast_verdict,
     plan_labels,
     read_candidate_batch,
     sample_error_limits,
@@ -861,6 +862,11 @@ def run_monitor(args):
 
 
 def plan_options(parser):
+    parser.add_argument(
+        "--forecast",
+        action="store_true",
+        help="Preview fixed-budget verdict probabilities without drawing a sample.",
+    )
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--risk-target", type=float, help="Find the minimum labels.")
     target.add_argument("--accepted", type=int, help="Find the minimum risk target.")
@@ -938,23 +944,31 @@ def run_plan(args):
     if args.sample_output is not None and seed is None:
         seed = 42
     fixed = args.batch_predictions is not None
-    if fixed:
-        if (
-            args.threshold_report is None
-            or args.label_budget is None
-            or args.sample_output is None
-        ):
+    if args.forecast:
+        if not fixed or args.expected_error is None:
             raise ValueError(
-                "--batch-predictions requires --threshold-report, --label-budget and --sample-output"
+                "--forecast requires --batch-predictions and --expected-error"
+            )
+        if args.sample_output is not None or seed is not None:
+            raise ValueError(
+                "--forecast does not draw a sample; omit --sample-output and --sample-seed"
+            )
+    if fixed:
+        if args.threshold_report is None or args.label_budget is None:
+            raise ValueError(
+                "--batch-predictions requires --threshold-report and --label-budget"
+            )
+        if not args.forecast and args.sample_output is None:
+            raise ValueError(
+                "provide --sample-output to draw a sample or --forecast to preview the budget"
             )
         if args.label_budget < 1:
             raise ValueError("--label-budget must be positive")
-        if any(
-            value is not None
-            for value in (args.expected_error, args.power, args.max_accepted)
-        ):
+        if args.power is not None or args.max_accepted is not None:
+            raise ValueError("--power and --max-accepted apply to label sizing")
+        if args.expected_error is not None and not args.forecast:
             raise ValueError(
-                "--expected-error, --power and --max-accepted apply to label sizing"
+                "--expected-error requires --forecast for a fixed-budget batch"
             )
     elif args.label_budget is not None or args.prediction_filter is not None:
         raise ValueError(
@@ -1031,6 +1045,13 @@ def run_plan(args):
         if args.prediction_filter is not None:
             column, value = args.prediction_filter
             options["prediction_filter"] = {"column": column, "value": value}
+        if args.forecast:
+            options.update(forecast=True, expected_error=args.expected_error)
+            result.update(
+                forecast_verdict(
+                    population, result["accepted"], args.expected_error, result
+                )
+            )
     else:
         result, options, accepted_rows = size_label_plan(args, saved, confidence)
     if args.threshold_report is not None:

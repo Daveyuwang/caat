@@ -14,10 +14,54 @@ from caat.finite import (
     hypergeometric_cdf,
     hypergeometric_cdf_float,
 )
-from caat.plan import plan_labels
+from caat.plan import forecast_verdict, plan_labels
 
 
 class LabelPlanTests(unittest.TestCase):
+    def test_forecast_uses_the_same_eligible_population_as_the_draw(self):
+        root = Path(__file__).resolve().parents[1] / "results"
+        args = [
+            "plan",
+            "--threshold-report",
+            str(root / "anli_r2/policy.json"),
+            "--batch-predictions",
+            str(root / "winogrande/predictions.csv"),
+            "--label-budget",
+            "100",
+            "--json",
+        ]
+        with TemporaryDirectory() as temp, redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(main([*args, "--forecast", "--expected-error", "0.15"]), 0)
+            forecast = json.loads(out.getvalue())
+            out.seek(0)
+            out.truncate()
+            self.assertEqual(
+                main([*args, "--sample-output", str(Path(temp) / "sample.csv")]), 0
+            )
+            draw = json.loads(out.getvalue())
+        self.assertNotIn("sample_path", forecast)
+        self.assertEqual(forecast["expected_population_errors"], 101)
+        for field in (
+            "accepted_population",
+            "accepted",
+            "max_errors_to_meet",
+            "min_errors_to_exceed",
+        ):
+            self.assertEqual(forecast[field], draw[field])
+        self.assertEqual(
+            forecast["input"]["accepted_population_sha256"],
+            draw["input"]["accepted_population_sha256"],
+        )
+        chances = forecast["verdict_probabilities"]
+        self.assertAlmostEqual(chances["meets"], 0.31647, places=5)
+        self.assertAlmostEqual(sum(chances.values()), 1)
+
+    def test_forecast_without_a_directional_boundary(self):
+        self.assertEqual(
+            forecast_verdict(0, 0, 0.1, {})["verdict_probabilities"],
+            {"meets": 0, "exceeds": 0, "inconclusive": 1},
+        )
+
     def test_routing_and_sample_source_reuse_tracked_identity_columns(self):
         with TemporaryDirectory() as directory, redirect_stdout(io.StringIO()):
             root = Path(directory)

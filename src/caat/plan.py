@@ -9,6 +9,7 @@ from .finite import (
     binomial_cdf_float,
     compare_binomial_cdf,
     compare_hypergeometric_cdf,
+    hypergeometric_cdf,
     hypergeometric_cdf_float,
     round_rate_up,
     upper_population_errors,
@@ -135,6 +136,29 @@ def sample_error_limits(size, labels, target, confidence):
     return {
         "max_errors_to_meet": meet if meet >= 0 else None,
         "min_errors_to_exceed": labels - correct if correct >= 0 else None,
+    }
+
+
+def forecast_verdict(size, labels, rate, limits):
+    """Full-draw verdict probabilities at an assumed finite population error count."""
+    if not 0 <= rate <= 1:
+        raise ValueError("expected error must be between 0 and 1")
+    errors = ceil(Fraction(str(rate)) * size)
+    low = limits.get("max_errors_to_meet")
+    high = limits.get("min_errors_to_exceed")
+    meets = hypergeometric_cdf(size, errors, labels, low) if low is not None else 0
+    exceeds = (
+        hypergeometric_cdf(size, size - errors, labels, labels - high)
+        if high is not None
+        else 0
+    )
+    return {
+        "expected_population_errors": errors,
+        "verdict_probabilities": {
+            "meets": float(meets),
+            "exceeds": float(exceeds),
+            "inconclusive": float(1 - meets - exceeds),
+        },
     }
 
 

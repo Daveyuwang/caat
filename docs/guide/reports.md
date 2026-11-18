@@ -231,6 +231,24 @@ records this count.
 
 `caat plan` sizes an independent check of one frozen acceptance policy.
 
+To compare budgets before requesting labels, give `--forecast` a saved policy,
+unlabeled predictions, a label budget and an explicit assumed error rate.
+
+```bash
+caat plan --forecast --threshold-report results/anli_r2/policy.json --batch-predictions results/winogrande/predictions.csv --label-budget 100 --expected-error 0.15
+```
+
+Here 667 rows qualify. A 15% scenario rounds up to 101 population errors.
+Drawing 100 labels gives a 31.65% chance of supporting the 20% target.
+With 300 labels that chance rises to 90.61%. Run another scenario with
+`--expected-error 0.25` to see the chance of detecting excess error.
+The JSON field `verdict_probabilities` gives the probabilities of `meets`,
+`exceeds` and `inconclusive` for a uniform draw without replacement.
+`expected_population_errors` records the rounded count. A budget larger
+than the eligible population uses the whole population. An empty population
+gives an inconclusive verdict and exit status 1. To issue a sample, replace
+`--forecast --expected-error RATE` with `--sample-output sample.csv`.
+
 With `--batch-predictions` and `--label-budget`, the plan keeps the saved
 risk target and samples from raw predictions. `total` counts selected input
 rows, `accepted_population` counts eligible rows, `review` counts the rest
