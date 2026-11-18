@@ -1,17 +1,14 @@
 # Changelog
 
-## Unreleased
+## 1.1.2
 
-Compare audit designs under a hard label ceiling, draw the selected offer and resume grading from its frozen schedule. The ARC-Challenge replay reproduces budget selection, requests and verdicts using the base package. [Budget comparison](docs/guide/reports.md#plan) · [ARC-Challenge results](docs/research/arc-challenge-audit.md)
+Compare audit plans under a label budget. Choose the smallest qualifying cap or the lowest expected grading cost, issue the first request and resume from partial receipts. On the ARC-Challenge draw, the lower-cost plan used 200 labels and the smaller plan used 250. Both reached the same verdict in one request. [Budget comparison](docs/guide/reports.md#plan) · [ARC-Challenge results](docs/research/arc-challenge-audit.md)
 
 ## 1.1 series
 
 ### Two-stage audit supplement
 
-The work from milestone 1.2 is available as the `1.1.1.dev0` supplement on
-the existing [1.1 release page](https://github.com/Daveyuwang/caat/releases/tag/v1.1.0).
-Choose the supplement wheel for the two-stage commands. PyPI's `1.1.0`
-distribution provides the original fixed-budget commands.
+Two-stage audits first shipped in the `1.1.1.dev0` [supplement](https://github.com/Daveyuwang/caat/releases/tag/v1.1.0). They are included in 1.1.2.
 
 - Compare an audit with two planned checkpoints to the best fixed-cap block size, using the same batch, scenarios and dispatch cost. [Budget planning](docs/guide/reports.md#plan)
 - Issue one request per checkpoint and resume partial receipts with the original request ID. [Grader handoff](docs/guide/queue.md#issue-audit-labels-in-blocks) · [HellaSwag replay](docs/research/hellaswag-audit.md)

@@ -2,7 +2,11 @@
 
 [![CI](https://github.com/Daveyuwang/caat/actions/workflows/ci.yml/badge.svg)](https://github.com/Daveyuwang/caat/actions/workflows/ci.yml)
 
-CAAT helps you decide which classifier or LLM predictions to accept and which to send for review. Give it saved predictions, confidence scores and a labeled sample. It fits a cutoff, reports the error among accepted outputs on held-out data, and applies the saved policy to the next batch.
+CAAT is a Python toolkit for deciding which model predictions to accept or send for review. Fit a cutoff on labeled examples, check its error on held-out data, then use the saved policy to route or audit a new batch.
+
+![CAAT uses separate labeled splits to select and check a cutoff. A saved policy can route new predictions or define a batch audit.](https://github.com/Daveyuwang/caat/raw/main/docs/figures/policy-pipeline.svg)
+
+A confirmed policy can route predictions immediately. If a selected cutoff misses its held-out target, you can still draw a label sample to check that cutoff on a new batch. [How the modules work](https://github.com/Daveyuwang/caat/blob/main/docs/research/method.md#module-design)
 
 ## Try CAAT on five predictions
 
@@ -10,11 +14,11 @@ From an empty directory, install the base CLI (Python 3.10 or later) and downloa
 
 ```bash
 python -m pip install caat-annotation
-curl --fail --location --create-dirs --output examples/ticket_triage.csv https://raw.githubusercontent.com/Daveyuwang/caat/v1.1.0/examples/ticket_triage.csv
+curl --fail --location --create-dirs --output examples/ticket_triage.csv https://raw.githubusercontent.com/Daveyuwang/caat/v1.1.2/examples/ticket_triage.csv
 caat evaluate examples/ticket_triage.csv --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --group-column inbox --threshold 0.75 --probability --output-dir replay/tickets
 ```
 
-At a cutoff of 0.75, CAAT accepts three tickets and makes one error. The output directory contains the risk–coverage curve, Brier score and calibration bins. [Report fields](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md) · [Reliability diagram](https://github.com/Daveyuwang/caat/raw/main/docs/figures/calibration-example.svg)
+At a cutoff of 0.75, CAAT accepts three of the five predictions. One of those three is wrong. The output directory contains the risk–coverage curve, Brier score and calibration bins. [Report fields](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md) · [Reliability diagram](https://github.com/Daveyuwang/caat/raw/main/docs/figures/calibration-example.svg)
 
 ## Try a review policy
 
@@ -59,7 +63,7 @@ The policy accepts `new-a` and sends `new-b` to review. One accepted example giv
 
 ## Audit a withheld policy on a new batch
 
-With a hard label ceiling, `caat plan --forecast --budget-ceiling` compares the smallest qualifying cap and the lowest expected grading cost. Choose either offer and issue its saved schedule with `caat audit-block`. On ARC-Challenge, the lower-cost offer reserved 26 more labels and used 50 fewer on the frozen draw. [Compare budgets](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md#plan) · [ARC-Challenge results](https://github.com/Daveyuwang/caat/blob/main/docs/research/arc-challenge-audit.md)
+Give `caat plan --forecast --budget-ceiling` a label budget. It finds the smallest tested cap that meets your power target and the plan with the lowest expected grading cost. Choose a plan and send its requests with `caat audit-block`. On ARC-Challenge, the lower-cost plan reserved 325 labels and used 200. The smaller plan reserved 299 and used 250. [Compare budgets](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md#plan) · [ARC-Challenge results](https://github.com/Daveyuwang/caat/blob/main/docs/research/arc-challenge-audit.md)
 
 The ANLI policy missed its target on R1. Draw 100 of the outputs its cutoff would accept on R2, then evaluate the saved grades for those exact outputs.
 

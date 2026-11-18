@@ -24,6 +24,7 @@ validation:
 nav:
   - Home: README.md
   - Start here:
+      - How CAAT works: docs/research/method.md
       - A classifier's predictions: docs/guide/classifier.md
       - Model labels for human review: docs/guide/annotation.md
       - Terms in the reports: docs/guide/glossary.md
@@ -68,7 +69,6 @@ nav:
       - Figures: docs/figures/README.md
   - Project:
       - Compare tools: docs/comparison.md
-      - Method and related work: docs/research/method.md
       - Roadmap: docs/ROADMAP.md
       - Contributing: CONTRIBUTING.md
       - Changelog: CHANGELOG.md

@@ -1,5 +1,7 @@
 # Benchmark figures
 
+The [policy pipeline](policy-pipeline.svg) illustrates the [module design](../research/method.md#module-design).
+
 Run `python scripts/figures.py` after installing Matplotlib 3.10.7 and producing the WildBench judge replay. The script reads the saved tables and exports SVG and PDF. [Judge replay instructions](../research/judge-study.md)
 
 ## When can a labeler stop?
@@ -23,7 +25,7 @@ The CLI policy plot gives the number of errors and accepted rows for each grader
 
 The grader-shift plot compares two graders on the same outputs at a 50% coverage target. A point measures the second grader’s change in accepted error relative to its change on the whole batch. Whiskers give paired 95% bootstrap intervals. The scale is linear between −10 and 10 percentage points and logarithmic beyond that range. Parentheses give the paired row count. The data come from `replay/judge_study/gate_cells.csv`. [SVG](wildbench-grader-shifts.svg) · [PDF](wildbench-grader-shifts.pdf)
 
-The AUROC matrices show how five scores rank passes for each model under three judges. A judge score of 7 or higher counts as a pass. Blue cells exceed 0.5, brown cells fall below 0.5 and `n/a` marks an undefined AUROC. The data come from `replay/judge_study/auroc.csv`. [SVG](wildbench-auroc.svg) · [PDF](wildbench-auroc.pdf)
+The AUROC matrices show how five scores rank passes under three judges. Each model name includes its sample size. Both OLMo runs have just two outputs each. A judge score of 7 or higher counts as a pass. Blue cells exceed 0.5, brown cells fall below 0.5 and `n/a` marks an undefined AUROC. The data come from `replay/judge_study/auroc.csv`. [SVG](wildbench-auroc.svg) · [PDF](wildbench-auroc.pdf)
 
 ## Calibration
 

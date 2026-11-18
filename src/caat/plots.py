@@ -130,7 +130,7 @@ def reliability_diagram(bins):
     for row in occupied:
         probability, accuracy = row["mean_probability"], row["accuracy"]
         x, y = left + side * probability, bottom - side * accuracy
-        description = f"{row['count']} rows, mean probability {probability:.2%}, observed correctness {accuracy:.2%}"
+        description = f"Bin size {row['count']}, mean probability {probability:.2%}, observed correctness {accuracy:.2%}"
         marks.append(
             f'<circle cx="{x:.2f}" cy="{y:.2f}" r="5" fill="{BLUE}" stroke="white">'
             f"<title>{description}</title></circle>"

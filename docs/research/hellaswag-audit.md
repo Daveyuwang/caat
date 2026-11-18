@@ -5,8 +5,8 @@ predictions. At a common cap of 321 labels, two checkpoints reduced the
 higher expected cost across the two design scenarios by **8.00%**, from
 318.37 to 292.90 label-equivalents. The optimized CAAT 1.1 baseline issued
 blocks of 314. Each request cost one label-equivalent in this comparison.
-The two-stage workflow from milestone 1.2 ships in the 1.1 series supplement.
-[Frozen design](../../results/hellaswag/design.json) · [Installation](https://github.com/Daveyuwang/caat/releases/tag/v1.1.0)
+CAAT 1.1.2 includes this two-stage workflow.
+[Frozen design](../../results/hellaswag/design.json) · [Installation](../../README.md#try-caat-on-five-predictions)
 
 | Seed 42, same ordered draw | Labels issued | Requests | Errors returned | Verdict |
 | --- | ---: | ---: | ---: | --- |
