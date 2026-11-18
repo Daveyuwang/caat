@@ -1,0 +1,166 @@
+{
+  "threshold": -0.3,
+  "overall": {
+    "total": 24,
+    "accepted": 12,
+    "errors": 5,
+    "coverage": 0.5,
+    "error_rate": 0.4166666666666667
+  },
+  "by_reference": {
+    "C": {
+      "total": 3,
+      "accepted": 3,
+      "errors": 1,
+      "coverage": 1.0,
+      "error_rate": 0.3333333333333333
+    },
+    "J": {
+      "total": 3,
+      "accepted": 2,
+      "errors": 1,
+      "coverage": 0.6666666666666666,
+      "error_rate": 0.5
+    },
+    "G": {
+      "total": 4,
+      "accepted": 2,
+      "errors": 0,
+      "coverage": 0.5,
+      "error_rate": 0.0
+    },
+    "A": {
+      "total": 4,
+      "accepted": 2,
+      "errors": 1,
+      "coverage": 0.5,
+      "error_rate": 0.5
+    },
+    "H": {
+      "total": 2,
+      "accepted": 1,
+      "errors": 1,
+      "coverage": 0.5,
+      "error_rate": 1.0
+    },
+    "I": {
+      "total": 3,
+      "accepted": 0,
+      "errors": 0,
+      "coverage": 0.0,
+      "error_rate": null
+    },
+    "F": {
+      "total": 2,
+      "accepted": 1,
+      "errors": 1,
+      "coverage": 0.5,
+      "error_rate": 1.0
+    },
+    "D": {
+      "total": 2,
+      "accepted": 0,
+      "errors": 0,
+      "coverage": 0.0,
+      "error_rate": null
+    },
+    "B": {
+      "total": 1,
+      "accepted": 1,
+      "errors": 0,
+      "coverage": 1.0,
+      "error_rate": 0.0
+    }
+  },
+  "by_group": {
+    "math": {
+      "total": 5,
+      "accepted": 5,
+      "errors": 2,
+      "coverage": 1.0,
+      "error_rate": 0.4
+    },
+    "law": {
+      "total": 4,
+      "accepted": 1,
+      "errors": 1,
+      "coverage": 0.25,
+      "error_rate": 1.0
+    },
+    "economics": {
+      "total": 1,
+      "accepted": 0,
+      "errors": 0,
+      "coverage": 0.0,
+      "error_rate": null
+    },
+    "health": {
+      "total": 2,
+      "accepted": 1,
+      "errors": 0,
+      "coverage": 0.5,
+      "error_rate": 0.0
+    },
+    "computer science": {
+      "total": 2,
+      "accepted": 1,
+      "errors": 0,
+      "coverage": 0.5,
+      "error_rate": 0.0
+    },
+    "history": {
+      "total": 1,
+      "accepted": 0,
+      "errors": 0,
+      "coverage": 0.0,
+      "error_rate": null
+    },
+    "philosophy": {
+      "total": 3,
+      "accepted": 0,
+      "errors": 0,
+      "coverage": 0.0,
+      "error_rate": null
+    },
+    "biology": {
+      "total": 2,
+      "accepted": 1,
+      "errors": 0,
+      "coverage": 0.5,
+      "error_rate": 0.0
+    },
+    "physics": {
+      "total": 3,
+      "accepted": 2,
+      "errors": 2,
+      "coverage": 0.6666666666666666,
+      "error_rate": 1.0
+    },
+    "chemistry": {
+      "total": 1,
+      "accepted": 1,
+      "errors": 0,
+      "coverage": 1.0,
+      "error_rate": 0.0
+    }
+  },
+  "brier_score": null,
+  "auroc": 0.5481481481481482,
+  "aurc": 0.342414785662531,
+  "normalized_aurc_gain": 0.1139021602787014,
+  "schema_version": 2,
+  "command": "evaluate",
+  "caat_version": "0.2.0",
+  "input": {
+    "path": "examples/mmlu_pro.csv",
+    "id_column": "id",
+    "score_column": "mean_token_logprob",
+    "correct_columns": [
+      "correct"
+    ],
+    "output_key_column": null,
+    "prediction_column": null,
+    "reference_column": "reference",
+    "group_column": "group"
+  }
+}

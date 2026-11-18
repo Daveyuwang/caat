@@ -1,0 +1,52 @@
+{
+  "source": {
+    "state": "https://storage.googleapis.com/crfm-helm-public/capabilities/benchmark_output/runs/v1.0.0/omni_math:model=qwen_qwen2.5-7b-instruct-turbo/scenario_state.json",
+    "state_sha256": "c62bc5c3f0848555eed274a76e8d17851507718439464443d31db4cad541342f",
+    "grader": "omni_math.gpt_equivalence_judgement"
+  },
+  "risk_target": 0.8,
+  "failure_rate": 0.05,
+  "threshold": -0.22340339817772675,
+  "design": {
+    "rows": 200,
+    "first_timestamp": 1741253417,
+    "last_timestamp": 1741253660
+  },
+  "calibration": {
+    "rows": 400,
+    "first_timestamp": 1741253662,
+    "last_timestamp": 1741254187
+  },
+  "holdout": {
+    "rows": 400,
+    "first_timestamp": 1741254188,
+    "last_timestamp": 1741254696,
+    "observed": {
+      "total": 400,
+      "accepted": 398,
+      "errors": 278,
+      "coverage": 0.995,
+      "error_rate": 0.6984924623115578
+    },
+    "anytime_pvalue": 1.0,
+    "first_alert": null
+  },
+  "injected": {
+    "first_injection_row": 201,
+    "labels_changed": 58,
+    "observed": {
+      "total": 400,
+      "accepted": 398,
+      "errors": 336,
+      "coverage": 0.995,
+      "error_rate": 0.8442211055276382
+    },
+    "anytime_pvalue": 9.838190801694597e-09,
+    "first_alert": {
+      "id": "id2374",
+      "row": 290,
+      "accepted": 288,
+      "errors": 226
+    }
+  }
+}

@@ -1,0 +1,6 @@
+ticket_id,model_route,expected_route,confidence,inbox
+T-01,billing,billing,0.90,email
+T-02,account,billing,0.75,email
+T-03,security,security,0.75,chat
+T-04,billing,billing,0.40,chat
+T-05,account,security,0.10,chat

@@ -1,0 +1,42 @@
+{
+  "decisions": {
+    "1000": "review",
+    "1001": "review",
+    "1005": "accept",
+    "1012": "accept",
+    "1019": "accept",
+    "102": "review",
+    "1021": "accept",
+    "1040": "accept",
+    "1051": "accept",
+    "1069": "review",
+    "1072": "accept",
+    "1075": "accept",
+    "1082": "review",
+    "1087": "review",
+    "1092": "accept",
+    "1094": "review",
+    "1098": "accept",
+    "1107": "accept",
+    "1108": "accept",
+    "1122": "review",
+    "1127": "review",
+    "1128": "accept",
+    "1129": "accept",
+    "1130": "accept"
+  },
+  "request": "8ccb39fdddad34e5eb45-1",
+  "outstanding": {
+    "anli": [
+      "58bfd4bc-5d65-46b3-8755-0fce6e470216",
+      "5475d62e-dbfd-4ebd-ae05-7c8ff21bff74",
+      "a437bec8-3b4b-4c83-aab2-122762914264",
+      "b8894481-cf87-4490-a643-308dfa5469d5",
+      "93077b48-ba5e-46a9-a1ec-24fda738864d",
+      "4962d114-2596-48cb-844a-ffeb234bdbac",
+      "cc3d73c7-3da7-4b01-9554-ad6510703080",
+      "4248a70d-08ee-448d-a9a1-857e6d7c2903",
+      "8e17bd1e-7300-4c81-ab77-7f7334c47128"
+    ]
+  }
+}

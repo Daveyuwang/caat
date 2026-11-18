@@ -1,0 +1,52 @@
+{
+  "generate": {
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+    "label_tokens": {
+      "A": 32,
+      "B": 33,
+      "C": 34
+    },
+    "logical_requests": 3014,
+    "batches": 189,
+    "input_tokens": 500325,
+    "wall_seconds": 130.27723100001458,
+    "device": "NVIDIA GeForce RTX 5080",
+    "checked_rows": 160,
+    "torch": "2.11.0+cu130",
+    "transformers": "5.16.0.dev0"
+  },
+  "rotate": {
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+    "label_tokens": {
+      "A": 32,
+      "B": 33,
+      "C": 34
+    },
+    "logical_requests": 400,
+    "batches": 25,
+    "input_tokens": 67714,
+    "wall_seconds": 17.791894700028934,
+    "device": "NVIDIA GeForce RTX 5080",
+    "checked_rows": 32,
+    "torch": "2.11.0+cu130",
+    "transformers": "5.16.0.dev0"
+  },
+  "verify": {
+    "model": "Qwen/Qwen3.5-2B",
+    "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+    "label_tokens": {
+      "True": 2434,
+      "False": 3913
+    },
+    "logical_requests": 3014,
+    "batches": 189,
+    "input_tokens": 410654,
+    "wall_seconds": 27.50160680001136,
+    "device": "NVIDIA GeForce RTX 5080",
+    "checked_rows": 160,
+    "torch": "2.11.0+cu130",
+    "transformers": "5.16.0.dev0"
+  }
+}

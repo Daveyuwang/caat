@@ -1,0 +1,12 @@
+{
+  "model": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+  "revision": "31b70e2e869a7173562077fd711b654946d38674",
+  "device": "NVIDIA GeForce RTX 5080",
+  "seed": 42,
+  "torch": "2.11.0+cu130",
+  "transformers": "5.16.0.dev0",
+  "prompts": 1000,
+  "batch_size": 16,
+  "batches": 63,
+  "seconds": 20.657648499996867
+}

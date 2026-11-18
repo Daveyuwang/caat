@@ -1,0 +1,5 @@
+image_id,margin,top_prob,predicted
+new-a,0.98,0.99,6
+new-b,0.10,0.40,2
+new-c,0.98,0.99,unknown
+new-d,0.98,0.99,

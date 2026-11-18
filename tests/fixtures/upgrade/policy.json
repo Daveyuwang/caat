@@ -1,0 +1,195 @@
+{
+  "schema_version": 2,
+  "split": {
+    "seed": 42,
+    "design": 108,
+    "calibration": 216,
+    "heldout": 217
+  },
+  "check_graders": [],
+  "ranking": {
+    "strict_pass": {
+      "auroc": 0.5963088878096163,
+      "aurc": 0.2701911568285247,
+      "normalized_aurc_gain": 0.2193270839287478
+    }
+  },
+  "selection": {
+    "schema_version": 1,
+    "rule": "ltt-bonferroni",
+    "graders": [
+      "strict_pass"
+    ],
+    "risk_target": 0.4,
+    "failure_rate": 0.05,
+    "per_candidate_level": 0.005,
+    "guarantee": {
+      "confidence": 0.95,
+      "assumptions": "IID calibration from the target population and independent candidate thresholds"
+    },
+    "calibration_total": 216,
+    "selected_threshold": -0.43964836263206303,
+    "candidates": [
+      {
+        "threshold": -0.11132320707225216,
+        "accepted": 28,
+        "coverage": 0.12962962962962962,
+        "errors": {
+          "strict_pass": 9
+        },
+        "worst_error_rate": 0.32142857142857145,
+        "pvalue": 0.258813938390233,
+        "tested": true,
+        "passes": false
+      },
+      {
+        "threshold": -0.20413220653970612,
+        "accepted": 42,
+        "coverage": 0.19444444444444445,
+        "errors": {
+          "strict_pass": 11
+        },
+        "worst_error_rate": 0.2619047619047619,
+        "pvalue": 0.044940227373639015,
+        "tested": true,
+        "passes": false
+      },
+      {
+        "threshold": -0.2700082673088243,
+        "accepted": 65,
+        "coverage": 0.30092592592592593,
+        "errors": {
+          "strict_pass": 17
+        },
+        "worst_error_rate": 0.26153846153846155,
+        "pvalue": 0.014042164891870592,
+        "tested": true,
+        "passes": false
+      },
+      {
+        "threshold": -0.3327795407672605,
+        "accepted": 94,
+        "coverage": 0.4351851851851852,
+        "errors": {
+          "strict_pass": 21
+        },
+        "worst_error_rate": 0.22340425531914893,
+        "pvalue": 0.0002262351050329409,
+        "tested": true,
+        "passes": true
+      },
+      {
+        "threshold": -0.3683515132637169,
+        "accepted": 111,
+        "coverage": 0.5138888888888888,
+        "errors": {
+          "strict_pass": 29
+        },
+        "worst_error_rate": 0.26126126126126126,
+        "pvalue": 0.0015616594933428637,
+        "tested": true,
+        "passes": true
+      },
+      {
+        "threshold": -0.4086965985571593,
+        "accepted": 131,
+        "coverage": 0.6064814814814815,
+        "errors": {
+          "strict_pass": 37
+        },
+        "worst_error_rate": 0.2824427480916031,
+        "pvalue": 0.003398148864467694,
+        "tested": true,
+        "passes": true
+      },
+      {
+        "threshold": -0.43964836263206303,
+        "accepted": 147,
+        "coverage": 0.6805555555555556,
+        "errors": {
+          "strict_pass": 42
+        },
+        "worst_error_rate": 0.2857142857142857,
+        "pvalue": 0.0026027734059042903,
+        "tested": true,
+        "passes": true
+      },
+      {
+        "threshold": -0.49527178962780843,
+        "accepted": 166,
+        "coverage": 0.7685185185185185,
+        "errors": {
+          "strict_pass": 50
+        },
+        "worst_error_rate": 0.30120481927710846,
+        "pvalue": 0.005295917332888365,
+        "tested": true,
+        "passes": false
+      },
+      {
+        "threshold": -0.5747921668788389,
+        "accepted": 186,
+        "coverage": 0.8611111111111112,
+        "errors": {
+          "strict_pass": 57
+        },
+        "worst_error_rate": 0.3064516129032258,
+        "pvalue": 0.005172053976122075,
+        "tested": true,
+        "passes": false
+      },
+      {
+        "threshold": -0.7978336075333192,
+        "accepted": 213,
+        "coverage": 0.9861111111111112,
+        "errors": {
+          "strict_pass": 70
+        },
+        "worst_error_rate": 0.3286384976525822,
+        "pvalue": 0.0190270814418702,
+        "tested": true,
+        "passes": false
+      }
+    ]
+  },
+  "heldout": {
+    "graders": {
+      "strict_pass": {
+        "total": 217,
+        "accepted": 144,
+        "errors": 33,
+        "coverage": 0.663594470046083,
+        "error_rate": 0.22916666666666666,
+        "meets_target": true,
+        "upper_bound_95": 0.29419936908048033
+      }
+    }
+  },
+  "confirmed": true,
+  "all_rows": {
+    "total": 541,
+    "accepted": 367,
+    "coverage": 0.678373382624769,
+    "fitting": 324
+  },
+  "split_sensitivity": {
+    "splits": 20,
+    "selected": 18,
+    "accepted_min": 284,
+    "accepted_median": 536.5,
+    "accepted_max": 541
+  },
+  "command": "policy",
+  "caat_version": "0.7.0",
+  "input": {
+    "path": "examples\\ifeval_graders.csv",
+    "id_column": "id",
+    "score_column": "mean_token_logprob",
+    "correct_columns": [
+      "strict_pass"
+    ],
+    "output_key_column": null,
+    "check_columns": [],
+    "group_column": null
+  }
+}

@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the selected version tag to PyPI
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Verify tag and build distributions
+        run: |
+          version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          test "$GITHUB_REF_NAME" = "v$version"
+          python -m pip install build==1.6.1 twine==7.0.0
+          python scripts/build_release.py
+      - name: Verify the installed wheel
+        run: |
+          python -m venv "$RUNNER_TEMP/release-wheel"
+          "$RUNNER_TEMP/release-wheel/bin/python" -m pip install --no-deps dist/*.whl
+          test "$("$RUNNER_TEMP/release-wheel/bin/caat" --version)" = "caat ${GITHUB_REF_NAME#v}"
+          unzip -Z1 dist/*.whl | grep -Fx caat/py.typed
+          unzip -Z1 dist/*.whl | grep -E '\.dist-info/licenses/LICENSE$'
+          "$RUNNER_TEMP/release-wheel/bin/python" -m unittest discover -s tests
+      - name: Replay the saved Qwen confidence benchmark
+        run: |
+          "$RUNNER_TEMP/release-wheel/bin/python" scripts/study_black_box.py replay --output "$RUNNER_TEMP/comparison.csv"
+          diff -u results/black_box/comparison.csv "$RUNNER_TEMP/comparison.csv"
+      - name: Check first use and upgrades with the release wheel
+        run: python scripts/check_policy_wheel.py dist/*.whl
+      - name: Record distribution digests
+        run: sha256sum dist/* >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: caat-annotation-distributions
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish && startsWith(github.ref, 'refs/tags/v') }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/caat-annotation/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: caat-annotation-distributions
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

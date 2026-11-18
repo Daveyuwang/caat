@@ -1,0 +1,36 @@
+:root {
+    --bs-link-color: #005980;
+    --bs-link-color-rgb: 0, 89, 128;
+    --bs-link-hover-color: #003b55;
+    --bs-link-hover-color-rgb: 0, 59, 85;
+}
+
+body::before {
+    background: none;
+}
+
+.navbar.bg-primary {
+    --bs-primary-rgb: 10, 67, 94;
+    background-image: none;
+}
+
+.navbar .dropdown-menu {
+    --bs-dropdown-link-active-bg: var(--bs-link-color);
+}
+
+[role="main"] > p {
+    max-width: 75ch;
+}
+
+pre code {
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 991.98px) {
+    [role="main"] table {
+        display: block;
+        overflow-x: auto;
+    }
+}

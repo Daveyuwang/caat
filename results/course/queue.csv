@@ -1,0 +1,4 @@
+archive,score,total,budget,seed,errors_found,random_errors_found,random_expected_errors
+imdb,deberta_probability_of_qwen_label,1816,454,42,68,23,19.5
+jigsaw,deberta_probability_of_qwen_label,3000,750,42,633,157,167.75
+fever,deberta_probability_of_qwen_label,1500,375,42,289,189,173.25

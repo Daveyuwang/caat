@@ -1,0 +1,28 @@
+{
+  "cheap_arm": "gap",
+  "oof_gain": {
+    "class_only": 0.18239651862371703,
+    "gap": 0.7034750401217031,
+    "native_pair": 0.6952126504049818,
+    "native_class": 0.668454997331541,
+    "all_logits": 0.43697952514833505
+  },
+  "design_contrasts": {
+    "native_class_minus_native_pair": {
+      "delta": 0.0,
+      "lower95": -0.013333333333333336,
+      "upper95": 0.013333333333333322,
+      "discordant_accept_mass": 12.0,
+      "projected_half_width": 0.009168188855633717
+    },
+    "paid_best_minus_gap": {
+      "delta": 0.0,
+      "lower95": -0.010000000000000009,
+      "upper95": 0.016666666666666663,
+      "discordant_accept_mass": 6.0,
+      "projected_half_width": 0.00916818885563372
+    }
+  },
+  "rotated_answer_changes": 90,
+  "design_rows": 400
+}

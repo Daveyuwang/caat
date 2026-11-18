@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 350 413" role="img" aria-labelledby="title">
+<title id="title">Reliability diagram</title>
+<rect width="350" height="413" fill="white"/>
+<g font-family="system-ui, sans-serif">
+<text x="20" y="27" fill="#172b38" font-size="18" font-weight="650" text-anchor="start">Reliability diagram</text>
+<text x="20" y="48" fill="#496170" font-size="13" font-weight="400" text-anchor="start">5 rows in 4 occupied bins</text>
+<text x="64" y="70" fill="#496170" font-size="13" font-weight="400" text-anchor="start">Observed correctness</text>
+<text x="184.0" y="366" fill="#496170" font-size="13" font-weight="400" text-anchor="middle">Mean predicted probability</text>
+<line x1="64" y1="321" x2="304" y2="321" stroke="#dbe4e9"/>
+<line x1="64" y1="81" x2="64" y2="321" stroke="#dbe4e9"/>
+<text x="54" y="325" fill="#496170" font-size="13" font-weight="400" text-anchor="end">0%</text>
+<text x="64" y="341" fill="#496170" font-size="13" font-weight="400" text-anchor="middle">0%</text>
+<line x1="64" y1="261.0" x2="304" y2="261.0" stroke="#dbe4e9"/>
+<line x1="124.0" y1="81" x2="124.0" y2="321" stroke="#dbe4e9"/>
+<text x="54" y="265.0" fill="#496170" font-size="13" font-weight="400" text-anchor="end">25%</text>
+<text x="124.0" y="341" fill="#496170" font-size="13" font-weight="400" text-anchor="middle">25%</text>
+<line x1="64" y1="201.0" x2="304" y2="201.0" stroke="#dbe4e9"/>
+<line x1="184.0" y1="81" x2="184.0" y2="321" stroke="#dbe4e9"/>
+<text x="54" y="205.0" fill="#496170" font-size="13" font-weight="400" text-anchor="end">50%</text>
+<text x="184.0" y="341" fill="#496170" font-size="13" font-weight="400" text-anchor="middle">50%</text>
+<line x1="64" y1="141.0" x2="304" y2="141.0" stroke="#dbe4e9"/>
+<line x1="244.0" y1="81" x2="244.0" y2="321" stroke="#dbe4e9"/>
+<text x="54" y="145.0" fill="#496170" font-size="13" font-weight="400" text-anchor="end">75%</text>
+<text x="244.0" y="341" fill="#496170" font-size="13" font-weight="400" text-anchor="middle">75%</text>
+<line x1="64" y1="81" x2="304" y2="81" stroke="#dbe4e9"/>
+<line x1="304" y1="81" x2="304" y2="321" stroke="#dbe4e9"/>
+<text x="54" y="85" fill="#496170" font-size="13" font-weight="400" text-anchor="end">100%</text>
+<text x="304" y="341" fill="#496170" font-size="13" font-weight="400" text-anchor="middle">100%</text>
+<line x1="64" y1="321" x2="304" y2="81" stroke="#496170" stroke-dasharray="5 4"/>
+<circle cx="88.00" cy="321.00" r="5" fill="#0072b2" stroke="white"><title>1 rows, mean probability 10.00%, observed correctness 0.00%</title></circle>
+<circle cx="160.00" cy="81.00" r="5" fill="#0072b2" stroke="white"><title>1 rows, mean probability 40.00%, observed correctness 100.00%</title></circle>
+<circle cx="244.00" cy="201.00" r="5" fill="#0072b2" stroke="white"><title>2 rows, mean probability 75.00%, observed correctness 50.00%</title></circle>
+<circle cx="280.00" cy="81.00" r="5" fill="#0072b2" stroke="white"><title>1 rows, mean probability 90.00%, observed correctness 100.00%</title></circle>
+<line x1="104" y1="392" x2="129" y2="392" stroke="#496170" stroke-dasharray="5 4"/>
+<text x="136" y="396" fill="#496170" font-size="12" font-weight="400" text-anchor="start">Perfect agreement</text>
+</g>
+</svg>

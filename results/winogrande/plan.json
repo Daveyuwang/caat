@@ -1,0 +1,25 @@
+{
+  "total": 821,
+  "accepted_population": 667,
+  "review": 154,
+  "accepted": 100,
+  "risk_target": 0.2,
+  "max_errors_to_meet": 13,
+  "min_errors_to_exceed": 27,
+  "sample_path": "results/winogrande/sample.csv",
+  "schema_version": 2,
+  "command": "plan",
+  "caat_version": "0.8.0rc1",
+  "input": {
+    "threshold_report_sha256": "5624e547f5a68e1cb0955a8c5c0f363e769a2d71ab99875314107cd9168bdbc8",
+    "batch_predictions": "results/winogrande/predictions.csv",
+    "label_budget": 100,
+    "accepted_population_sha256": "192a85f1fa308861f63bbb3cfc5655d255af0f9866b55ffa380c2504c7e87f2b",
+    "output_key_column": "output_sha256",
+    "fit_outputs_checked": true,
+    "holdout_confidence": 0.95,
+    "threshold_report": "results/anli_r2/policy.json",
+    "threshold": 4.75,
+    "sample_seed": 42
+  }
+}

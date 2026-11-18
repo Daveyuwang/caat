@@ -1,0 +1,16 @@
+{
+  "count": 2204,
+  "accepted_error": {
+    "fitted": 0.07168784029038112,
+    "native_and_answer": 0.059437386569872956
+  },
+  "comparisons": {
+    "native_and_answer": {
+      "delta": 0.012250453720508168,
+      "lower95": 0.004990925589836659,
+      "upper95": 0.01950998185117967
+    }
+  },
+  "design_selected_single": "native_and_answer",
+  "design_selected_native": "native_and_answer"
+}

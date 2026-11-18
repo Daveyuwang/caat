@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "caat-annotation"
+version = "1.0.0"
+description = "Score, calibrate, evaluate, and use model confidence to decide what to accept or review"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+keywords = ["selective prediction", "risk control", "LLM evaluation", "human review", "calibration"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Homepage = "https://github.com/Daveyuwang/caat"
+Documentation = "https://github.com/Daveyuwang/caat/blob/main/README.md"
+Issues = "https://github.com/Daveyuwang/caat/issues"
+
+[project.scripts]
+caat = "caat.cli:main"
+
+[project.optional-dependencies]
+dev = ["ruff==0.14.14", "mypy==1.19.1", "hypothesis==6.151.9"]
+docs = ["mkdocs==1.6.1"]
+scorer = ["scikit-learn>=1.4,<2"]
+inspect = [
+    "inspect-ai>=0.3.252,<0.4; python_version < '3.11'",
+    # The Python 3.10 SDK releases in this range still import acp.helpers.
+    "agent-client-protocol<1; python_version < '3.11'",
+    "inspect-ai>=0.3.289,<0.4; python_version >= '3.11'",
+]
+models = ["torch>=2.6", "transformers>=4.57,<6", "accelerate>=1.1"]
+workflow = ["tomli>=2; python_version < '3.11'"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+caat = ["py.typed"]
+
+[tool.ruff]
+target-version = "py310"
