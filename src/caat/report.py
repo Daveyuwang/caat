@@ -264,6 +264,13 @@ def read_label_plan(path, *, allow_empty=False):
             else None,
             "total": total,
         }
+        if "sample_columns" in inputs:
+            columns = inputs["sample_columns"]
+            if not isinstance(columns, list) or not all(
+                isinstance(name, str) and name for name in columns
+            ):
+                raise ValueError(f"{path}: invalid sample columns")
+            fixed["sample_columns"] = columns
     return {
         **fixed,
         "accepted": labels,

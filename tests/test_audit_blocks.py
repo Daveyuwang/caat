@@ -15,6 +15,64 @@ R2 = Path(__file__).resolve().parents[1] / "results/anli_r2"
 
 
 class BlockTests(unittest.TestCase):
+    def test_block_reissues_the_selected_sample_fields(self):
+        with TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            sample = folder / "draw.csv"
+            policy = [
+                "--threshold-report",
+                str(R2 / "policy.json"),
+                "--batch-predictions",
+                str(R2 / "predictions.csv"),
+            ]
+            plan = folder / "plan.json"
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "plan",
+                            *policy,
+                            "--label-budget",
+                            "100",
+                            "--sample-output",
+                            str(sample),
+                            "--sample-source",
+                            str(R2 / "predictions.csv"),
+                            "--sample-column",
+                            "answer",
+                            "--output",
+                            str(plan),
+                        ]
+                    ),
+                    0,
+                )
+            with sample.open(encoding="utf-8", newline="") as stream:
+                expected = list(csv.DictReader(stream))[:10]
+            args = [
+                "audit-block",
+                *policy,
+                "--plan-report",
+                str(plan),
+                "--block-size",
+                "10",
+                "--grader",
+                "anli",
+                "--handoff",
+                str(folder / "handoff"),
+                "--json",
+            ]
+            with redirect_stdout(StringIO()) as out:
+                self.assertEqual(main(args), 0)
+            path = Path(json.loads(out.getvalue())["request"]["path"])
+            original = path.read_bytes()
+            with path.open(encoding="utf-8", newline="") as stream:
+                self.assertEqual(list(csv.DictReader(stream)), expected)
+            path.unlink()
+            sample.unlink()
+            with redirect_stdout(StringIO()):
+                self.assertEqual(main(args), 0)
+            self.assertEqual(path.read_bytes(), original)
+
     def test_concurrent_issue_and_recover_partial_receipts(self):
         with TemporaryDirectory() as tmp:
             folder = Path(tmp)

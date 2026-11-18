@@ -115,10 +115,18 @@ def check_block_handoff(cli, root, fixtures, plan_path):
         encoding="utf-8", newline=""
     ) as stream:
         known = {r["id"]: r for r in csv.DictReader(stream)}
+    with (root / fixtures / "predictions.csv").open(
+        encoding="utf-8", newline=""
+    ) as stream:
+        answers = {
+            (r["id"], r["output_sha256"]): r["answer"] for r in csv.DictReader(stream)
+        }
     returned = root / "returned.csv"
     while request := report["request"]:
         with (root / request["path"]).open(encoding="utf-8", newline="") as stream:
             issued = list(csv.DictReader(stream))
+        if any(r["answer"] != answers[r["id"], r["output_key"]] for r in issued):
+            raise ValueError("issued answers differ from the saved predictions")
         with returned.open("w", encoding="utf-8", newline="") as stream:
             writer = csv.DictWriter(stream, ["id", "output_key", "correct"])
             writer.writeheader()
@@ -138,7 +146,19 @@ def check_withheld_batch(cli, root):
     (root / fixtures).mkdir(parents=True, exist_ok=True)
     for name in ("predictions.csv", "policy.json", "sample-grades.csv"):
         copyfile(ROOT / fixtures / name, root / fixtures / name)
-    plan = json.loads(command(cli, root, "plan", *cmds["plan"], "--json"))
+    plan = json.loads(
+        command(
+            cli,
+            root,
+            "plan",
+            *cmds["plan"],
+            "--sample-source",
+            str(fixtures / "predictions.csv"),
+            "--sample-column",
+            "answer",
+            "--json",
+        )
+    )
     result = json.loads(
         command(cli, root, "evaluate", *cmds["evaluate"], "--json", status=1)
     )

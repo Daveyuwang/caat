@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .partial import progress_report
 from .plan import candidate_draw
-from .queue import write_queue
+from .queue import read_sample_columns, write_queue
 from .report import emit, make_report, read_label_plan, read_threshold_report
 from .table import read_grader_file, read_table_rows
 
@@ -133,10 +133,9 @@ def run_block(args):
     draw = candidate_draw(args.batch_predictions, saved, plan)
     if draw and draw[0].output_key is None:
         raise ValueError("a block handoff requires keyed batch predictions")
+    columns = plan.pop("sample_columns", [])
     contract = {k: v for k, v in plan.items() if k != "sample_path"}
     contract.update(block_size=args.block_size, graders=names)
-    binding = json.dumps(contract, sort_keys=True)
-    run_id = sha256(binding.encode()).hexdigest()[:20]
     args.handoff.mkdir(parents=True, exist_ok=True)
     journal = args.handoff / "audit.sqlite3"
     files = args.grader_file or []
@@ -146,6 +145,8 @@ def run_block(args):
         args.batch_predictions,
         *(p for _, p in files),
     ]
+    if columns:
+        inputs.append(Path(plan["sample_path"]))
     for path in inputs:
         resolved = path.resolve()
         if resolved.parent == args.handoff.resolve() and (
@@ -162,15 +163,35 @@ def run_block(args):
                 "CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY CHECK(id=1), binding TEXT, state TEXT)"
             )
             entry = db.execute("SELECT binding, state FROM audit WHERE id=1").fetchone()
+            state = (
+                json.loads(entry[1])
+                if entry
+                else {
+                    "requests": [],
+                    "grades": {n: {} for n in names},
+                    "columns": columns,
+                }
+            )
+            # Handoffs issued before 1.0 keep their four-column requests and IDs.
+            if "columns" not in state:
+                columns = []
+            if columns:
+                contract["sample_columns"] = columns
+            binding = json.dumps(contract, sort_keys=True)
+            run_id = sha256(binding.encode()).hexdigest()[:20]
             if entry and entry[0] != binding:
                 raise ValueError(
                     "handoff does not match the saved plan, block size or graders"
                 )
-            state = (
-                json.loads(entry[1])
-                if entry
-                else {"requests": [], "grades": {n: {} for n in names}}
-            )
+            if columns and not entry:
+                values, _, _ = read_sample_columns(
+                    Path(plan["sample_path"]),
+                    draw,
+                    columns,
+                    id_column="id",
+                    output_key_column="output_key",
+                )
+                state["sample_values"] = values
             receive(state, args.request, files, draw)
             result = advance(state, draw, plan, args.block_size, run_id)
             db.execute(
@@ -193,8 +214,29 @@ def run_block(args):
                         raise ValueError(
                             f"issued CSV differs from the frozen request: {path}"
                         )
+                    if columns:
+                        actual, _, _ = read_sample_columns(
+                            path,
+                            issued,
+                            columns,
+                            id_column="id",
+                            output_key_column="output_key",
+                        )
+                        if any(
+                            tuple(state["sample_values"][uid]) != data
+                            for uid, data in actual.items()
+                        ):
+                            raise ValueError(
+                                f"issued CSV differs from the frozen request: {path}"
+                            )
                 else:
-                    write_queue(path, issued, include_output_key=True)
+                    write_queue(
+                        path,
+                        issued,
+                        include_output_key=True,
+                        extra_columns=columns,
+                        extra_values=state.get("sample_values"),
+                    )
                 result["request"] = dict(request, path=str(path))
     except sqlite3.Error as exc:
         raise ValueError(f"{journal}: {exc}") from exc
