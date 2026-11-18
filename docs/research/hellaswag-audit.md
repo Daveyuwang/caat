@@ -24,3 +24,20 @@ For all three record issued labels, requests and verdict. Open the eligible
 census last. Also report costs at zero and five labels per request. The
 milestone threshold is a 5% reduction in worst-scenario expected cost
 against the best 1.1 block size, with the same power requirement and cap.
+
+## Reproduce the audit
+
+The cohort is frozen. Collection stopped before the predictions were saved.
+Once the logits and reference grades are available, the following CPU replay
+will redraw the sample, restart a partially returned first request and
+compare the three verdicts.
+
+```bash
+python -m pip install .
+python scripts/study_hellaswag.py replay
+```
+
+To repeat collection, install the models extra, PyArrow and a CUDA build
+of PyTorch. Run `scripts/collect_hellaswag.py freeze` and then `collect`.
+Run `scripts/study_hellaswag.py` with `design`, `audit` and `census` in
+that order. The dataset supplies the reference ending for each issued row.
