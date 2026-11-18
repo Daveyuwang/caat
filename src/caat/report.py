@@ -408,14 +408,27 @@ def describe(report):
             f"The label count grows quickly as the assumed rate nears the target.{batch}"
         )
     if command == "evaluate" and "decision_status" in report:
-        lines = []
+        lines = [
+            f"{report['accepted_population']} eligible outputs. "
+            f"Planned draw {report['planned_labels']} at a budget of {report['label_budget']} labels."
+        ]
         for name, counts in report["graders"].items():
-            possible = counts["possible_final_errors"]
-            action = counts["batch_verdict"] or "request more labels"
-            lines.append(
-                f"{name}: {counts['graded']}/{report['planned_labels']} graded, "
-                f"{counts['errors']} errors, {possible[0]} to {possible[1]} possible at cap. {action}."
+            low, high = counts["possible_final_errors"]
+            action = (
+                "Request more grades."
+                if counts["batch_verdict"] is None
+                else f"Stop grading. Full-budget verdict: {counts['batch_verdict']}."
             )
+            line = (
+                f"{name}: {counts['graded']} graded with {counts['errors']} errors. "
+                f"Possible final errors: {low} to {high}. {action}"
+            )
+            if "risk_upper_bound" in counts:
+                line += (
+                    f" One-sided {percent(report['holdout_confidence'])} risk limits: "
+                    f"lower {percent(counts['risk_lower_bound'])}, upper {percent(counts['risk_upper_bound'])}."
+                )
+            lines.append(line)
         return "\n".join(lines)
     if command == "evaluate":
         counts = report["overall"]
