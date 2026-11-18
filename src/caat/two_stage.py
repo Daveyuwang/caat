@@ -1,7 +1,7 @@
 """Exact two-look designs for uniform sampling from a finite batch."""
 
 from fractions import Fraction
-from math import ceil, comb, floor, isfinite
+from math import ceil, comb, floor, fsum, isfinite
 
 from .finite import hypergeometric_cdf
 from .plan import (
@@ -52,7 +52,13 @@ def validate_stages(stages, size, cap, target, confidence):
     ):
         raise ValueError("expected two frozen checkpoints")
     first = stages[0].get("labels")
-    if type(first) is not int or not 0 < first < cap or stages[1].get("labels") != cap:
+    final = stages[1].get("labels")
+    if (
+        type(first) is not int
+        or not 0 < first < cap
+        or type(final) is not int
+        or final != cap
+    ):
         raise ValueError("invalid checkpoint label counts")
     boundaries = []
     for s in stages:
@@ -112,8 +118,8 @@ def _single_comparison(size, cap, limits, rates, price):
         pending = [pending_probability(size, k, t, cap - t, ranges) for t in range(cap)]
         costs = []
         for b in range(1, cap + 1):
-            requests = sum(pending[::b])
-            labels = sum(min(b, cap - t) * pending[t] for t in range(0, cap, b))
+            requests = fsum(pending[::b])
+            labels = fsum(min(b, cap - t) * pending[t] for t in range(0, cap, b))
             costs.append((labels + price * requests, labels, requests))
         schedules.append(costs)
         scenarios.append(dict(rate=rate, errors=k, **result["verdict_probabilities"]))

@@ -1,0 +1,41 @@
+{
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+  "device": "NVIDIA GeForce RTX 5080",
+  "seed": 42,
+  "torch": "2.11.0+cu130",
+  "transformers": "5.16.0.dev0",
+  "dtype": "bfloat16",
+  "logical_requests": 1500,
+  "batches": 188,
+  "input_tokens": 378774,
+  "wall_seconds": 2351.7446955001215,
+  "dataset_revision": "218ec52e09a7e7462a5400043bb9a69a41d06b76",
+  "batch_size": 8,
+  "allocator_limit_gib": 2.25,
+  "scoring_runs": [
+    {
+      "device": "NVIDIA GeForce RTX 5080",
+      "end": 48
+    },
+    {
+      "device": "cpu",
+      "end": 224
+    },
+    {
+      "device": "NVIDIA GeForce RTX 5080",
+      "end": 1500
+    }
+  ],
+  "peak_reserved_mib_last_run": 2102,
+  "gpu_confirmation": {
+    "rows": 176,
+    "ordered_ids_sha256": "595f3ef1799908cd9d77b9b002375f2492376c216b49a962fd333a8f4b65d4bd",
+    "changed_choices": 2,
+    "changed_eligibility": 2,
+    "max_logit_difference": 1.75,
+    "wall_seconds": 134.70759640005417,
+    "input_tokens": 23373,
+    "device": "NVIDIA GeForce RTX 5080"
+  }
+}

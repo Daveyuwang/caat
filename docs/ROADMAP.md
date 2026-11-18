@@ -1,5 +1,13 @@
 # CAAT roadmap
 
+## 1.2 milestone
+
+Plan a two-stage audit on an unlabeled batch, dispatch work at each checkpoint
+and resume a partial receipt. On 1,500 HellaSwag predictions, the planner's
+higher expected cost across the two prespecified scenarios fell 8.00% versus
+the best 1.1 fixed block. The observed draw took 321 labels versus 314.
+[HellaSwag study](research/hellaswag-audit.md) · [Milestone](https://github.com/Daveyuwang/caat/milestone/1)
+
 ## 1.1.0
 
 Preview verdict probabilities and grading costs on an unlabeled batch,

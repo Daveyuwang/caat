@@ -97,13 +97,12 @@ def source_grader():
     return grade
 
 
-def drive(batch, policy, plan, grader, work):
+def drive(batch, policy, plan, grader, work, *, block_size=10, interrupt_first=False):
     args = (
         "audit-block",
         "--handoff",
         work / "handoff",
-        "--block-size",
-        10,
+        *(("--block-size", block_size) if block_size is not None else ()),
         "--grader",
         "dataset",
         "--batch-predictions",
@@ -128,8 +127,18 @@ def drive(batch, policy, plan, grader, work):
             raise ValueError("grader did not return exactly the issued outputs")
         trace.extend(dict(block=report["requests"], **r) for r in grades)
         path = work / "receipt.csv"
-        write_report(path, grades, GRADE_FIELDS)
         receipt = ("--request", request["id"], "--grader-file", f"dataset={path}")
+        if interrupt_first and request["start"] == 0:
+            split = len(grades) // 2
+            write_report(path, grades[:split], GRADE_FIELDS)
+            command(*args, *receipt)
+            resumed = command(*args)
+            if resumed["request"]["id"] != request["id"] or set(
+                resumed["outstanding"]["dataset"]
+            ) != set(keyed(grades[split:])):
+                raise ValueError("restart lost the partial receipt")
+            calls += 2
+        write_report(path, grades, GRADE_FIELDS)
         report = command(*args, *receipt)
         calls += 1
         if request["start"] == 0:
