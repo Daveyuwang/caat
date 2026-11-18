@@ -1,7 +1,7 @@
 """Exact two-look designs for uniform sampling from a finite batch."""
 
 from fractions import Fraction
-from math import ceil, comb, floor, isfinite
+from math import ceil, comb, floor, fsum, isfinite
 
 from .finite import hypergeometric_cdf
 from .plan import (
@@ -118,8 +118,8 @@ def _single_comparison(size, cap, limits, rates, price):
         pending = [pending_probability(size, k, t, cap - t, ranges) for t in range(cap)]
         costs = []
         for b in range(1, cap + 1):
-            requests = sum(pending[::b])
-            labels = sum(min(b, cap - t) * pending[t] for t in range(0, cap, b))
+            requests = fsum(pending[::b])
+            labels = fsum(min(b, cap - t) * pending[t] for t in range(0, cap, b))
             costs.append((labels + price * requests, labels, requests))
         schedules.append(costs)
         scenarios.append(dict(rate=rate, errors=k, **result["verdict_probabilities"]))

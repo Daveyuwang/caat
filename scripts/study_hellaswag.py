@@ -106,7 +106,13 @@ def freeze(work):
         if report["qualifies"]:
             candidates.append((max(s["cost"] for s in report["scenarios"]), first))
     sample, _, _ = draw(work, cap)
-    result = dict(base, cap=cap, sample_sha256=sample_digest(sample), interim=None)
+    result = dict(
+        base,
+        cap=cap,
+        sample_sha256=sample_digest(sample),
+        interim=None,
+        single_stage=report["single_stage"],
+    )
     if candidates:
         _, first = min(candidates)
         sample, _, report = draw(work, cap, first)
@@ -116,7 +122,6 @@ def freeze(work):
             interim=first,
             stages=report["stages"],
             scenarios=report["scenarios"],
-            single_stage=report["single_stage"],
         )
     return result
 
@@ -148,15 +153,12 @@ def source_grader(rows, manifest):
 
 def audit(work, design, grade):
     cap, first = design["cap"], design["interim"]
-    arms = []
+    arms = [
+        ("single_stage", design["single_stage"]["block_size"], None),
+        ("bulk", cap, None),
+    ]
     if first is not None:
-        arms.extend(
-            [
-                ("two_stage", None, first),
-                ("single_stage", design["single_stage"]["block_size"], None),
-            ]
-        )
-    arms.append(("bulk", cap, None))
+        arms.insert(0, ("two_stage", None, first))
     results = {}
     for name, block, checkpoint in arms:
         folder = work / name

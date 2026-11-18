@@ -25,6 +25,11 @@ census last. Also report costs at zero and five labels per request. The
 milestone threshold is a 5% reduction in worst-scenario expected cost
 against the best 1.1 block size, with the same power requirement and cap.
 
+The local run switched devices while the desktop was in use. Before
+freezing the design, rescore every CPU-scored row on the RTX 5080 in
+its original batch of eight. Use the GPU logits for the audit and record
+how many choices and cutoff decisions changed.
+
 ## Reproduce the audit
 
 The cohort is frozen. Collection stopped before the predictions were saved.
