@@ -10,7 +10,7 @@ From an empty directory, install the base CLI (Python 3.10 or later) and downloa
 
 ```bash
 python -m pip install caat-annotation
-curl --fail --location --create-dirs --output examples/ticket_triage.csv https://raw.githubusercontent.com/Daveyuwang/caat/v1.0.0/examples/ticket_triage.csv
+curl --fail --location --create-dirs --output examples/ticket_triage.csv https://raw.githubusercontent.com/Daveyuwang/caat/v1.1.0/examples/ticket_triage.csv
 caat evaluate examples/ticket_triage.csv --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --group-column inbox --threshold 0.75 --probability --output-dir replay/tickets
 ```
 
@@ -58,6 +58,8 @@ caat monitor examples/fitted_batch_graded.csv --threshold-report replay/fitted-c
 The policy accepts `new-a` and sends `new-b` to review. One accepted example gives too little evidence to confirm the 2% target, so evaluate and audit return status 1. The monitor reports no alert. [Workflow configuration](https://github.com/Daveyuwang/caat/blob/main/docs/guide/workflow.md) · [Monitor interpretation](https://github.com/Daveyuwang/caat/blob/main/docs/guide/monitor.md)
 
 ## Audit a withheld policy on a new batch
+
+Before requesting labels, use `caat plan --forecast` to compare the chances of meeting or exceeding the risk target at a proposed budget. Add `--block-size` to estimate how many labels and requests one grader will receive. [Budget forecast](https://github.com/Daveyuwang/caat/blob/main/docs/guide/reports.md#plan)
 
 The ANLI policy missed its target on R1. Draw 100 of the outputs its cutoff would accept on R2, then evaluate the saved grades for those exact outputs.
 
