@@ -57,6 +57,13 @@ class BlockTests(unittest.TestCase):
             self.assertEqual(reports, [reports[0]] * 3)
             report = reports[0]
             first = report["request"]["id"]
+            issued_path = Path(report["request"]["path"])
+            initial_stat = issued_path.stat()
+            self.assertEqual(invoke(), report)
+            self.assertEqual(issued_path.stat().st_mtime_ns, initial_stat.st_mtime_ns)
+            issued_path.unlink()
+            self.assertEqual(invoke(), report)
+            self.assertTrue(issued_path.is_file())
             with (R2 / "sample-grades.csv").open(newline="") as stream:
                 known = {r["id"]: r for r in csv.DictReader(stream)}
 

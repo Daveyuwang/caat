@@ -10,7 +10,7 @@ from .partial import progress_report
 from .plan import candidate_draw
 from .queue import write_queue
 from .report import emit, make_report, read_label_plan, read_threshold_report
-from .table import read_grader_file
+from .table import read_grader_file, read_table_rows
 
 
 def block_options(parser, named_file):
@@ -182,11 +182,19 @@ def run_block(args):
             if request := result["request"]:
                 db.execute("BEGIN IMMEDIATE")
                 path = args.handoff / f"request-{request['id']}.csv"
-                write_queue(
-                    path,
-                    draw[request["start"] : request["end"]],
-                    include_output_key=True,
-                )
+                issued = draw[request["start"] : request["end"]]
+                if path.exists():
+                    rows, _ = read_table_rows(
+                        path, output_key_column="output_key", require_labels=False
+                    )
+                    if [(r.id, r.score, r.group, r.output_key) for r in rows] != [
+                        (r.id, r.score, r.group, r.output_key) for r in issued
+                    ]:
+                        raise ValueError(
+                            f"issued CSV differs from the frozen request: {path}"
+                        )
+                else:
+                    write_queue(path, issued, include_output_key=True)
                 result["request"] = dict(request, path=str(path))
     except sqlite3.Error as exc:
         raise ValueError(f"{journal}: {exc}") from exc
