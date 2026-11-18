@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Compare an audit with two planned checkpoints to the best fixed-cap block size, using the same batch, scenarios and dispatch cost. [Budget planning](docs/guide/reports.md#plan)
+
 ## 1.1.0
 
 - Preview the chances of meeting or exceeding a saved policy's risk target before issuing labels with `caat plan --forecast`. [Budget forecast](docs/guide/reports.md#plan)

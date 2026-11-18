@@ -368,6 +368,31 @@ def describe(report):
                 f"Wrote the HTML report to {report['input']['html']}.",
             )
         )
+    if command == "two-stage-plan":
+        lines = [
+            "Two-stage audit: "
+            + (
+                "qualifies."
+                if report["qualifies"]
+                else "insufficient power at this checkpoint and cap."
+            )
+        ]
+        for stage in report["stages"]:
+            lines.append(
+                f"At {stage['labels']} labels: meets at or below {stage['max_errors_to_meet']}, exceeds at or above {stage['min_errors_to_exceed']} errors (None = unreachable)."
+            )
+        for name, scenarios in (
+            ("Two stages", report["scenarios"]),
+            (
+                f"Single stage, blocks of {report['single_stage']['block_size']}",
+                report["single_stage"]["scenarios"],
+            ),
+        ):
+            for s in scenarios:
+                lines.append(
+                    f"{name}, assumed {percent(s['rate'])}: meets {percent(s['meets'])}, exceeds {percent(s['exceeds'])}, inconclusive {percent(s['inconclusive'])}; {s['expected_labels']:.2f} labels, {s['expected_requests']:.2f} requests, cost {s['cost']:.2f}."
+                )
+        return "\n".join(lines)
     if command == "plan":
         inputs = report["input"]
         target = report["risk_target"]

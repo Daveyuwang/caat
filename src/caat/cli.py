@@ -47,6 +47,7 @@ from .plan import (
     sample_error_limits,
 )
 from .partial import evaluate_partial
+from .two_stage import design as two_stage_design
 from .plots import reliability_diagram, write_svg
 from .plugins import catalog
 from .policy import policy, split_rows
@@ -864,6 +865,19 @@ def run_monitor(args):
 
 def plan_options(parser):
     parser.add_argument(
+        "--interim-labels", type=int, help="First checkpoint of a two-stage audit."
+    )
+    parser.add_argument(
+        "--error-scenarios",
+        type=float,
+        nargs=2,
+        metavar=("LOW", "HIGH"),
+        help="Assumed population error rates below and above the target.",
+    )
+    parser.add_argument(
+        "--request-cost", type=float, help="Cost of one dispatch in labels (default 1)."
+    )
+    parser.add_argument(
         "--block-size",
         type=int,
         help="Forecast labels and requests for one grader per block of this size.",
@@ -946,6 +960,24 @@ def plan_options(parser):
 
 
 def run_plan(args):
+    two_stage = args.interim_labels is not None
+    if two_stage:
+        if (
+            not args.forecast
+            or not args.batch_predictions
+            or args.error_scenarios is None
+        ):
+            raise ValueError(
+                "--interim-labels requires --forecast, --batch-predictions and --error-scenarios"
+            )
+        if args.expected_error is not None or args.block_size is not None:
+            raise ValueError(
+                "two-stage forecasts use --error-scenarios and checkpoint-sized requests"
+            )
+    elif args.error_scenarios is not None or args.request_cost is not None:
+        raise ValueError(
+            "--error-scenarios and --request-cost require --interim-labels"
+        )
     if args.block_size is not None and not args.forecast:
         raise ValueError("--block-size requires --forecast")
     seed = args.sample_seed
@@ -953,7 +985,7 @@ def run_plan(args):
         seed = 42
     fixed = args.batch_predictions is not None
     if args.forecast:
-        if not fixed or args.expected_error is None:
+        if not fixed or (not two_stage and args.expected_error is None):
             raise ValueError(
                 "--forecast requires --batch-predictions and --expected-error"
             )
@@ -972,7 +1004,7 @@ def run_plan(args):
             )
         if args.label_budget < 1:
             raise ValueError("--label-budget must be positive")
-        if args.power is not None or args.max_accepted is not None:
+        if (args.power is not None and not two_stage) or args.max_accepted is not None:
             raise ValueError("--power and --max-accepted apply to label sizing")
         if args.expected_error is not None and not args.forecast:
             raise ValueError(
@@ -1053,7 +1085,27 @@ def run_plan(args):
         if args.prediction_filter is not None:
             column, value = args.prediction_filter
             options["prediction_filter"] = {"column": column, "value": value}
-        if args.forecast:
+        if two_stage:
+            options.update(
+                forecast=True,
+                interim_labels=args.interim_labels,
+                error_scenarios=args.error_scenarios,
+                power=0.8 if args.power is None else args.power,
+                request_cost=1 if args.request_cost is None else args.request_cost,
+            )
+            result.update(
+                two_stage_design(
+                    population,
+                    result["accepted"],
+                    args.interim_labels,
+                    saved["risk_target"],
+                    confidence,
+                    args.error_scenarios,
+                    options["power"],
+                    options["request_cost"],
+                )
+            )
+        elif args.forecast:
             options.update(forecast=True, expected_error=args.expected_error)
             result.update(
                 forecast_verdict(
@@ -1099,7 +1151,7 @@ def run_plan(args):
                 sample_source_id_column=source_id,
                 sample_source_output_key_column=source_key,
             )
-    report = make_report("plan", options, result)
+    report = make_report("two-stage-plan" if two_stage else "plan", options, result)
     serialized = render_report("json", report)
     paths = [path for path in (args.output, sample_path) if path is not None]
     with staged_outputs(paths) as staged:
@@ -1116,7 +1168,7 @@ def run_plan(args):
                 extra_values=extra_values,
             )
     print(serialized if args.json else render_report("text", report))
-    return int(not budget)
+    return int(not budget or not result.get("qualifies", True))
 
 
 def size_label_plan(args, saved, confidence):

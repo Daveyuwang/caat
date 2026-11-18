@@ -179,6 +179,17 @@ def verdict_ranges(cap, limits):
     ]
 
 
+def pending_probability(size, errors, graded, remaining, ranges):
+    settled = 0.0
+    for _, first, last in ranges:
+        upper = last - remaining
+        if first <= upper:
+            settled += hypergeometric_cdf_float(size, errors, graded, upper) - (
+                hypergeometric_cdf_float(size, errors, graded, first - 1)
+            )
+    return max(0.0, 1.0 - settled)
+
+
 def forecast_block_cost(size, errors, cap, limits, block_size):
     """Expected work issued to one grader at the fixed-cap verdict boundaries."""
     if block_size < 1:
@@ -188,14 +199,7 @@ def forecast_block_cost(size, errors, cap, limits, block_size):
     for graded in range(0, cap, block_size):
         remaining = cap - graded
         # The draw is settled if the possible final counts all fit in one range.
-        settled = 0.0
-        for _, first, last in ranges:
-            upper = last - remaining
-            if first <= upper:
-                settled += hypergeometric_cdf_float(size, errors, graded, upper) - (
-                    hypergeometric_cdf_float(size, errors, graded, first - 1)
-                )
-        pending = max(0.0, 1.0 - settled)
+        pending = pending_probability(size, errors, graded, remaining, ranges)
         requests += pending
         labels += min(block_size, remaining) * pending
     return {
