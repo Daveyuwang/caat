@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Preview the chances of meeting or exceeding a saved policy's risk target before issuing labels with `caat plan --forecast`. [Budget forecast](docs/guide/reports.md#plan)
+- Add `--block-size` to the forecast to compare expected labels and requests for one grader with a bulk export.
 
 ## 1.0.0
 

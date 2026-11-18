@@ -375,13 +375,20 @@ def describe(report):
         if "batch_predictions" in inputs:
             if inputs.get("forecast"):
                 chances = report["verdict_probabilities"]
-                return (
+                summary = (
                     f"{population} of {report['total']} rows qualify. With {report['accepted']} labels "
                     f"and {report['expected_population_errors']} assumed errors among the eligible rows "
                     f"(target {percent(target)}), full-draw verdict probabilities are "
                     f"meets {percent(chances['meets'])}, exceeds {percent(chances['exceeds'])}, "
                     f"inconclusive {percent(chances['inconclusive'])}."
                 )
+                if cost := report.get("block_cost"):
+                    summary += (
+                        f" One grader in blocks of {inputs['block_size']}: "
+                        f"{cost['expected_labels']:.2f} expected labels in {cost['expected_requests']:.2f} requests. "
+                        f"Bulk: {cost['bulk_labels']} labels in {cost['bulk_requests']} request(s)."
+                    )
+                return summary
             summary = (
                 f"At the saved cutoff, {population} of {report['total']} rows would qualify "
                 f"and {report['review']} would go to review. "

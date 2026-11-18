@@ -40,6 +40,7 @@ from .plan import (
     batch_verdict,
     check_candidate_sample,
     check_label_plan,
+    forecast_block_cost,
     forecast_verdict,
     plan_labels,
     read_candidate_batch,
@@ -863,6 +864,11 @@ def run_monitor(args):
 
 def plan_options(parser):
     parser.add_argument(
+        "--block-size",
+        type=int,
+        help="Forecast labels and requests for one grader per block of this size.",
+    )
+    parser.add_argument(
         "--forecast",
         action="store_true",
         help="Preview fixed-budget verdict probabilities without drawing a sample.",
@@ -940,6 +946,8 @@ def plan_options(parser):
 
 
 def run_plan(args):
+    if args.block_size is not None and not args.forecast:
+        raise ValueError("--block-size requires --forecast")
     seed = args.sample_seed
     if args.sample_output is not None and seed is None:
         seed = 42
@@ -1052,6 +1060,15 @@ def run_plan(args):
                     population, result["accepted"], args.expected_error, result
                 )
             )
+            if args.block_size is not None:
+                options["block_size"] = args.block_size
+                result["block_cost"] = forecast_block_cost(
+                    population,
+                    result["expected_population_errors"],
+                    result["accepted"],
+                    result,
+                    args.block_size,
+                )
     else:
         result, options, accepted_rows = size_label_plan(args, saved, confidence)
     if args.threshold_report is not None:

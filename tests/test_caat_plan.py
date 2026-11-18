@@ -4,6 +4,7 @@ import json
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from fractions import Fraction
+from itertools import combinations
 from math import comb, nextafter
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -14,10 +15,43 @@ from caat.finite import (
     hypergeometric_cdf,
     hypergeometric_cdf_float,
 )
-from caat.plan import forecast_verdict, plan_labels
+from caat.plan import (
+    forecast_block_cost,
+    forecast_verdict,
+    plan_labels,
+    sample_error_limits,
+)
 
 
 class LabelPlanTests(unittest.TestCase):
+    def test_block_cost_matches_every_order_of_a_small_population(self):
+        size, errors, cap = 11, 3, 8
+        limits = sample_error_limits(size, cap, 0.3, 0.8)
+
+        def outcome(n):
+            if n <= limits["max_errors_to_meet"]:
+                return "meets"
+            if n >= limits["min_errors_to_exceed"]:
+                return "exceeds"
+            return "inconclusive"
+
+        for block in (1, 3, 8, 12):
+            labels = requests = draws = 0
+            for positions in combinations(range(size), errors):
+                graded = 0
+                while True:
+                    observed = sum(p < graded for p in positions)
+                    if outcome(observed) == outcome(observed + cap - graded):
+                        break
+                    graded = min(graded + block, cap)
+                    requests += 1
+                labels += graded
+                draws += 1
+            cost = forecast_block_cost(size, errors, cap, limits, block)
+            self.assertAlmostEqual(cost["expected_labels"], labels / draws)
+            self.assertAlmostEqual(cost["expected_requests"], requests / draws)
+            self.assertEqual((cost["bulk_labels"], cost["bulk_requests"]), (cap, 1))
+
     def test_forecast_uses_the_same_eligible_population_as_the_draw(self):
         root = Path(__file__).resolve().parents[1] / "results"
         args = [

@@ -2,7 +2,13 @@
 
 from .artifacts import staged_outputs
 from .metrics import Counts
-from .plan import batch_verdict, candidate_draw, check_draw_rows, sample_error_limits
+from .plan import (
+    batch_verdict,
+    candidate_draw,
+    check_draw_rows,
+    sample_error_limits,
+    verdict_ranges,
+)
 from .report import emit, make_report, read_threshold_report
 from .rules import assess_accepted_risk
 from .table import read_grader_file, read_table_rows
@@ -13,21 +19,17 @@ def progress_report(plan, grades):
     target, confidence = plan["risk_target"], plan["holdout_confidence"]
     limits = sample_error_limits(size, cap, target, confidence) if size else {}
 
-    def verdict(errors):
-        meets = limits.get("max_errors_to_meet")
-        exceeds = limits.get("min_errors_to_exceed")
-        if meets is not None and errors <= meets:
-            return "meets"
-        if exceeds is not None and errors >= exceeds:
-            return "exceeds"
-        return "inconclusive"
+    ranges = verdict_ranges(cap, limits)
 
     results = {}
     for name, bits in grades.items():
         graded = len(bits)
         errors = graded - sum(bits.values())
         high = errors + cap - graded
-        outcome = verdict(errors) if verdict(errors) == verdict(high) else None
+        outcome = next(
+            (name for name, first, last in ranges if first <= errors and high <= last),
+            None,
+        )
         counts = {
             "graded": graded,
             "errors": errors,
