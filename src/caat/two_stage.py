@@ -52,7 +52,13 @@ def validate_stages(stages, size, cap, target, confidence):
     ):
         raise ValueError("expected two frozen checkpoints")
     first = stages[0].get("labels")
-    if type(first) is not int or not 0 < first < cap or stages[1].get("labels") != cap:
+    final = stages[1].get("labels")
+    if (
+        type(first) is not int
+        or not 0 < first < cap
+        or type(final) is not int
+        or final != cap
+    ):
         raise ValueError("invalid checkpoint label counts")
     boundaries = []
     for s in stages:

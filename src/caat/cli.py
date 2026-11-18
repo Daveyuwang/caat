@@ -1063,7 +1063,7 @@ def run_plan(args):
             "accepted": min(args.label_budget, population),
             "risk_target": saved["risk_target"],
         }
-        if population:
+        if population and not two_stage:
             result.update(
                 sample_error_limits(
                     population, result["accepted"], saved["risk_target"], confidence

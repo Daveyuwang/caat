@@ -9,7 +9,7 @@ from common import write_report
 from prepare_boolq import digest
 
 
-def streamed_qwen(name, revision, torch):
+def streamed_qwen(name, revision, torch, device):
     """Read each BF16 tensor from its pinned shard as Accelerate needs it."""
     from accelerate import cpu_offload, init_empty_weights
     from accelerate.utils.offload import OffloadedWeightsLoader
@@ -35,11 +35,11 @@ def streamed_qwen(name, revision, torch):
             k: {"safetensors_file": str(folder / shard)} for k, shard in shards.items()
         }
     )
-    cpu_offload(model, execution_device=torch.device("cuda:0"), state_dict=weights)
+    cpu_offload(model, execution_device=torch.device(device), state_dict=weights)
     meta = dict(
         model=name,
         revision=revision,
-        device=torch.cuda.get_device_name(),
+        device=torch.cuda.get_device_name() if device == "cuda" else "cpu",
         seed=42,
         torch=version("torch"),
         transformers=version("transformers"),
@@ -56,17 +56,20 @@ def collect_choices(
     batch_size=16,
     memory_gib=None,
     checkpoint=None,
+    device="cuda",
+    stop_after=None,
 ):
     from caat.collect import TransformersBackend
     import torch
 
     name, revision = MODELS["generate"]
     if memory_gib is not None:
-        size = torch.cuda.get_device_properties(0).total_memory
-        torch.cuda.set_per_process_memory_fraction(memory_gib * 2**30 / size)
+        if device == "cuda":
+            size = torch.cuda.get_device_properties(0).total_memory
+            torch.cuda.set_per_process_memory_fraction(memory_gib * 2**30 / size)
         torch.set_num_threads(2)
         torch.manual_seed(42)
-        model, tokenizer, metadata = streamed_qwen(name, revision, torch)
+        model, tokenizer, metadata = streamed_qwen(name, revision, torch, device)
     else:
         engine = TransformersBackend(
             name,
@@ -100,6 +103,7 @@ def collect_choices(
     results = []
     total_tokens = 0
     elapsed = 0.0
+    runs = []
     identity = dict(
         model=name,
         revision=revision,
@@ -118,17 +122,19 @@ def collect_choices(
                 saved["input_tokens"],
                 saved["wall_seconds"],
             )
+            runs = saved["runs"]
     prior_seconds = elapsed
     start = perf_counter()
+    end = len(rows) if stop_after is None else min(stop_after, len(rows))
     with torch.inference_mode():
-        for i in range(len(results), len(rows), batch_size):
+        for i in range(len(results), end, batch_size):
             group = formatted[i : i + batch_size]
             inputs = tokenizer(
                 [s for _, s in group],
                 padding=True,
                 add_special_tokens=False,
                 return_tensors="pt",
-            ).to("cuda")
+            ).to(device)
             logits = (
                 model(**inputs, logits_to_keep=1, use_cache=False)
                 .logits[:, -1, token_ids]
@@ -151,6 +157,9 @@ def collect_choices(
                 )
             elapsed = prior_seconds + perf_counter() - start
             if checkpoint:
+                if not runs or runs[-1]["device"] != metadata["device"]:
+                    runs.append(dict(device=metadata["device"]))
+                runs[-1]["end"] = len(results)
                 pending = Path(str(checkpoint) + ".tmp")
                 pending.write_text(
                     json.dumps(
@@ -159,11 +168,15 @@ def collect_choices(
                             rows=results,
                             input_tokens=total_tokens,
                             wall_seconds=elapsed,
+                            runs=runs,
                         )
                     ),
                     encoding="utf-8",
                 )
                 pending.replace(checkpoint)
+    if len(results) < len(rows):
+        print(f"Saved {len(results)} predictions at {checkpoint}")
+        return
     write_report(out / "predictions.csv", sorted(results, key=lambda r: r["id"]))
     summary = dict(
         **metadata,
@@ -178,8 +191,12 @@ def collect_choices(
         summary.update(
             batch_size=batch_size,
             allocator_limit_gib=memory_gib,
-            peak_reserved_mib=torch.cuda.max_memory_reserved() // 2**20,
+            scoring_runs=runs,
         )
+        if device == "cuda":
+            summary["peak_reserved_mib_last_run"] = (
+                torch.cuda.max_memory_reserved() // 2**20
+            )
     (out / "collection.json").write_text(
         json.dumps(summary, indent=2) + "\n", encoding="utf-8"
     )

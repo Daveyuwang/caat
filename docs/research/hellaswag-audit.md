@@ -41,6 +41,8 @@ To repeat collection, install the models extra, PyArrow and a CUDA build
 of PyTorch. Run `scripts/collect_hellaswag.py freeze` and then `collect`.
 The collector streams the pinned BF16 weights from disk, caps PyTorch's
 GPU allocator at 2.25 GiB and saves progress after each batch of eight.
-Repeating `collect` resumes from the last completed batch.
+Repeating `collect` resumes from the last completed batch. Use `--device cpu`
+to continue with two CPU threads. The collection report records each device
+and its last row in scoring order. Use `--stop-after` to repeat a segment.
 Run `scripts/study_hellaswag.py` with `design`, `audit` and `census` in
 that order. The dataset supplies the reference ending for each issued row.

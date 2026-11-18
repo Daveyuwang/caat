@@ -54,7 +54,13 @@ def prompts():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("stage", choices=("freeze", "collect"))
+    parser.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
+    parser.add_argument(
+        "--stop-after", type=int, help="pause after the batch containing this many rows"
+    )
     args = parser.parse_args()
+    if args.stop_after is not None and args.stop_after < 1:
+        parser.error("--stop-after must be positive")
     rows = prompts()
     manifest = [m for m, _ in rows]
     path = OUT / "manifest.csv"
@@ -72,4 +78,6 @@ if __name__ == "__main__":
             batch_size=8,
             memory_gib=2.25,
             checkpoint=ROOT / "replay" / "hellaswag-collection.json",
+            device=args.device,
+            stop_after=args.stop_after,
         )
