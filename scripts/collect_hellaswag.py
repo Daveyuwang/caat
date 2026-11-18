@@ -64,4 +64,12 @@ if __name__ == "__main__":
     else:
         if read_csv(path) != [{k: str(v) for k, v in m.items()} for m in manifest]:
             raise ValueError("HellaSwag cohort differs from the frozen manifest")
-        collect_choices(rows, CHOICES, OUT, REVISION)
+        collect_choices(
+            rows,
+            CHOICES,
+            OUT,
+            REVISION,
+            batch_size=8,
+            memory_gib=2.25,
+            checkpoint=ROOT / "replay" / "hellaswag-collection.json",
+        )
