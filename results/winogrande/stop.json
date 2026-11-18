@@ -1,0 +1,19 @@
+{
+  "requests": 9,
+  "unique_requested": 90,
+  "requested_labels": 90,
+  "returned_labels": 90,
+  "audit_calls": 11,
+  "grader_calls": 9,
+  "wall_seconds": 0.28098649997264147,
+  "result": {
+    "graded": 90,
+    "errors": 28,
+    "possible_final_errors": [
+      28,
+      38
+    ],
+    "batch_verdict": "exceeds",
+    "decision_status": "settled"
+  }
+}
