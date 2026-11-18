@@ -190,11 +190,44 @@ def read_threshold_report(path, *, require_confirmed=False, fingerprint=False):
     return options
 
 
+def read_budget_offer(path, name):
+    report = _read_json_report(path)
+    try:
+        if report["command"] != "budget-comparison" or report["qualifies"] is not True:
+            raise ValueError("expected a qualifying budget comparison")
+        settings = report["input"]
+        ceiling = settings["budget_ceiling"]
+        rates = settings["error_scenarios"]
+        if (
+            type(ceiling) is not int
+            or ceiling < 1
+            or not isinstance(rates, list)
+            or len(rates) != 2
+            or not all(_finite_number(r) for r in rates)
+            or not all(
+                _finite_number(settings[k])
+                for k in ("request_cost", "power", "holdout_confidence")
+            )
+        ):
+            raise ValueError("invalid budget comparison settings")
+        selection = settings.get("prediction_filter")
+        if selection is not None and not all(
+            isinstance(selection[k], str) for k in ("column", "value")
+        ):
+            raise ValueError("invalid comparison filter")
+        cap = report["offers"][name]["cap"]
+        if type(cap) is not int or not 1 <= cap <= ceiling:
+            raise ValueError("invalid selected cap")
+        return report
+    except (KeyError, TypeError, IndexError) as exc:
+        raise ValueError(f"{path}: invalid saved budget comparison") from exc
+
+
 def read_label_plan(path, *, allow_empty=False):
     report = _read_json_report(path)
     if (
         not isinstance(report, dict)
-        or report.get("command") not in ("plan", "two-stage-plan")
+        or report.get("command") not in ("plan", "two-stage-plan", "fixed-block-plan")
         or not isinstance(report.get("input"), dict)
     ):
         raise ValueError(f"{path}: expected a CAAT plan JSON report")
@@ -268,6 +301,11 @@ def read_label_plan(path, *, allow_empty=False):
             else None,
             "total": total,
         }
+        if report["command"] == "fixed-block-plan":
+            block = inputs.get("block_size")
+            if type(block) is not int or not 1 <= block <= labels:
+                raise ValueError(f"{path}: invalid fixed block in selected offer")
+            fixed["block_size"] = block
         if "sample_columns" in inputs:
             columns = inputs["sample_columns"]
             if not isinstance(columns, list) or not all(
@@ -275,6 +313,8 @@ def read_label_plan(path, *, allow_empty=False):
             ):
                 raise ValueError(f"{path}: invalid sample columns")
             fixed["sample_columns"] = columns
+    if report["command"] == "fixed-block-plan" and "block_size" not in fixed:
+        raise ValueError(f"{path}: selected block plan requires a fixed batch")
     if report["command"] == "two-stage-plan":
         from .two_stage import validate_stages
 
@@ -431,7 +471,7 @@ def describe(report):
                     f"{name}, assumed {percent(s['rate'])}: meets {percent(s['meets'])}, exceeds {percent(s['exceeds'])}, inconclusive {percent(s['inconclusive'])}; {s['expected_labels']:.2f} labels, {s['expected_requests']:.2f} requests, cost {s['cost']:.2f}."
                 )
         return "\n".join(lines)
-    if command == "plan":
+    if command in ("plan", "fixed-block-plan"):
         inputs = report["input"]
         target = report["risk_target"]
         population = report.get("accepted_population")
