@@ -23,7 +23,11 @@ def block_options(parser, named_file):
     parser.add_argument("--plan-report", required=True, type=Path)
     parser.add_argument("--threshold-report", required=True, type=Path)
     parser.add_argument("--batch-predictions", required=True, type=Path)
-    parser.add_argument("--block-size", required=True, type=int)
+    parser.add_argument(
+        "--block-size",
+        type=int,
+        help="Fixed-cap block size. Two-stage draws issue one request per checkpoint.",
+    )
     parser.add_argument(
         "--grader",
         required=True,
@@ -96,10 +100,15 @@ def advance(state, draw, plan, block_size, run_id):
         current = None
         outstanding = {}
         if pending:
+            end_next = (
+                next(s["labels"] for s in plan["stages"] if s["labels"] > end)
+                if "stages" in plan
+                else min(end + block_size, len(draw))
+            )
             current = {
                 "id": f"{run_id}-{len(requests) + 1}",
                 "start": end,
-                "end": min(end + block_size, len(draw)),
+                "end": end_next,
                 "graders": pending,
             }
             requests.append(current)
@@ -122,9 +131,16 @@ def advance(state, draw, plan, block_size, run_id):
 
 def run_block(args):
     names = sorted(args.grader)
-    if args.block_size < 1 or not all(names) or len(names) != len(set(names)):
-        raise ValueError("use a positive block size and distinct grader names")
     plan = read_label_plan(args.plan_report, allow_empty=True)
+    if not all(names) or len(names) != len(set(names)):
+        raise ValueError("use distinct grader names")
+    if "stages" in plan:
+        if args.block_size is not None:
+            raise ValueError(
+                "two-stage plans issue at their saved checkpoints; omit --block-size"
+            )
+    elif args.block_size is None or args.block_size < 1:
+        raise ValueError("use a positive --block-size for a fixed-cap audit")
     if "threshold_report_sha256" not in plan:
         raise ValueError(
             "audit-block requires a fixed-budget plan for raw batch predictions"
