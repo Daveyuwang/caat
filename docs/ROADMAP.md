@@ -4,6 +4,8 @@ CAAT covers the confidence pipeline on saved model outputs: score,
 calibrate, evaluate, and use. The local collection extra can produce those
 inputs. [Sampling-budget replay](research/sample-budget.md)
 
+Version 0.7 audits the outputs a saved policy would accept on a new batch. With a budget of 100 labels, the audit found 43 errors on ANLI R2 and 12 on the archived BoolQ control. The first batch exceeded the 20% target and the second met it. Routing still requires a confirmed policy. [Fixed-budget audit](research/fixed-batch-audit.md)
+
 Version 0.6 shows which predicted classes consume a global review budget and can fit a categorical prediction alongside numeric features. Adding the class reduced ANLI R1 accepted error by 0.58 points at 75% coverage. The interval included zero. The verifier cost an additional call per row and the independent audit rejected the candidate cutoff. Class inputs and verification remain opt-in. [Class-aware walkthrough](guide/classifier.md#hand-off-a-class-aware-policy) · [ANLI results](research/anli-results.md)
 
 Version 0.5 applies a frozen scorer from routing through monitoring and supports independent calibration labels and ungraded reference scores. On BoolQ, reference quantiles improved stability at 320 labels, and an exploratory native score with the answer identity had the lowest accepted error among the reported 0.5 comparisons. [Frozen workflow](guide/workflow.md#calibrate-a-frozen-score) · [BoolQ results](research/boolq-results.md)

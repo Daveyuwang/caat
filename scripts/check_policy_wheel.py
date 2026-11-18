@@ -87,6 +87,41 @@ def check_batch(cli, handoff, commands, expected):
     return decisions
 
 
+def check_withheld_batch(cli, root):
+    cmds = documented_commands("README.md", "Audit a withheld policy on a new batch")
+    fixtures = Path("results/anli_r2")
+    (root / fixtures).mkdir(parents=True, exist_ok=True)
+    for name in ("predictions.csv", "policy.json", "sample-grades.csv"):
+        copyfile(ROOT / fixtures / name, root / fixtures / name)
+    plan = json.loads(command(cli, root, "plan", *cmds["plan"], "--json"))
+    result = json.loads(
+        command(cli, root, "evaluate", *cmds["evaluate"], "--json", status=1)
+    )
+    counts = result["overall"]
+    if (
+        plan["accepted_population"],
+        plan["review"],
+        counts["accepted"],
+        counts["errors"],
+        counts["batch_verdict"],
+    ) != (580, 299, 100, 43, "exceeds"):
+        raise ValueError("packaged R2 audit differs from the frozen draw")
+    command(
+        cli,
+        root,
+        "route",
+        str(fixtures / "predictions.csv"),
+        "--threshold-report",
+        str(fixtures / "policy.json"),
+        "--output",
+        "blocked.csv",
+        status=2,
+    )
+    if (root / "blocked.csv").exists():
+        raise ValueError("withheld policy produced decisions")
+    return counts["batch_verdict"]
+
+
 def verify(wheel):
     numeric = documented_commands(
         "README.md", "Reuse one fitted policy from routing through audit"
@@ -138,7 +173,9 @@ def verify(wheel):
         class_decisions = check_batch(
             base, handoff, categorical, {**known, "new-c": "review", "new-d": "review"}
         )
+        batch_verdict = check_withheld_batch(base, handoff)
         return {
+            "fixed_batch_verdict": batch_verdict,
             "training_seconds": round(training_seconds, 2),
             "handoff_seconds": round(perf_counter() - phase, 2),
             "decisions": decisions,

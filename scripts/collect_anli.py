@@ -7,7 +7,7 @@ from time import perf_counter
 
 from collect_boolq import MODELS
 from common import ROOT, read_csv, write_report
-from prepare_anli import SPLITS, source
+from prepare_anli import source
 from prepare_boolq import digest, normalized
 
 LABELS = ("entailment", "neutral", "contradiction")
@@ -22,7 +22,7 @@ def inputs(stage, manifest, directory):
         if previous.keys() != ids.keys() or len(previous) != len(generated):
             raise ValueError("generator IDs differ from the manifest")
     semantics = LABELS[1:] + LABELS[:1] if stage == "rotate" else LABELS
-    for split in SPLITS:
+    for split in dict.fromkeys(r["split"] for r in ids.values()):
         for doc in source(split, ["uid", "premise", "hypothesis"]):
             uid = doc["uid"]
             if uid not in ids:
@@ -135,9 +135,16 @@ def collect(stage, manifest, directory, batch_size):
                 results.append(row)
             count += int(batch.attention_mask.sum())
     elapsed = perf_counter() - start
-    if len(results) != (400 if stage == "rotate" else 3014) or len(
-        {r["id"] for r in results}
-    ) != len(results):
+    expected = [
+        r["id"]
+        for r in read_csv(manifest)
+        if stage != "rotate" or r["role"] == "design"
+    ]
+    if (
+        not expected
+        or sorted(r["id"] for r in results) != sorted(expected)
+        or len(set(expected)) != len(expected)
+    ):
         raise ValueError("incomplete inference stage")
     directory.mkdir(parents=True, exist_ok=True)
     write_report(directory / (stage + ".csv"), results)

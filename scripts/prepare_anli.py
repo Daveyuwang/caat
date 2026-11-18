@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 from random import Random
 
-from common import write_report
+from common import read_csv, write_report
 from prepare_boolq import digest, normalized
 
 REVISION = "8e4813d81f46d313dac7892e1c28076917cfcdf9"
@@ -26,18 +26,25 @@ def source(split, columns, *, ids=None):
     return pq.read_table(path, columns=columns, filters=filters).to_pylist()
 
 
-def freeze(output):
+def premise_groups(split, seen):
+    groups = {}
+    for row in source(split, ["uid", "premise", "hypothesis"]):
+        premise = digest(normalized(row["premise"]))
+        if premise in seen:
+            continue
+        candidate = (digest(normalized(row["hypothesis"])), row["uid"])
+        if premise not in groups or candidate < groups[premise]:
+            groups[premise] = candidate
+    return groups
+
+
+def freeze(output, *, exclude=None):
     seen = set()
     manifest = []
-    for split in SPLITS:
-        groups = {}
-        for row in source(split, ["uid", "premise", "hypothesis"]):
-            premise = digest(normalized(row["premise"]))
-            if premise in seen:
-                continue
-            candidate = (digest(normalized(row["hypothesis"])), row["uid"])
-            if premise not in groups or candidate < groups[premise]:
-                groups[premise] = candidate
+    if exclude is not None:
+        seen.update(row["premise_sha256"] for row in read_csv(exclude))
+    for split in ("test_r2",) if exclude is not None else SPLITS:
+        groups = premise_groups(split, seen)
         seen.update(groups)
         rows = sorted(groups.items())
         Random(SEED).shuffle(rows)
@@ -45,7 +52,9 @@ def freeze(output):
             roles = ["design"] * 400 + ["reference"] * 160 + ["calibration"] * 480
             rows = rows[: len(roles)]
         else:
-            roles = ["primary" if split == "test_r1" else "stress"] * len(rows)
+            roles = [
+                {"test_r1": "primary", "test_r3": "stress", "test_r2": "audit"}[split]
+            ] * len(rows)
         for (premise, (hypothesis, uid)), role in zip(rows, roles, strict=True):
             manifest.append(
                 dict(
@@ -65,4 +74,11 @@ def freeze(output):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
-    freeze(parser.parse_args().output)
+    parser.add_argument(
+        "--r2-exclude",
+        type=Path,
+        metavar="MANIFEST",
+        help="Freeze test R2 after excluding all premises in the previous manifest.",
+    )
+    args = parser.parse_args()
+    freeze(args.output, exclude=args.r2_exclude)
