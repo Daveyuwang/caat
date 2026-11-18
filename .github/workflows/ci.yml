@@ -379,4 +379,5 @@ jobs:
           "$RUNNER_TEMP/wheel/bin/caat" --version
           "$RUNNER_TEMP/wheel/bin/python" "$GITHUB_WORKSPACE/scripts/study_winogrande.py" replay
           "$RUNNER_TEMP/wheel/bin/python" "$GITHUB_WORKSPACE/scripts/study_hellaswag.py" replay
+          "$RUNNER_TEMP/wheel/bin/python" "$GITHUB_WORKSPACE/scripts/study_arc.py" replay
           "$RUNNER_TEMP/wheel/bin/caat" policy "$GITHUB_WORKSPACE/examples/ifeval_graders.csv" --score-column mean_token_logprob --correct-column strict_pass --risk-target 0.4
