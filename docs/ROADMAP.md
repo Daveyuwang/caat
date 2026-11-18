@@ -16,7 +16,7 @@ Score-stratified auditing is the next alternative. The two equal-sized
 score halves on HellaSwag contain 125 and 25 errors, compared with 122 and
 114 on ANLI R2. Before adding strata, demonstrate lower decision cost under
 the same directional guarantees. Arbitrary-time stopping is a separate
-option for teams whose labels arrive continuously. [Stratified prediction-powered inference](https://arxiv.org/abs/2406.04291) Â· [Finite-population confidence sequences](https://arxiv.org/abs/2006.04347)
+option for teams whose labels arrive continuously. [Stratified prediction-powered inference](https://arxiv.org/abs/2406.04291) · [Finite-population confidence sequences](https://arxiv.org/abs/2006.04347)
 
 ## 1.1 series
 
@@ -26,23 +26,23 @@ Plan a two-stage audit on an unlabeled batch, dispatch work at each checkpoint
 and resume a partial receipt. On 1,500 HellaSwag predictions, the planner's
 higher expected cost across the two prespecified scenarios fell 8.00% versus
 the best 1.1 fixed block. The observed draw took 321 labels versus 314.
-[HellaSwag study](research/hellaswag-audit.md) Â· [Completed milestone](https://github.com/Daveyuwang/caat/milestone/1) Â· [Install the 1.1 supplement](https://github.com/Daveyuwang/caat/releases/tag/v1.1.0)
+[HellaSwag study](research/hellaswag-audit.md) · [Completed milestone](https://github.com/Daveyuwang/caat/milestone/1) · [Install the 1.1 supplement](https://github.com/Daveyuwang/caat/releases/tag/v1.1.0)
 
 ### 1.1.0
 
 Preview verdict probabilities and grading costs on an unlabeled batch,
 then draw the audit sample at the chosen budget. The UCI letter study
 selected 300 labels and used all 30 blocks before reaching an inconclusive
-verdict. [Budget forecast](guide/reports.md#plan) Â· [Letter audit](research/letter-audit.md)
+verdict. [Budget forecast](guide/reports.md#plan) · [Letter audit](research/letter-audit.md)
 
 ## 1.0.0
 
-Take a saved batch from scoring through a routing decision, then use the same policy to audit the next labeled batch. When a cutoff misses its target, a labeler can still draw a fixed-budget audit sample and stop once every possible completion gives the same verdict. [Policy walkthrough](../README.md#reuse-one-fitted-policy-from-routing-through-audit) Â· [Audit handoff](guide/queue.md#issue-audit-labels-in-blocks)
+Take a saved batch from scoring through a routing decision, then use the same policy to audit the next labeled batch. When a cutoff misses its target, a labeler can still draw a fixed-budget audit sample and stop once every possible completion gives the same verdict. [Policy walkthrough](../README.md#reuse-one-fitted-policy-from-routing-through-audit) · [Audit handoff](guide/queue.md#issue-audit-labels-in-blocks)
 
-[1.x compatibility](../CONTRIBUTING.md#public-interface) Â· [Release notes](../CHANGELOG.md)
+[1.x compatibility](../CONTRIBUTING.md#public-interface) · [Release notes](../CHANGELOG.md)
 
 ## After 1.0
 
 A priority for research is cutoff stability. A class-aware score changed accepted error by 0.58 percentage points on ANLI R1 at 75% coverage, and the interval included zero. A follow-up should compare scores at matched inference cost and test the selected cutoff on a fresh batch. [ANLI results](research/anli-results.md)
 
-For integrations, start with a real prediction table or evaluation log and the decision its owner needs to make. [Contributor guide](../CONTRIBUTING.md) Â· [Plugin contracts](guide/plugins.md)
+For integrations, start with a real prediction table or evaluation log and the decision its owner needs to make. [Contributor guide](../CONTRIBUTING.md) · [Plugin contracts](guide/plugins.md)
