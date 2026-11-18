@@ -962,13 +962,9 @@ def plan_options(parser):
 def run_plan(args):
     two_stage = args.interim_labels is not None
     if two_stage:
-        if (
-            not args.forecast
-            or not args.batch_predictions
-            or args.error_scenarios is None
-        ):
+        if not args.batch_predictions or args.error_scenarios is None:
             raise ValueError(
-                "--interim-labels requires --forecast, --batch-predictions and --error-scenarios"
+                "--interim-labels requires --batch-predictions and --error-scenarios"
             )
         if args.expected_error is not None or args.block_size is not None:
             raise ValueError(
@@ -1087,7 +1083,7 @@ def run_plan(args):
             options["prediction_filter"] = {"column": column, "value": value}
         if two_stage:
             options.update(
-                forecast=True,
+                forecast=args.forecast,
                 interim_labels=args.interim_labels,
                 error_scenarios=args.error_scenarios,
                 power=0.8 if args.power is None else args.power,
@@ -1105,6 +1101,10 @@ def run_plan(args):
                     options["request_cost"],
                 )
             )
+            if not args.forecast and not result["qualifies"]:
+                raise ValueError(
+                    "insufficient power for this design; use --forecast to compare budgets"
+                )
         elif args.forecast:
             options.update(forecast=True, expected_error=args.expected_error)
             result.update(
@@ -2749,6 +2749,10 @@ def main(argv=None):
         fit_outputs = label_plan = candidate_policy = None
         if args.command in {"evaluate", "audit"}:
             label_plan = load_label_plan(args)
+            if label_plan and "stages" in label_plan:
+                if args.command != "evaluate":
+                    raise ValueError("use evaluate for checkpoint verdicts")
+                return evaluate_partial(args, label_plan)
             if getattr(args, "partial", False):
                 return evaluate_partial(args, label_plan)
             saved = load_threshold_options(args, label_plan=label_plan)

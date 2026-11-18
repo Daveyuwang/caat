@@ -208,6 +208,23 @@ The report shows grades returned, observed errors and the range of possible erro
 
 ## Issue audit labels in blocks
 
+For a two-stage plan, use the same checkpoint, scenarios and cap as the
+forecast. Replace `--forecast` with `--sample-output` and save the plan.
+The journal issues the first checkpoint in one request. Each grader who
+still needs the final checkpoint receives the remaining rows in a second
+request. Resume by repeating the handoff command with the same inputs.
+
+```bash
+caat plan --threshold-report results/letter_audit/policy.json --batch-predictions results/letter_audit/predictions.csv --label-budget 300 --interim-labels 200 --error-scenarios .02 .08 --sample-output replay/letters.csv --output replay/letters-plan.json
+caat audit-block --threshold-report results/letter_audit/policy.json --batch-predictions results/letter_audit/predictions.csv --plan-report replay/letters-plan.json --handoff replay/letters --grader dataset
+```
+
+Return grades with `--request ID --grader-file dataset=receipt.csv`. A
+partial return keeps the current request open. `caat evaluate --partial`
+replays the frozen sample order and reports the checkpoint, error count
+and label count used for the verdict. The two-stage plan uses a distinct
+report type that earlier CAAT versions reject.
+
 Create the 0.7 sample plan and give graders only the CSV that `audit-block` issues. The handoff directory keeps a SQLite journal and one CSV per request. Use a local directory shared by the processes running this audit. This example uses the archived R2 plan.
 
 ```bash

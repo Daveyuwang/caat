@@ -194,7 +194,7 @@ def read_label_plan(path, *, allow_empty=False):
     report = _read_json_report(path)
     if (
         not isinstance(report, dict)
-        or report.get("command") != "plan"
+        or report.get("command") not in ("plan", "two-stage-plan")
         or not isinstance(report.get("input"), dict)
     ):
         raise ValueError(f"{path}: expected a CAAT plan JSON report")
@@ -275,6 +275,17 @@ def read_label_plan(path, *, allow_empty=False):
             ):
                 raise ValueError(f"{path}: invalid sample columns")
             fixed["sample_columns"] = columns
+    if report["command"] == "two-stage-plan":
+        from .two_stage import validate_stages
+
+        if (
+            "batch_predictions" not in report["input"]
+            or report.get("qualifies") is not True
+        ):
+            raise ValueError(f"{path}: expected a qualified two-stage draw")
+        stages = report.get("stages")
+        validate_stages(stages, population, labels, risk, confidence)
+        fixed["stages"] = stages
     return {
         **fixed,
         "accepted": labels,
@@ -474,6 +485,16 @@ def describe(report):
             f"Planned draw {report['planned_labels']} at a budget of {report['label_budget']} labels."
         ]
         for name, counts in report["graders"].items():
+            if "stages" in report:
+                if counts["decision_status"] == "settled":
+                    lines.append(
+                        f"{name}: {counts['batch_verdict']} at checkpoint {counts['decision_stage']} with {counts['decision_errors']} errors in {counts['decision_labels']} labels."
+                    )
+                else:
+                    lines.append(
+                        f"{name}: {counts['graded']} graded; next checkpoint at {counts['next_checkpoint']} labels."
+                    )
+                continue
             low, high = counts["possible_final_errors"]
             action = (
                 "Request more grades."

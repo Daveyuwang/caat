@@ -14,8 +14,52 @@ from .rules import assess_accepted_risk
 from .table import read_grader_file, read_table_rows
 
 
+def checkpoint_progress(stages, bits):
+    outcomes = list(bits.values())
+    counts = dict(
+        graded=len(outcomes),
+        errors=len(outcomes) - sum(outcomes),
+        decision_status="pending",
+        batch_verdict=None,
+    )
+    for index, stage in enumerate(stages, 1):
+        n = stage["labels"]
+        if len(outcomes) < n:
+            return dict(counts, next_checkpoint=n)
+        errors = n - sum(outcomes[:n])
+        verdict = next(
+            name for name, lo, hi in verdict_ranges(n, stage) if lo <= errors <= hi
+        )
+        if verdict != "inconclusive" or index == len(stages):
+            return dict(
+                counts,
+                decision_status="settled",
+                batch_verdict=verdict,
+                decision_stage=index,
+                decision_errors=errors,
+                decision_labels=n,
+            )
+
+
 def progress_report(plan, grades):
     size, cap = plan["accepted_population"], plan["accepted"]
+    if "stages" in plan:
+        results = {
+            name: checkpoint_progress(plan["stages"], bits)
+            for name, bits in grades.items()
+        }
+        return dict(
+            accepted_population=size,
+            label_budget=plan["label_budget"],
+            planned_labels=cap,
+            risk_target=plan["risk_target"],
+            holdout_confidence=plan["holdout_confidence"],
+            stages=plan["stages"],
+            graders=results,
+            decision_status="settled"
+            if all(r["batch_verdict"] for r in results.values())
+            else "pending",
+        )
     target, confidence = plan["risk_target"], plan["holdout_confidence"]
     limits = sample_error_limits(size, cap, target, confidence) if size else {}
 
@@ -133,6 +177,11 @@ def evaluate_partial(args, plan):
     else:
         grades = {
             name: {r.id: r.outcomes[i] for r in rows} for i, name in enumerate(names)
+        }
+    if "stages" in plan:
+        grades = {
+            name: {r.id: bits[r.id] for r in draw[: len(bits)]}
+            for name, bits in grades.items()
         }
     result = progress_report(plan, grades)
     inputs = [

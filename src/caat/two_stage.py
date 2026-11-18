@@ -44,6 +44,45 @@ def _stage(n, low, high):
     )
 
 
+def validate_stages(stages, size, cap, target, confidence):
+    if (
+        not isinstance(stages, list)
+        or len(stages) != 2
+        or not all(isinstance(s, dict) for s in stages)
+    ):
+        raise ValueError("expected two frozen checkpoints")
+    first = stages[0].get("labels")
+    if type(first) is not int or not 0 < first < cap or stages[1].get("labels") != cap:
+        raise ValueError("invalid checkpoint label counts")
+    boundaries = []
+    for s in stages:
+        n = s["labels"]
+        low, high = s.get("max_errors_to_meet"), s.get("min_errors_to_exceed")
+        if set(s) != {"labels", "max_errors_to_meet", "min_errors_to_exceed"} or any(
+            x is not None and (type(x) is not int or not 0 <= x <= n)
+            for x in (low, high)
+        ):
+            raise ValueError("invalid checkpoint boundaries")
+        low, high = (-1 if low is None else low), (n + 1 if high is None else high)
+        if low >= high:
+            raise ValueError("overlapping checkpoint boundaries")
+        boundaries.append((low, high))
+    (a, b), (c, d) = boundaries
+    allowed = floor(Fraction(str(target)) * size)
+    if allowed >= size:
+        raise ValueError("two-stage targets must have a violating population")
+    ways = comb(cap, first)
+    alpha = 1 - Fraction(str(confidence))
+    for k, initial, last in ((allowed + 1, a, c), (size - allowed, first - b, cap - d)):
+        mass = _mass(size, k, cap)
+        cross = _crossing_counts(cap, first, initial)
+        used = sum(w * (ways if y <= last else cross[y]) for y, w in enumerate(mass))
+        if used > alpha * sum(mass) * ways:
+            raise ValueError(
+                "checkpoint boundaries exceed the directional error allowance"
+            )
+
+
 def _outcomes(mass, early_low, early_high, ways, first, final, low, high):
     total = sum(mass) * ways
     meets = exceeds = continued = 0
