@@ -4,6 +4,7 @@
 
 - Use `caat evaluate --partial` to check whether the grades returned so far settle a fixed-budget audit.
 - Resume keyed CSV assignments with `caat audit-block`. Each block has a stable ID and records outstanding labels by grader.
+- On WinoGrande the block handoff requested 90 labels and reproduced the 100-label verdict. [Study and replay](docs/research/winogrande-results.md)
 
 ## 0.7.0
 

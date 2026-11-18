@@ -118,6 +118,8 @@ The sample found 43 errors. Its one-sided 95% lower limit was 35.34%, so
 the verdict is `exceeds` and evaluation returns status 1. Routing from
 the original policy stays disabled. [Fixed-batch guide](https://github.com/Daveyuwang/caat/blob/main/docs/guide/queue.md#draw-an-audit-sample-after-a-policy-misses-its-target) · [R2 results](https://github.com/Daveyuwang/caat/blob/main/docs/research/fixed-batch-audit.md)
 
+To collect labels one block at a time, use `caat audit-block`. On WinoGrande, nine blocks of ten labels established the same verdict as the full 100-label draw. To check grades already collected, use `caat evaluate --partial`. [Block handoff](https://github.com/Daveyuwang/caat/blob/main/docs/guide/queue.md#issue-audit-labels-in-blocks) · [WinoGrande results](https://github.com/Daveyuwang/caat/blob/main/docs/research/winogrande-results.md)
+
 ## Set a cutoff
 
 `caat policy` sorts IDs and shuffles with `--seed` (default 42) to assign

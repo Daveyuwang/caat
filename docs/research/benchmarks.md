@@ -15,6 +15,8 @@ multiple-choice reasoning, and open-ended factual recall.
 | [MMLU-Pro](../../examples/mmlu_pro.csv) | Mean token log probability | −0.30 | 12 / 24 | 5 |
 | [TriviaQA](../../examples/triviaqa.csv) | Archived response score | 0.50 | 13 / 24 | 0 |
 
+The [WinoGrande audit](winogrande-results.md) replays the blockwise and full-budget verdicts for a frozen set of 667 eligible outputs. It uses only the saved rows and the base package.
+
 ## Full HELM archives
 
 The comparison uses all 541 IFEval and 1,000 MMLU-Pro responses in the
