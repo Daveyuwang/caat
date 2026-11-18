@@ -2,9 +2,8 @@
 
 import argparse
 import json
-from time import perf_counter
 
-from collect_boolq import MODELS
+from collect_choice_logits import collect_choices
 from common import ROOT, read_csv, write_report
 from prepare_boolq import digest, normalized
 
@@ -51,76 +50,6 @@ def prompts():
     return sorted(families.values(), key=lambda pair: pair[0]["id"])
 
 
-def collect(rows):
-    from caat.collect import TransformersBackend
-    import torch
-
-    name, revision = MODELS["generate"]
-    engine = TransformersBackend(
-        name,
-        revision,
-        device="cuda",
-        seed=42,
-        local_files_only=False,
-        gpu_memory="12GiB",
-    )
-    tokenizer = engine.tokenizer
-    tokens = [tokenizer.encode(c, add_special_tokens=False) for c in "AB"]
-    if tokens != [[32], [33]] or engine.model.dtype != torch.bfloat16:
-        raise ValueError("collection requires the frozen A/B tokens and BF16 weights")
-    formatted = sorted(
-        [(m, engine.format_prompt(text)) for m, text in rows],
-        key=lambda pair: len(pair[1]),
-    )
-    results = []
-    total_tokens = 0
-    start = perf_counter()
-    with torch.inference_mode():
-        for i in range(0, len(rows), 16):
-            group = formatted[i : i + 16]
-            inputs = tokenizer(
-                [s for _, s in group],
-                padding=True,
-                add_special_tokens=False,
-                return_tensors="pt",
-            ).to(engine.model.device)
-            logits = (
-                engine.model(**inputs, logits_to_keep=1, use_cache=False)
-                .logits[:, -1, [32, 33]]
-                .float()
-                .tolist()
-            )
-            total_tokens += int(inputs.attention_mask.sum())
-            for (m, text), (a, b) in zip(group, logits, strict=True):
-                choice = "A" if a >= b else "B"
-                results.append(
-                    dict(
-                        id=m["id"],
-                        prompt_sha256=digest(text),
-                        A=a,
-                        B=b,
-                        answer=choice,
-                        output_sha256=m[choice + "_sha256"],
-                        gap=abs(a - b),
-                    )
-                )
-    elapsed = perf_counter() - start
-    write_report(OUT / "predictions.csv", sorted(results, key=lambda r: r["id"]))
-    summary = dict(
-        **engine.metadata,
-        dtype="bfloat16",
-        logical_requests=len(rows),
-        batches=(len(rows) + 15) // 16,
-        input_tokens=total_tokens,
-        wall_seconds=elapsed,
-        dataset_revision=REVISION,
-    )
-    (OUT / "collection.json").write_text(
-        json.dumps(summary, indent=2) + "\n", encoding="utf-8"
-    )
-    print(summary)
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("stage", choices=["freeze", "collect"])
@@ -136,4 +65,4 @@ if __name__ == "__main__":
             {k: str(v) for k, v in m.items()} for m in manifest
         ]:
             raise ValueError("cohort changed after freeze")
-        collect(rows)
+        collect_choices(rows, "AB", OUT, REVISION)
