@@ -1,28 +1,13 @@
 # CAAT roadmap
 
-CAAT covers the confidence pipeline on saved model outputs: score,
-calibrate, evaluate, and use. The local collection extra can produce those
-inputs. [Sampling-budget replay](research/sample-budget.md)
+## 1.0.0
 
-Version 0.7 audits the outputs a saved policy would accept on a new batch. With a budget of 100 labels, the audit found 43 errors on ANLI R2 and 12 on the archived BoolQ control. The first batch exceeded the 20% target and the second met it. Routing still requires a confirmed policy. [Fixed-budget audit](research/fixed-batch-audit.md)
+Take a saved batch from scoring through a routing decision, then use the same policy to audit the next labeled batch. When a cutoff misses its target, a labeler can still draw a fixed-budget audit sample and stop once every possible completion gives the same verdict. [Policy walkthrough](../README.md#reuse-one-fitted-policy-from-routing-through-audit) · [Audit handoff](guide/queue.md#issue-audit-labels-in-blocks)
 
-Version 0.6 shows which predicted classes consume a global review budget and can fit a categorical prediction alongside numeric features. Adding the class reduced ANLI R1 accepted error by 0.58 points at 75% coverage. The interval included zero. The verifier cost an additional call per row and the independent audit rejected the candidate cutoff. Class inputs and verification remain opt-in. [Class-aware walkthrough](guide/classifier.md#hand-off-a-class-aware-policy) · [ANLI results](research/anli-results.md)
+For 1.0, freeze the documented CLI flags, exit statuses, Python imports, plugin contracts and report fields. [Public interface](../CONTRIBUTING.md#public-interface) Replay existing saved policies from the installed wheel and verify the distribution from a clean checkout. Keep benchmark data, protocols and generated figures linked from the [benchmark guide](research/benchmarks.md).
 
-Version 0.5 applies a frozen scorer from routing through monitoring and supports independent calibration labels and ungraded reference scores. On BoolQ, reference quantiles improved stability at 320 labels, and an exploratory native score with the answer identity had the lowest accepted error among the reported 0.5 comparisons. [Frozen workflow](guide/workflow.md#calibrate-a-frozen-score) · [BoolQ results](research/boolq-results.md)
+## After 1.0
 
-Version 0.3.0 added inputs from Inspect, lm-evaluation-harness, Every Eval
-Ever, and HELM, a one-file workflow, label planning, monitoring, and
-summaries that state why a result holds.
-[Changelog](../CHANGELOG.md)
+A priority for research is cutoff stability. A class-aware score changed accepted error by 0.58 percentage points on ANLI R1 at 75% coverage, and the interval included zero. A follow-up should compare scores at matched inference cost and test the selected cutoff on a fresh batch. [ANLI results](research/anli-results.md)
 
-| Stage | Open work |
-| --- | --- |
-| Score | Compare complementary signals on a new task at matched inference cost. |
-| Calibrate | Calibration references and fixtures for score types proposed by users. |
-| Evaluate | More standard LLM evaluation sets beyond IFEval, MMLU-Pro, TriviaQA, and ARC-Challenge. |
-| Use | Validate a more stable cutoff for learned scores on fresh data. Label columns in `caat calibrate fit`. A queue file without the empty group column. `caat route` naming the rows that chose the cutoff. Recheck proportional grader shifts on held-out WildBench archives. |
-| Reports | Extend the offline report when a replay needs additional fields. |
-
-Start with a saved input, an independent check or hand-calculated
-example, and an acceptance case. [Contributor guide](../CONTRIBUTING.md) ·
-[Plugin contracts](guide/plugins.md)
+For integrations, start with a real prediction table or evaluation log and the decision its owner needs to make. [Contributor guide](../CONTRIBUTING.md) · [Plugin contracts](guide/plugins.md)

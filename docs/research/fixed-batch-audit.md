@@ -15,7 +15,7 @@ was at most 13 observed errors to support the target or at least 27 to
 establish excess. The protocol and cohort were frozen before inference.
 The draw was recorded before opening its grades, and the verdict was recorded
 before opening the remaining 480 eligible grades.
-[Protocol commit](https://github.com/Daveyuwang/caat/commit/3beaea7) · [Frozen draw](https://github.com/Daveyuwang/caat/commit/19fa4e1) · [Sampled verdict](https://github.com/Daveyuwang/caat/commit/4e404b2)
+The development history records the protocol at `3beaea7`, the draw at `19fa4e1` and the verdict at `4e404b2`. [Frozen cohort](../../results/anli_r2/manifest.csv) · [Sampled outputs](../../results/anli_r2/sample.csv) · [Sample verdict](../../results/anli_r2/sample-result.json)
 
 The RTX 5080 scored 879 original prompts in 55 batches (149,208 input
 tokens, 37.66 seconds excluding model loading). Planning and auditing then

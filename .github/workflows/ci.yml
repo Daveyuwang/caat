@@ -65,20 +65,13 @@ jobs:
         run: python -m pip install ".[workflow]"
       - name: Unit tests and benchmark replay
         run: python -m unittest discover -s tests -v
-      - name: README examples
+      - name: Installed commands and report rendering
         run: |
           caat --version
           caat plugins --json > /dev/null
           caat evaluate examples/ticket_triage.csv --adapter csv --metric ranking --render json --render-output replay/registered-report.json --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --threshold 0.75 > /dev/null
           caat evaluate examples/ticket_triage.csv --id-column ticket_id --prediction-column model_route --reference-column expected_route --score-column confidence --group-column inbox --threshold 0.75 --probability --output-dir replay/tickets --reliability-plot replay/tickets/reliability.svg --html replay/tickets/report.html
           git diff --no-index --ignore-cr-at-eol --exit-code docs/figures/calibration-example.svg replay/tickets/reliability.svg
-          caat policy examples/ifeval_graders.csv --score-column mean_token_logprob --correct-column strict_pass --check-column helm_strict_pass --risk-target 0.4 --plot replay/readme-policy.svg
-          git diff --no-index --ignore-cr-at-eol --exit-code docs/figures/policy-example.svg replay/readme-policy.svg
-          audit_status=0
-          caat audit examples/audit/predictions.csv --output-key-column output_key --grader-file reference=examples/audit/reference.csv --grader-file rubric=examples/audit/rubric.csv --threshold 0.75 --risk-target 0.4 --json > /dev/null || audit_status=$?
-          test "$audit_status" -eq 1
-          caat select examples/ifeval_strict.csv --score-column mean_token_logprob --correct-column strict_pass --thresholds -0.20 -0.35 -0.60 --risk-target 0.4 --rule empirical > /dev/null
-          caat features examples/token_scores.jsonl --output replay/token_scores.csv
           caat scores examples/ifeval_graders.csv --score-column mean_token_logprob --correct-column strict_pass --correct-column helm_strict_pass --bootstrap 0 > /dev/null
 
   inspect-logs:

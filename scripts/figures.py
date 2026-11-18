@@ -1,17 +1,17 @@
 """Draw the CAAT research figures from saved CSV tables."""
 
 import argparse
+from itertools import groupby
+from math import isnan
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import PercentFormatter
 
-from common import ARCHIVES, ROOT, read_csv
+from common import ARCHIVES, ROOT, read_csv, read_json
 
 
-COLORS = ("#0072b2", "#b54e00", "#00835f", "#aa4b86", "#7458ad", "#83672d", "#4d6979")
-STYLES = ("-", "--", ":", "-.")
-MARKERS = ("o", "s", "^", "D", "P")
 GRADER_NAMES = {
     "strict_pass": "Google strict",
     "helm_strict_pass": "HELM full pass",
@@ -37,6 +37,7 @@ def setup_style():
             "xtick.color": "#415964",
             "ytick.color": "#415964",
             "svg.fonttype": "none",
+            "pdf.fonttype": 42,
             "svg.hashsalt": "caat-research",
         }
     )
@@ -59,46 +60,56 @@ def export(figure, destination):
     print(f"Wrote {destination.name}.svg and .pdf")
 
 
+def score_matrix(axis, values, row_names, column_names, palette, fmt):
+    # Fixed limits keep a given shade comparable across graders and archives.
+    axis.imshow(values, cmap=palette, vmin=0, vmax=1, aspect="auto")
+    axis.set_xticks(range(len(column_names)), column_names)
+    axis.set_yticks(range(len(row_names)), row_names)
+    axis.tick_params(length=0, pad=5)
+    axis.spines[:].set_visible(False)
+    for y, row in enumerate(values):
+        for x, value in enumerate(row):
+            text = "n/a" if isnan(value) else format(value, fmt)
+            axis.text(x, y, text, ha="center", va="center", fontsize=8)
+    for position in range(len(row_names) - 1):
+        axis.axhline(position + 0.5, color="white", linewidth=1)
+    for position in range(len(column_names) - 1):
+        axis.axvline(position + 0.5, color="white", linewidth=1)
+
+
 def risk_coverage(rows, output):
+    palette = LinearSegmentedColormap.from_list(
+        "accepted_error", ["#ffffff", "#e5b690"]
+    )
     for archive, (_, _, graders) in ARCHIVES.items():
         subset = [row for row in rows if row["benchmark"] == archive]
         methods = list(dict.fromkeys(row["method"] for row in subset))
-        fig, axes = plt.subplots(1, 2, figsize=(9.4, 4.5), sharey=True)
-        fig.subplots_adjust(left=0.10, right=0.97, top=0.88, bottom=0.30, wspace=0.17)
-        for ax, grader in zip(axes, graders, strict=True):
-            for i, method in enumerate(methods):
-                points = [
-                    row
-                    for row in subset
-                    if row["method"] == method and row["label_source"] == grader
-                ]
-                ax.plot(
-                    [float(row["coverage"]) for row in points],
-                    [float(row["error_rate"]) for row in points],
-                    color=COLORS[i % len(COLORS)],
-                    linestyle=STYLES[(i // len(COLORS)) % len(STYLES)],
-                    marker=MARKERS[i % len(MARKERS)],
-                    markersize=3.3,
-                    linewidth=1.5,
-                    label=method.replace("_", " "),
-                )
-            ax.set_title(GRADER_NAMES[grader])
-            ax.set_xlabel("Coverage")
-            ax.xaxis.set_major_formatter(PercentFormatter(1))
-            ax.yaxis.set_major_formatter(PercentFormatter(1))
-            ax.grid(axis="y", color="#e0e8ec", linewidth=0.8)
-            ax.set_axisbelow(True)
-        axes[0].set_ylabel("Accepted error rate")
-        handles, labels = axes[0].get_legend_handles_labels()
-        fig.legend(
-            handles,
-            labels,
-            loc="lower center",
-            bbox_to_anchor=(0.5, 0.03),
-            frameon=False,
-            fontsize=8,
-            ncols=3,
+        budgets = sorted({float(row["target_coverage"]) for row in subset})
+        fig, axes = plt.subplots(
+            1, 2, figsize=(9.1, 1.8 + len(methods) * 0.34), sharey=True
         )
+        fig.subplots_adjust(left=0.26, right=0.98, top=0.87, bottom=0.21, wspace=0.1)
+        for ax, grader in zip(axes, graders, strict=True):
+            risks = {
+                (row["method"], float(row["target_coverage"])): float(row["error_rate"])
+                for row in subset
+                if row["label_source"] == grader
+            }
+            score_matrix(
+                ax,
+                [[risks[method, budget] for budget in budgets] for method in methods],
+                [method.replace("_", " ") for method in methods],
+                [f"{budget:.0%}" for budget in budgets],
+                palette,
+                ".1%",
+            )
+            ax.set_title(GRADER_NAMES[grader])
+        fig.supxlabel("Target coverage", x=0.62, y=0.035)
+        dataset, model = archive.rsplit("_", 1)
+        dataset = {"ifeval": "IFEval", "mmlu_pro": "MMLU-Pro"}[dataset]
+        model = {"qwen": "Qwen 2.5 7B", "llama": "Llama 3.1 8B"}[model]
+        fig.text(0.018, 0.94, f"{dataset} · {model}", weight="bold")
+        fig.text(0.018, 0.87, "Accepted error rate")
         export(fig, output / f"risk-coverage-{archive.replace('_', '-')}")
 
 
@@ -110,13 +121,13 @@ def wildbench_shifts(rows, output):
     pairs = list(
         dict.fromkeys((row["first_judge"], row["second_judge"]) for row in rows)
     )
-    models = sorted({row["model"] for row in rows}, reverse=True)
+    models = sorted({row["model"] for row in rows})
     fig, axes = plt.subplots(
-        1, len(pairs), figsize=(11.7, 5.8), sharey=True, sharex=True
+        1, len(pairs), figsize=(12.2, 6.5), sharey=True, sharex=True
     )
-    fig.subplots_adjust(left=0.28, right=0.98, top=0.89, bottom=0.13, wspace=0.18)
-    for index, (ax, pair) in enumerate(zip(axes, pairs, strict=True)):
-        ax.axvline(0, color="#67818f", linewidth=1, linestyle="--")
+    fig.subplots_adjust(left=0.31, right=0.98, top=0.91, bottom=0.15, wspace=0.12)
+    for ax, pair in zip(axes, pairs, strict=True):
+        ax.axvline(0, color="#556777", linewidth=1, linestyle="--")
         cells = {
             row["model"]: row
             for row in rows
@@ -128,20 +139,23 @@ def wildbench_shifts(rows, output):
                 100 * float(row[key])
                 for key in ("lower_95", "excess_shift", "upper_95")
             )
-            ax.hlines(y, lower, upper, linewidth=1.3, color=COLORS[index])
-            ax.scatter(
-                point, y, s=19, marker=MARKERS[index], color=COLORS[index], zorder=2
-            )
+            ax.hlines(y, lower, upper, linewidth=1.5, color="#286b83")
+            ax.scatter([lower, upper], [y, y], marker="|", color="#286b83", s=20)
+            ax.scatter(point, y, s=20, color="#143e51", zorder=3)
         ax.set_title(f"{GRADER_NAMES[pair[0]]} to {GRADER_NAMES[pair[1]]}")
         ax.set_xscale("symlog", linthresh=10)
         ax.set_xticks([-5, 0, 5, 10, 25, 50], ["−5", "0", "5", "10", "25", "50"])
-        ax.grid(axis="y", color="#e7edef", linewidth=0.65)
+        ax.grid(axis="y", color="#e4e9ec", linewidth=0.7)
         ax.set_axisbelow(True)
-        ax.yaxis.set_tick_params(length=0)
-    axes[0].set_yticks(
-        range(len(models)), [short_model(model) for model in models], fontsize=8
+        ax.tick_params(axis="y", length=0)
+    totals = {row["model"]: int(row["total"]) for row in rows}
+    labels = [f"{short_model(model)}  ({totals[model]:,})" for model in models]
+    axes[0].set_yticks(range(len(models)), labels, fontsize=8.5)
+    axes[0].invert_yaxis()
+    fig.text(0.018, 0.945, "Model (paired rows)", weight="bold")
+    fig.supxlabel(
+        "Excess grader shift (percentage points), paired 95% interval", x=0.64, y=0.045
     )
-    fig.supxlabel("Excess shift in percentage points", x=0.63, y=0.03)
     export(fig, output / "wildbench-grader-shifts")
 
 
@@ -152,54 +166,37 @@ def wildbench_auroc(rows, output):
         if row["scenario"] == "wildbench" and row["outcome_cutoff"] == "7"
     ]
     judges = list(dict.fromkeys(row["judge"] for row in data))
+    names = {
+        "mean_token_logprob": "Mean\nlog p",
+        "sequence_logprob": "Seq.\nlog p",
+        "negative_mean_token_logprob": "Neg. mean\nlog p",
+        "low_token_logprob": "Low\nlog p",
+        "shorter_response": "Shorter\nresponse",
+    }
     scores = list(dict.fromkeys(row["score"] for row in data))
-    models = sorted({row["model"] for row in data}, reverse=True)
-    fig, axes = plt.subplots(
-        1, len(judges), figsize=(12.5, 6.4), sharey=True, sharex=True
+    models = sorted({row["model"] for row in data})
+    palette = LinearSegmentedColormap.from_list(
+        "auroc", ["#e3af83", "#ffffff", "#84bfd0"]
     )
-    fig.subplots_adjust(left=0.26, right=0.98, top=0.91, bottom=0.21, wspace=0.16)
+    fig, axes = plt.subplots(1, len(judges), figsize=(14.4, 6.3), sharey=True)
+    fig.subplots_adjust(left=0.215, right=0.99, top=0.92, bottom=0.13, wspace=0.08)
     for ax, judge in zip(axes, judges, strict=True):
-        ax.axvline(0.5, color="#67818f", linewidth=1, linestyle="--")
-        pairs = {
-            (row["model"], row["score"]): row["auroc"]
+        values = {
+            (row["model"], row["score"]): float(row["auroc"] or "nan")
             for row in data
             if row["judge"] == judge
         }
-        for index, score in enumerate(scores):
-            available = [
-                (y + (index - 2) * 0.11, float(pairs[model, score]))
-                for y, model in enumerate(models)
-                if pairs[model, score]
-            ]
-            y, x = zip(*available)
-            ax.scatter(
-                x,
-                y,
-                label=score.replace("_", " "),
-                marker=MARKERS[index],
-                s=23,
-                color=COLORS[index],
-                zorder=2,
-            )
+        score_matrix(
+            ax,
+            [[values[model, score] for score in scores] for model in models],
+            [short_model(model) for model in models],
+            [names[score] for score in scores],
+            palette,
+            ".2f",
+        )
         ax.set_title(GRADER_NAMES[judge])
-        ax.set_xlabel("AUROC")
-        ax.set_xlim(-0.025, 1.025)
-        ax.set_xticks([0, 0.2, 0.4, 0.6, 0.8, 1])
-        ax.grid(axis="y", color="#e7edef", linewidth=0.65)
-        ax.set_axisbelow(True)
-        ax.yaxis.set_tick_params(length=0)
-    axes[0].set_yticks(
-        range(len(models)), [short_model(model) for model in models], fontsize=8
-    )
-    handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(
-        handles,
-        labels,
-        loc="lower center",
-        bbox_to_anchor=(0.58, 0.035),
-        frameon=False,
-        ncols=3,
-    )
+        ax.tick_params(labelsize=8)
+    fig.text(0.015, 0.95, "AUROC by confidence score", weight="bold")
     export(fig, output / "wildbench-auroc")
 
 
@@ -213,11 +210,14 @@ def calibration_replay(rows, output):
             "Omni-MATH · Token probability",
         ),
     )
-    figure, axes = plt.subplots(1, 3, figsize=(10, 3.7), sharex=True, sharey=True)
-    figure.subplots_adjust(left=0.09, right=0.98, bottom=0.24, top=0.86, wspace=0.21)
-    for axis, (archive, score, title) in zip(axes, examples, strict=True):
-        axis.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="#67818f")
+    figure, axes = plt.subplots(2, 3, figsize=(9.2, 5.9), sharex=True, sharey=True)
+    figure.subplots_adjust(
+        left=0.14, right=0.985, bottom=0.13, top=0.90, wspace=0.18, hspace=0.15
+    )
+    for column, (archive, score, title) in enumerate(examples):
+        axes[0, column].set_title(title)
         for index, method in enumerate(("raw", "platt")):
+            axis = axes[index, column]
             bins = [
                 row
                 for row in rows
@@ -226,30 +226,86 @@ def calibration_replay(rows, output):
                 and row["method"] == method
                 and int(row["count"]) > 0
             ]
+            axis.plot([0, 1], [0, 1], color="#748694", linestyle="--", linewidth=1)
             axis.scatter(
                 [float(row["mean_probability"]) for row in bins],
                 [float(row["accuracy"]) for row in bins],
-                s=[18 + 0.09 * int(row["count"]) for row in bins],
-                label={"raw": "Raw score", "platt": "Platt"}[method],
-                color=COLORS[index],
-                marker=MARKERS[index],
-                alpha=0.72,
+                s=[14 + 0.12 * int(row["count"]) for row in bins],
+                facecolors="none",
+                edgecolors="#126681",
+                linewidths=1.4,
             )
-        axis.set(
-            title=title,
-            xlim=(-0.04, 1.04),
-            ylim=(-0.04, 1.04),
-            xticks=(0, 0.5, 1),
-            yticks=(0, 0.5, 1),
-        )
-        axis.set_aspect("equal")
-        axis.xaxis.set_major_formatter(PercentFormatter(1))
-        axis.yaxis.set_major_formatter(PercentFormatter(1))
-    axes[0].set_ylabel("Observed correctness")
-    figure.supxlabel("Mean predicted probability", y=0.12)
-    handles, labels = axes[0].get_legend_handles_labels()
-    figure.legend(handles, labels, loc="lower center", ncols=2, frameon=False)
+            axis.set(
+                xlim=(-0.06, 1.06),
+                ylim=(-0.06, 1.06),
+                xticks=(0, 0.5, 1),
+                yticks=(0, 0.5, 1),
+                aspect="equal",
+            )
+            axis.xaxis.set_major_formatter(PercentFormatter(1, decimals=0))
+            axis.yaxis.set_major_formatter(PercentFormatter(1, decimals=0))
+            axis.grid(color="#e1e8eb", linewidth=0.65)
+            axis.set_axisbelow(True)
+    for index, method in enumerate(("Raw", "Platt")):
+        axes[index, 0].set_ylabel(method, weight="bold", labelpad=8)
+    figure.supylabel("Observed correctness", x=0.024)
+    figure.supxlabel("Mean predicted probability", x=0.55, y=0.035)
     export(figure, output / "calibration-replay")
+
+
+def audit_stopping(output):
+    archive = ROOT / "results/winogrande"
+    plan = read_json(archive / "plan.json")
+    full = read_json(archive / "full-result.json")
+    cap, boundary = plan["accepted"], plan["min_errors_to_exceed"]
+    figure, axis = plt.subplots(figsize=(8, 3.8), layout="constrained")
+    graded, errors = 0, 0
+    for _, block in groupby(
+        read_csv(archive / "receipts.csv"), key=lambda row: row["block"]
+    ):
+        for row in block:
+            graded += 1
+            errors += int(row["correct"]) == 0
+        upper = errors + cap - graded
+        color = "#126681" if errors >= boundary else "#788b96"
+        axis.vlines(graded, errors, upper, linewidth=2.2, color=color)
+        axis.scatter([graded, graded], [errors, upper], marker="_", s=76, color=color)
+    axis.axhline(boundary, color="#a24b1e", linestyle="--", linewidth=1)
+    axis.annotate(
+        f"{boundary} errors settle ‘exceeds’",
+        (1, boundary),
+        xytext=(0, -12),
+        textcoords="offset points",
+        color="#843d18",
+        bbox={"facecolor": "white", "edgecolor": "none", "pad": 1},
+    )
+    axis.annotate(
+        f"After {graded} labels\n{errors} to {upper} possible errors",
+        (graded, upper),
+        xytext=(-4, 32),
+        textcoords="offset points",
+        ha="right",
+        arrowprops={"arrowstyle": "-", "color": "#126681"},
+    )
+    axis.scatter(cap, full["errors"], color="#162f40", marker="D", s=30)
+    axis.annotate(
+        f"{full['errors']} at full draw",
+        (cap, full["errors"]),
+        xytext=(0, -24),
+        textcoords="offset points",
+        ha="right",
+    )
+    axis.set_title("WinoGrande fixed-budget audit", loc="left", weight="bold", pad=10)
+    axis.set(
+        xlabel="Labels graded",
+        ylabel=f"Possible errors in the {cap}-label draw",
+        xlim=(0, cap + 3),
+        ylim=(0, cap),
+        xticks=range(0, cap + 1, 10),
+    )
+    axis.grid(axis="y", linewidth=0.6, color="#e1e8eb")
+    axis.set_axisbelow(True)
+    export(figure, output / "winogrande-audit")
 
 
 def main():
@@ -269,6 +325,7 @@ def main():
     )
     if args.calibration_only:
         return
+    audit_stopping(args.output_dir)
     risk_coverage(read_csv(ROOT / "results/module_study/ranking.csv"), args.output_dir)
     records = args.replay_dir / "judge_study"
     wildbench_shifts(read_csv(records / "gate_cells.csv"), args.output_dir)

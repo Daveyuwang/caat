@@ -35,6 +35,7 @@ SOURCES = (
     "scripts/prepare_digit_example.py",
     "scripts/prepare_boolq.py",
     "scripts/prepare_anli.py",
+    "scripts/collect_winogrande.py",
     "scripts/study_paired_calibration.py",
     "scripts/study_score_choice.py",
     "scripts/study_cutoff_grid.py",

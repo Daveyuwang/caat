@@ -1,6 +1,6 @@
 # A blockwise audit on WinoGrande
 
-The audit requested **90 of the planned 100 labels** on a new WinoGrande batch. The ninth block brought the error count to 28. At least 27 errors were enough to establish that the eligible population exceeded its 20% target. The remaining ten grades could not change that verdict. The original ANLI policy stayed withheld from routing. [Frozen draw](https://github.com/Daveyuwang/caat/commit/fcf70d5) · [Recorded stopping decision](https://github.com/Daveyuwang/caat/commit/34c8aea)
+The audit requested **90 of the planned 100 labels** on a new WinoGrande batch. The ninth block brought the error count to 28. At least 27 errors were enough to establish that the eligible population exceeded its 20% target. The remaining ten grades could not change that verdict. The original ANLI policy stayed withheld from routing. The draw was recorded at `fcf70d5` and the stopping decision at `34c8aea`. [Frozen sample](../../results/winogrande/sample.csv) · [Stopping record](../../results/winogrande/stop.json)
 
 | Check | Labels inspected | Errors | Result |
 | --- | ---: | ---: | --- |

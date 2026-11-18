@@ -100,7 +100,7 @@ respectively. They measure the extra scoring cost after generation. The
 option-likelihood check used one next-token evaluation per question in
 63 batches per model. The archived run metadata records versions, device,
 batch sizes, calls, and timing by stage.
-[Qwen run](../../results/black_box_families/qwen2_5_7b/run.json) ·
+[Qwen run](../../results/black_box_1k/run.json) ·
 [Phi run](../../results/black_box_families/phi4_mini/run.json) ·
 [SmolLM2 run](../../results/black_box_families/smollm2/run.json)
 

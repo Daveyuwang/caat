@@ -99,51 +99,49 @@ def risk_coverage(report, curve):
 
 
 def reliability_diagram(bins):
-    width, height = 670, 350
-    left, right, top, bottom = 66, 642, 66, 283
-
-    def x(value):
-        return round(left + (right - left) * value, 2)
-
-    def y(value):
-        return round(bottom - (bottom - top) * value, 2)
-
     title = "Reliability diagram"
+    left, top, side = 64, 81, 240
+    right, bottom = left + side, top + side
+    occupied = [row for row in bins if row["count"]]
+    rows = sum(row["count"] for row in occupied)
     marks = [
-        label(left, 27, title, size=18, weight="650"),
-        label(left, top - 10, "Observed correctness", color=MUTED),
+        label(20, 27, title, size=18, weight="650"),
+        label(20, 48, f"{rows:,} rows in {len(occupied)} occupied bins", color=MUTED),
+        label(left, top - 11, "Observed correctness", color=MUTED),
         label(
-            (left + right) / 2,
-            bottom + 46,
+            left + side / 2,
+            bottom + 45,
             "Mean predicted probability",
             anchor="middle",
             color=MUTED,
         ),
     ]
-    for value in (0, 0.25, 0.5, 0.75, 1):
+    for tick in (0, 0.25, 0.5, 0.75, 1):
+        x, y = left + side * tick, bottom - side * tick
         marks.extend(
             [
-                line(left, y(value), right, y(value)),
-                label(
-                    left - 10, y(value) + 4, f"{value:.0%}", anchor="end", color=MUTED
-                ),
-                label(
-                    x(value), bottom + 20, f"{value:.0%}", anchor="middle", color=MUTED
-                ),
+                line(left, y, right, y),
+                line(x, top, x, bottom),
+                label(left - 10, y + 4, f"{tick:.0%}", anchor="end", color=MUTED),
+                label(x, bottom + 20, f"{tick:.0%}", anchor="middle", color=MUTED),
             ]
         )
-    marks.append(line(left, bottom, right, top, ORANGE, dashed=True))
-    for row in bins:
-        if row["count"]:
-            description = (
-                f"{row['count']} rows, mean probability {row['mean_probability']:.2%}, "
-                f"observed correctness {row['accuracy']:.2%}"
-            )
-            marks.append(
-                f'<circle cx="{x(row["mean_probability"])}" cy="{y(row["accuracy"])}" r="5" fill="{BLUE}">'
-                f"<title>{description}</title></circle>"
-            )
-    return canvas(width, height, title, marks)
+    marks.append(line(left, bottom, right, top, MUTED, dashed=True))
+    for row in occupied:
+        probability, accuracy = row["mean_probability"], row["accuracy"]
+        x, y = left + side * probability, bottom - side * accuracy
+        description = f"{row['count']} rows, mean probability {probability:.2%}, observed correctness {accuracy:.2%}"
+        marks.append(
+            f'<circle cx="{x:.2f}" cy="{y:.2f}" r="5" fill="{BLUE}" stroke="white">'
+            f"<title>{description}</title></circle>"
+        )
+    marks.extend(
+        [
+            line(104, bottom + 71, 129, bottom + 71, MUTED, dashed=True),
+            label(136, bottom + 75, "Perfect agreement", size=12, color=MUTED),
+        ]
+    )
+    return canvas(350, bottom + 92, title, marks)
 
 
 def grader_comparison(report):
@@ -162,55 +160,78 @@ def grader_comparison(report):
     if confidence is not None:
         title = f"{confidence * 100:.4g}% upper error bound by grader"
         rate_key = "risk_upper_bound"
-    width, left, right, top = 670, 166, 577, 72
-    axis = top + max(1, len(graders)) * 43
-    marks = [label(22, 28, title, size=18, weight="650")]
+    width, left, right, top = 690, 186, 540, 85
+    axis = top + max(1, len(graders)) * 36
+    marks = [label(20, 28, title, size=18, weight="650")]
     if threshold is None:
         marks.append(
-            label(22, 59, "No candidate threshold met the target.", color=MUTED)
+            label(20, 56, "No candidate threshold met the target.", color=MUTED)
         )
-        return canvas(width, 88, title, marks)
-    marks.append(label(22, 48, f"Cutoff {threshold:.8g}", color=MUTED))
+        return canvas(width, 76, title, marks)
+    marks.append(label(20, 49, f"Cutoff {threshold:.8g}", color=MUTED))
     observed = max([target or 0, *(entry[rate_key] or 0 for entry in graders.values())])
     maximum = min(1.0, ceil(max(0.25, 1.1 * observed) * 10) / 10)
 
     def x(value):
         return round(left + (right - left) * value / maximum, 2)
 
-    for value in (0, maximum / 2, maximum):
-        marks.append(line(x(value), top - 8, x(value), axis))
+    marks.extend(
+        [
+            label(20, top - 13, "Grader", color=MUTED),
+            label(width - 20, top - 13, "Errors / accepted", color=MUTED, anchor="end"),
+        ]
+    )
+    for tick in (0, maximum / 2, maximum):
+        marks.append(line(x(tick), top, x(tick), axis))
         marks.append(
-            label(x(value), axis + 21, f"{value:.0%}", anchor="middle", color=MUTED)
+            label(x(tick), axis + 19, f"{tick:.0%}", anchor="middle", color=MUTED)
         )
     for index, (name, counts) in enumerate(graders.items()):
-        center = top + 43 * index + 12
+        center = top + 36 * index + 15
         rate = counts[rate_key]
         display_name = name if len(name) <= 21 else name[:19] + "…"
         marks.append(
-            f"<g><title>{escape(name)}</title>{label(left - 10, center + 4, display_name, anchor='end')}</g>"
+            f"<g><title>{escape(name)}</title>{label(20, center + 4, display_name)}</g>"
+        )
+        marks.append(
+            label(
+                width - 20,
+                center + 4,
+                f"{counts['errors']} / {counts['accepted']}",
+                anchor="end",
+            )
         )
         if rate is None:
             marks.append(label(left + 8, center + 4, "No accepted rows", color=MUTED))
             continue
-        color = ORANGE if counts.get("meets_target") is False else BLUE
+        marks.append(line(left, center, right, center))
         marks.append(
-            f'<rect x="{left}" y="{center - 8}" width="{x(rate) - left:.2f}" height="16" rx="2" fill="{color}"/>'
+            f'<circle cx="{x(rate)}" cy="{center}" r="5.5" fill="{BLUE}" stroke="white"/>'
         )
-        marks.append(label(x(rate) + 8, center + 4, f"{rate:.2%}", weight="600"))
+        marks.append(
+            label(
+                x(rate),
+                center - 8,
+                f"{rate:.2%}",
+                size=12,
+                anchor="middle",
+                weight="600",
+            )
+        )
     if target is not None:
         marks.extend(
             [
-                line(x(target), top - 10, x(target), axis, ORANGE, dashed=True),
+                line(x(target), top - 3, x(target), axis, ORANGE, dashed=True),
                 label(
                     x(target),
-                    axis + 40,
-                    f"Target {target:.0%}",
+                    axis + 39,
+                    f"Target {target * 100:.4g}%",
                     anchor="middle",
                     color=ORANGE,
                 ),
             ]
         )
-    return canvas(width, axis + 54, title, marks)
+    return canvas(width, axis + (55 if target is not None else 32), title, marks)
 
 
 def render_plot(report, curve=None):
