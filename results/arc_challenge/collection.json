@@ -1,0 +1,14 @@
+{
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "revision": "a09a35458c702b33eeacc393d103063234e8bc28",
+  "device": "NVIDIA GeForce RTX 5080",
+  "seed": 42,
+  "torch": "2.11.0+cu130",
+  "transformers": "5.16.0.dev0",
+  "dtype": "bfloat16",
+  "logical_requests": 1165,
+  "batches": 73,
+  "input_tokens": 117997,
+  "wall_seconds": 41.042695899959654,
+  "dataset_revision": "210d026faf9955653af8916fad021475a3f00453"
+}
