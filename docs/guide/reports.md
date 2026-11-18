@@ -229,7 +229,8 @@ records this count.
 
 ## Plan
 
-To compare two checkpoints with the fixed-cap audit, add an interim label
+Two checkpoints are available in the [1.1 series supplement](https://github.com/Daveyuwang/caat/releases/tag/v1.1.0).
+To compare them with the fixed-cap audit, add an interim label
 count and two plausible error rates bracketing the saved target.
 
 ```bash

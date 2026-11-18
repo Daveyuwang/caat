@@ -1,11 +1,18 @@
 # Changelog
 
-## Unreleased
+## 1.1 series
+
+### Two-stage audit supplement
+
+The work from milestone 1.2 is available as the `1.1.1.dev0` supplement on
+the existing [1.1 release page](https://github.com/Daveyuwang/caat/releases/tag/v1.1.0).
+Choose the supplement wheel for the two-stage commands. PyPI's `1.1.0`
+distribution provides the original fixed-budget commands.
 
 - Compare an audit with two planned checkpoints to the best fixed-cap block size, using the same batch, scenarios and dispatch cost. [Budget planning](docs/guide/reports.md#plan)
 - Issue one request per checkpoint and resume partial receipts with the original request ID. [Grader handoff](docs/guide/queue.md#issue-audit-labels-in-blocks) · [HellaSwag replay](docs/research/hellaswag-audit.md)
 
-## 1.1.0
+### 1.1.0
 
 - Preview the chances of meeting or exceeding a saved policy's risk target before issuing labels with `caat plan --forecast`. [Budget forecast](docs/guide/reports.md#plan)
 - Add `--block-size` to the forecast to compare expected labels and requests for one grader with a bulk export.
