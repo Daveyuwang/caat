@@ -70,6 +70,13 @@ and sum over the cases that continue (37 through 63). The 71 remaining
 draws follow the hypergeometric law on the remaining 1,026 rows. Add the
 probability of crossing the same direction at the first checkpoint.
 
+At the census error count, the paired two-stage draw costs less than the
+314-row block on 93.78% of draws, ties on 2.13%, and costs more on 4.09%
+at the design price. For the last case the first 250 must contain 37 to
+63 errors and the fixed block must settle at 314. Condition on the first
+count, then draw the next 64 from the remaining 1,026. The fixed block
+settles at cumulative counts of 46 or fewer, 54 to 67, or 75 or more.
+
 The first pass used 378,774 input tokens. While the desktop was in use,
 176 rows ran on CPU. Rescoring those rows in their original batches on
 the RTX 5080 changed two choices and two cutoff decisions. All published
