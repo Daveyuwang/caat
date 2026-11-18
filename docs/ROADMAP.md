@@ -1,8 +1,8 @@
 # CAAT roadmap
 
-## 1.3 milestone
+## Budget comparison (milestone 1.3, released in 1.1.2)
 
-A label lead can compare the smallest qualifying cap and the lowest expected grading cost under one hard ceiling, then issue either offer and resume from partial receipts. On ARC-Challenge, reserving 325 labels instead of 299 reduced the higher expected cost across two design scenarios by 9.02%. The frozen draw used 200 labels instead of 250. [Budget comparison](guide/reports.md#plan) · [ARC-Challenge audit](research/arc-challenge-audit.md) · [Milestone](https://github.com/Daveyuwang/caat/milestone/2)
+CAAT compares audit plans under one label budget and issues the plan you choose. On ARC-Challenge, raising the cap from 299 to 325 reduced the higher of two expected grading costs by 9.02%. The frozen draw used 200 labels instead of 250. [Budget comparison](guide/reports.md#plan) · [ARC-Challenge audit](research/arc-challenge-audit.md) · [Milestone](https://github.com/Daveyuwang/caat/milestone/2)
 
 The retrospective design checks used the same 500-label ceiling and one label per request.
 
@@ -26,7 +26,7 @@ Plan a two-stage audit on an unlabeled batch, dispatch work at each checkpoint
 and resume a partial receipt. On 1,500 HellaSwag predictions, the planner's
 higher expected cost across the two prespecified scenarios fell 8.00% versus
 the best 1.1 fixed block. The observed draw took 321 labels versus 314.
-[HellaSwag study](research/hellaswag-audit.md) · [Completed milestone](https://github.com/Daveyuwang/caat/milestone/1) · [Install the 1.1 supplement](https://github.com/Daveyuwang/caat/releases/tag/v1.1.0)
+[HellaSwag study](research/hellaswag-audit.md) · [Completed milestone](https://github.com/Daveyuwang/caat/milestone/1) · [Original supplement](https://github.com/Daveyuwang/caat/releases/tag/v1.1.0)
 
 ### 1.1.0
 

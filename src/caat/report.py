@@ -870,7 +870,8 @@ def lowest_error_summary(selection, fewer="--design-grid-size"):
 def counts_summary(counts):
     rate = counts["error_rate"]
     rate_text = "undefined risk" if rate is None else f"{percent(rate)} error"
-    return f"Accepted {counts['accepted']} of {counts['total']} rows with {counts['errors']} errors ({rate_text})."
+    unit = "error" if counts["errors"] == 1 else "errors"
+    return f"Accepted {counts['accepted']} of {counts['total']} rows with {counts['errors']} {unit} ({rate_text})."
 
 
 def percent(value):

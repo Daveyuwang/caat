@@ -27,7 +27,7 @@ def setup_style():
     plt.switch_backend("Agg")
     plt.rcParams.update(
         {
-            "font.family": "DejaVu Sans",
+            "font.family": ["DejaVu Sans", "sans-serif"],
             "font.size": 9,
             "axes.spines.top": False,
             "axes.spines.right": False,
@@ -169,17 +169,19 @@ def wildbench_auroc(rows, output):
     names = {
         "mean_token_logprob": "Mean\nlog p",
         "sequence_logprob": "Seq.\nlog p",
-        "negative_mean_token_logprob": "Neg. mean\nlog p",
+        "negative_mean_token_logprob": "−Mean\nlog p",
         "low_token_logprob": "Low\nlog p",
-        "shorter_response": "Shorter\nresponse",
+        "shorter_response": "Shorter\nreply",
     }
     scores = list(dict.fromkeys(row["score"] for row in data))
     models = sorted({row["model"] for row in data})
     palette = LinearSegmentedColormap.from_list(
         "auroc", ["#e3af83", "#ffffff", "#84bfd0"]
     )
-    fig, axes = plt.subplots(1, len(judges), figsize=(14.4, 6.3), sharey=True)
-    fig.subplots_adjust(left=0.215, right=0.99, top=0.92, bottom=0.13, wspace=0.08)
+    totals = {row["model"]: int(row["n"]) for row in data}
+    labels = [f"{short_model(model)}  ({totals[model]:,})" for model in models]
+    fig, axes = plt.subplots(1, len(judges), figsize=(11.5, 6.3), sharey=True)
+    fig.subplots_adjust(left=0.30, right=0.99, top=0.91, bottom=0.13, wspace=0.09)
     for ax, judge in zip(axes, judges, strict=True):
         values = {
             (row["model"], row["score"]): float(row["auroc"] or "nan")
@@ -189,14 +191,15 @@ def wildbench_auroc(rows, output):
         score_matrix(
             ax,
             [[values[model, score] for score in scores] for model in models],
-            [short_model(model) for model in models],
+            labels,
             [names[score] for score in scores],
             palette,
             ".2f",
         )
         ax.set_title(GRADER_NAMES[judge])
         ax.tick_params(labelsize=8)
-    fig.text(0.015, 0.95, "AUROC by confidence score", weight="bold")
+    fig.text(0.015, 0.94, "Model (outputs)", weight="bold")
+    fig.supxlabel("AUROC by confidence score", x=0.65, y=0.02)
     export(fig, output / "wildbench-auroc")
 
 

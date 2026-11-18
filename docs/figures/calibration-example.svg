@@ -27,10 +27,10 @@
 <text x="54" y="85" fill="#496170" font-size="13" font-weight="400" text-anchor="end">100%</text>
 <text x="304" y="341" fill="#496170" font-size="13" font-weight="400" text-anchor="middle">100%</text>
 <line x1="64" y1="321" x2="304" y2="81" stroke="#496170" stroke-dasharray="5 4"/>
-<circle cx="88.00" cy="321.00" r="5" fill="#0072b2" stroke="white"><title>1 rows, mean probability 10.00%, observed correctness 0.00%</title></circle>
-<circle cx="160.00" cy="81.00" r="5" fill="#0072b2" stroke="white"><title>1 rows, mean probability 40.00%, observed correctness 100.00%</title></circle>
-<circle cx="244.00" cy="201.00" r="5" fill="#0072b2" stroke="white"><title>2 rows, mean probability 75.00%, observed correctness 50.00%</title></circle>
-<circle cx="280.00" cy="81.00" r="5" fill="#0072b2" stroke="white"><title>1 rows, mean probability 90.00%, observed correctness 100.00%</title></circle>
+<circle cx="88.00" cy="321.00" r="5" fill="#0072b2" stroke="white"><title>Bin size 1, mean probability 10.00%, observed correctness 0.00%</title></circle>
+<circle cx="160.00" cy="81.00" r="5" fill="#0072b2" stroke="white"><title>Bin size 1, mean probability 40.00%, observed correctness 100.00%</title></circle>
+<circle cx="244.00" cy="201.00" r="5" fill="#0072b2" stroke="white"><title>Bin size 2, mean probability 75.00%, observed correctness 50.00%</title></circle>
+<circle cx="280.00" cy="81.00" r="5" fill="#0072b2" stroke="white"><title>Bin size 1, mean probability 90.00%, observed correctness 100.00%</title></circle>
 <line x1="104" y1="392" x2="129" y2="392" stroke="#496170" stroke-dasharray="5 4"/>
 <text x="136" y="396" fill="#496170" font-size="12" font-weight="400" text-anchor="start">Perfect agreement</text>
 </g>

@@ -239,9 +239,7 @@ Both offers meet the required directional power in each design scenario. `smalle
 
 The grid includes the effective ceiling and the first qualifying single-stage cap, found by scanning integer caps. Other caps start at 200 and step by 25. Below 200 they start at 25. For each cap CAAT compares every fixed block size and first checkpoints from 50 in steps of 25, plus two thirds of the cap rounded down. With at most 25 available labels it tries every cap and first checkpoint. The JSON lists the caps tested. Exit 1 means no tested design qualified.
 
-Two checkpoints are available in the [1.1 series supplement](https://github.com/Daveyuwang/caat/releases/tag/v1.1.0).
-To compare them with the fixed-cap audit, add an interim label
-count and two plausible error rates bracketing the saved target.
+To compare a specific two-stage plan with fixed blocks, set the first checkpoint, final cap and two error rates on opposite sides of the target.
 
 ```bash
 caat plan --forecast --threshold-report results/letter_audit/policy.json --batch-predictions results/letter_audit/predictions.csv --label-budget 300 --interim-labels 200 --error-scenarios .02 .08 --power .8 --request-cost 1
