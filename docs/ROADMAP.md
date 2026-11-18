@@ -1,6 +1,6 @@
 # CAAT roadmap
 
-## 1.1 development
+## 1.1.0
 
 Preview verdict probabilities and grading costs on an unlabeled batch,
 then draw the audit sample at the chosen budget. The UCI letter study
