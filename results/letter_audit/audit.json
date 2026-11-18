@@ -1,0 +1,43 @@
+{
+  "labels": 300,
+  "requests": 30,
+  "block_verdict": {
+    "graded": 300,
+    "errors": 12,
+    "possible_final_errors": [
+      12,
+      12
+    ],
+    "batch_verdict": "inconclusive",
+    "decision_status": "settled",
+    "total": 300,
+    "accepted": 300,
+    "coverage": 1.0,
+    "error_rate": 0.04,
+    "risk_upper_errors": 89,
+    "risk_upper_bound": 0.06104252400548697,
+    "meets_target": false,
+    "risk_lower_errors": 37,
+    "risk_lower_bound": 0.025377229080932786
+  },
+  "full_draws": {
+    "300": {
+      "accepted": 300,
+      "errors": 12,
+      "risk_lower_errors": 37,
+      "risk_upper_errors": 89,
+      "risk_lower_bound": 0.025377229080932786,
+      "risk_upper_bound": 0.06104252400548697,
+      "batch_verdict": "inconclusive"
+    },
+    "100": {
+      "accepted": 100,
+      "errors": 2,
+      "risk_lower_errors": 6,
+      "risk_upper_errors": 87,
+      "risk_lower_bound": 0.00411522633744856,
+      "risk_upper_bound": 0.05967078189300412,
+      "batch_verdict": "inconclusive"
+    }
+  }
+}

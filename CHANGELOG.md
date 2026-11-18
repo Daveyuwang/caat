@@ -4,6 +4,7 @@
 
 - Preview the chances of meeting or exceeding a saved policy's risk target before issuing labels with `caat plan --forecast`. [Budget forecast](docs/guide/reports.md#plan)
 - Add `--block-size` to the forecast to compare expected labels and requests for one grader with a bulk export.
+- The [UCI Letter Recognition audit](docs/research/letter-audit.md) replays budget selection, block delivery and a full-population check on a new classifier batch.
 
 ## 1.0.0
 

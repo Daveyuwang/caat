@@ -1,5 +1,8 @@
 # CPU benchmark replay
 
+The [UCI letter audit](letter-audit.md) uses a classifier's saved probabilities
+to choose a label budget and compare block and bulk grading costs.
+
 The [module study](#module-study) extends this replay to two model
 families and compares score features and grader changes on frozen outputs.
 The [matched-cost replay](matched-cost.md) compares a score-gated
