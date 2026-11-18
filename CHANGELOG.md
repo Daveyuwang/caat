@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.0rc1
+
+- Use `caat evaluate --partial` to check whether the grades returned so far settle a fixed-budget audit.
+- Resume keyed CSV assignments with `caat audit-block`. Each block has a stable ID and records outstanding labels by grader.
+
 ## 0.7.0
 
 - Draw a reproducible, fixed-budget audit sample from new predictions with
