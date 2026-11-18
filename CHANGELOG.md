@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Preview the chances of meeting or exceeding a saved policy's risk target before issuing labels with `caat plan --forecast`. [Budget forecast](docs/guide/reports.md#plan)
+
 ## 1.0.0
 
 CAAT takes saved classifier or LLM predictions from score comparison and calibration to a review policy. The same frozen policy works with `route`, `evaluate`, `audit` and `monitor`. A withheld policy can be audited on a new batch while routing remains disabled. [Policy workflow](docs/guide/workflow.md) · [Fixed-budget audit](docs/guide/queue.md#draw-an-audit-sample-after-a-policy-misses-its-target)

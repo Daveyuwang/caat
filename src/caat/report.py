@@ -198,6 +198,10 @@ def read_label_plan(path, *, allow_empty=False):
         or not isinstance(report.get("input"), dict)
     ):
         raise ValueError(f"{path}: expected a CAAT plan JSON report")
+    if report["input"].get("forecast"):
+        raise ValueError(
+            f"{path}: a forecast has no sample; supply the drawn label plan"
+        )
     labels = report.get("accepted")
     population = report.get("accepted_population")
     risk = report.get("risk_target")
@@ -369,6 +373,15 @@ def describe(report):
         target = report["risk_target"]
         population = report.get("accepted_population")
         if "batch_predictions" in inputs:
+            if inputs.get("forecast"):
+                chances = report["verdict_probabilities"]
+                return (
+                    f"{population} of {report['total']} rows qualify. With {report['accepted']} labels "
+                    f"and {report['expected_population_errors']} assumed errors among the eligible rows "
+                    f"(target {percent(target)}), full-draw verdict probabilities are "
+                    f"meets {percent(chances['meets'])}, exceeds {percent(chances['exceeds'])}, "
+                    f"inconclusive {percent(chances['inconclusive'])}."
+                )
             summary = (
                 f"At the saved cutoff, {population} of {report['total']} rows would qualify "
                 f"and {report['review']} would go to review. "
