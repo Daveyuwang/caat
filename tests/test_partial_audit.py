@@ -64,6 +64,74 @@ class PartialAuditTests(unittest.TestCase):
                             )
                             self.assertEqual("risk_upper_bound" in result, t == cap)
 
+    def test_empty_eligible_batch_and_full_text(self):
+        with TemporaryDirectory() as tmp:
+            p = Path(tmp)
+            batch, sample, plan, grades = [
+                p / name
+                for name in ("batch.csv", "sample.csv", "plan.json", "grades.csv")
+            ]
+            batch.write_text("id,gap,output_sha256\nnew,0,untaken\n", encoding="utf-8")
+            write_grades(grades, [])
+            inputs = [
+                "--batch-predictions",
+                str(batch),
+                "--threshold-report",
+                str(R2 / "policy.json"),
+            ]
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "plan",
+                            *inputs,
+                            "--sample-output",
+                            str(sample),
+                            "--output",
+                            str(plan),
+                            "--label-budget",
+                            "10",
+                        ]
+                    ),
+                    1,
+                )
+            with redirect_stdout(io.StringIO()) as text:
+                self.assertEqual(
+                    main(
+                        [
+                            "evaluate",
+                            str(sample),
+                            *inputs,
+                            "--partial",
+                            "--plan-report",
+                            str(plan),
+                            "--grader-file",
+                            f"g={grades}",
+                        ]
+                    ),
+                    1,
+                )
+            self.assertIn("0 eligible outputs", text.getvalue())
+            self.assertIn("Full-budget verdict: inconclusive", text.getvalue())
+            self.assertNotIn("risk limits", text.getvalue())
+            with redirect_stdout(io.StringIO()) as text:
+                main(
+                    [
+                        "evaluate",
+                        str(R2 / "sample.csv"),
+                        "--partial",
+                        "--threshold-report",
+                        str(R2 / "policy.json"),
+                        "--plan-report",
+                        str(R2 / "plan.json"),
+                        "--batch-predictions",
+                        str(R2 / "predictions.csv"),
+                        "--grader-file",
+                        f"g={R2 / 'sample-grades.csv'}",
+                    ]
+                )
+            self.assertIn("risk limits", text.getvalue())
+
     def test_r2_prefix_and_grade_identity(self):
         sample = read_rows(R2 / "sample.csv")
         lookup = {r["id"]: r for r in read_rows(R2 / "sample-grades.csv")}
