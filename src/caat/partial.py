@@ -86,7 +86,7 @@ def evaluate_partial(args, plan):
         )
     files = args.grader_file or []
     names = [name for name, _ in files] or args.correct_column or []
-    if not names or len(names) != len(set(names)):
+    if not names or not all(names) or len(names) != len(set(names)):
         raise ValueError(
             "provide distinct --grader-file names or --correct-column names"
         )
@@ -148,6 +148,8 @@ def evaluate_partial(args, plan):
         "threshold_report_sha256": plan["threshold_report_sha256"],
         "batch_predictions": str(args.batch_predictions),
         "sample_seed": plan["sample_seed"],
+        "sample": str(args.predictions),
+        "grader_files": {name: str(path) for name, path in files},
     }
     with staged_outputs([args.output] if args.output else []) as staged:
         emit(
