@@ -32,6 +32,7 @@ ALL_REPORTS = (
     "policy",
     "run",
     "plan",
+    "two-stage-plan",
     "queue",
     "route",
     "scores",

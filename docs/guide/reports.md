@@ -229,6 +229,23 @@ records this count.
 
 ## Plan
 
+To compare two checkpoints with the fixed-cap audit, add an interim label
+count and two plausible error rates bracketing the saved target.
+
+```bash
+caat plan --forecast --threshold-report results/letter_audit/policy.json --batch-predictions results/letter_audit/predictions.csv --label-budget 300 --interim-labels 200 --error-scenarios .02 .08 --power .8 --request-cost 1
+```
+
+The two-stage report gives cumulative error boundaries at both checkpoints.
+Each direction's chance of a false verdict over both looks is bounded by
+one minus the confidence level. The planner tries five interim error
+allocations (10%, 20%, 40%, 50%, 80% of the directional allowance) and
+calibrates the final boundaries using the joint without-replacement law.
+Among qualifying designs it minimizes the larger scenario cost (labels plus
+requests times the supplied cost) for one grader. The fixed-cap comparison
+tries every constant block size. Exit 1 means this family did not attain
+the requested power at the specified checkpoint and cap.
+
 `caat plan` sizes an independent check of one frozen acceptance policy.
 
 To compare budgets before requesting labels, give `--forecast` a saved policy,
