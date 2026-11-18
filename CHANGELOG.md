@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Compare an audit with two planned checkpoints to the best fixed-cap block size, using the same batch, scenarios and dispatch cost. [Budget planning](docs/guide/reports.md#plan)
+- Issue one request per checkpoint and resume partial receipts with the original request ID. [Grader handoff](docs/guide/queue.md#issue-audit-labels-in-blocks) · [HellaSwag replay](docs/research/hellaswag-audit.md)
 
 ## 1.1.0
 
