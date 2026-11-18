@@ -1,5 +1,51 @@
 # Choosing an audit budget for letter recognition
 
+The forecast selected **300 labels** from four candidate budgets before
+grading any of the 4,000 new predictions. Of these, 1,458 qualified at
+the saved cutoff of 0.8526697034. The independent policy holdout had
+18 errors in 602 eligible rows. [Saved policy](../../results/letter_audit/policy.json)
+
+| Labels | Chance of meeting the 5% target at 2% error | Chance of detecting excess at 8% error |
+| ---: | ---: | ---: |
+| 50 | 0.00% | 20.71% |
+| 100 | 37.80% | 27.62% |
+| 150 | 62.71% | 42.80% |
+| 300 | 93.02% | 80.15% |
+
+The 300-label draw had 12 errors. At most 9 would support the target and
+at least 21 would establish excess. The verdict was **inconclusive** after
+30 requests of ten labels each, matching the bulk verdict. The 100-label
+control had two errors and was also inconclusive. The subsequent census
+found 47 errors among 1,458 eligible rows (3.22%). At this error count,
+51.12% of uniform 300-label draws give an inconclusive verdict.
+[Frozen design](../../results/letter_audit/design.json) ·
+[Sample outcomes](../../results/letter_audit/audit.json) ·
+[Census](../../results/letter_audit/census.json)
+
+| 300-label scenario | Expected labels in blocks of ten | Expected requests | Cost of one extra request at break-even, in labels |
+| --- | ---: | ---: | ---: |
+| 2% assumed before grading | 299.66 | 29.97 | 0.012 |
+| 8% assumed before grading | 256.98 | 25.70 | 1.74 |
+| Observed census | 298.61 | 29.86 | 0.048 |
+
+Bulk delivery takes 300 labels and one request. If an extra dispatch
+costs two labels, bulk costs less under both original assumptions. At
+one label per dispatch, bulk costs less under the 2% scenario and blocks
+cost less under the 8% scenario. The observed draw used the full budget.
+
+Run the base-package replay from an installed checkout. It fetches the
+pinned data, checks both seeded sample identities and compares the budget
+grid, issued grades, full verdicts and eligible census to the saved results.
+
+```bash
+python scripts/study_letter_audit.py replay
+```
+
+To repeat fitting, use scikit-learn 1.9.1 and run the stages `freeze`,
+`audit` and `census` in that order. The protocol was recorded at
+`4348e08`, the predictions and budget at `1b61ee2` and the sample
+verdicts at `88d5959` before the census.
+
 ## Frozen protocol
 
 Use David J. Slate's UCI Letter Recognition data in source order. The

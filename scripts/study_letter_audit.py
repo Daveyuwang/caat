@@ -96,6 +96,17 @@ def freeze(work, raw):
     )
     policy["input"]["path"] = fit.name
     write_json(POLICY, policy)
+    write_json(
+        OUT / "design.json",
+        {
+            "source_sha256": SOURCE_DIGEST,
+            "sklearn": sklearn.__version__,
+            **budget_design(work),
+        },
+    )
+
+
+def budget_design(work):
     scenarios = []
     for budget in BUDGETS:
         pair = {}
@@ -129,19 +140,14 @@ def freeze(work, raw):
     for budget in dict.fromkeys((chosen or 100, 100)):
         path, _, plan = draw(work, budget)
         samples[str(budget)] = sample_digest(path)
-    write_json(
-        OUT / "design.json",
-        {
-            "source_sha256": SOURCE_DIGEST,
-            "sklearn": sklearn.__version__,
-            "accepted_population": plan["accepted_population"],
-            "accepted_population_sha256": plan["input"]["accepted_population_sha256"],
-            "threshold_report_sha256": plan["input"]["threshold_report_sha256"],
-            "scenarios": scenarios,
-            "qualifying_budget": chosen,
-            "sample_sha256": samples,
-        },
-    )
+    return {
+        "accepted_population": plan["accepted_population"],
+        "accepted_population_sha256": plan["input"]["accepted_population_sha256"],
+        "threshold_report_sha256": plan["input"]["threshold_report_sha256"],
+        "scenarios": scenarios,
+        "qualifying_budget": chosen,
+        "sample_sha256": samples,
+    }
 
 
 def frozen_draw(work, design, budget):
@@ -191,21 +197,17 @@ def audit(work, raw, design, predictions):
         results[str(cap)] = measure(BATCH, POLICY, sample, plan, grades)
     if results[str(budget)]["batch_verdict"] != stop["result"]["batch_verdict"]:
         raise ValueError("block and full-draw verdicts differ")
-    write_json(
-        OUT / "audit.json",
-        {
-            "labels": len(trace),
-            "requests": stop["requests"],
-            "block_verdict": stop["result"],
-            "full_draws": results,
-        },
-    )
+    return {
+        "labels": len(trace),
+        "requests": stop["requests"],
+        "block_verdict": stop["result"],
+        "full_draws": results,
+    }
 
 
 def census(work, raw, design, predictions):
     budget = design["qualifying_budget"] or 100
     _, _, plan = frozen_draw(work, design, budget)
-    result = read_json(OUT / "audit.json")
     cutoff = plan["input"]["threshold"]
     rows = [
         dict(id=uid, output_key=r["prediction"])
@@ -216,29 +218,35 @@ def census(work, raw, design, predictions):
         raise ValueError("census differs from eligible population")
     errors = sum(1 - r["correct"] for r in source_grader(raw, predictions)(rows))
     cost = forecast_block_cost(len(rows), errors, plan["accepted"], plan, 10)
-    print(
-        f"{errors}/{len(rows)} eligible errors; expected {cost['expected_labels']:.2f} labels, "
-        f"{cost['expected_requests']:.2f} requests; observed {result['labels']}, {result['requests']}"
-    )
-    write_json(OUT / "census.json", {"eligible": len(rows), "errors": errors, **cost})
+    return {"eligible": len(rows), "errors": errors, **cost}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=("freeze", "audit", "census"))
+    parser.add_argument("stage", choices=("freeze", "audit", "census", "replay"))
     args = parser.parse_args()
     with TemporaryDirectory() as directory:
         work = Path(directory)
         raw = source_rows(work)
         if args.stage == "freeze":
             freeze(work, raw)
-        else:
-            design = read_json(OUT / "design.json")
-            predictions = {r["id"]: r for r in read_csv(BATCH)}
-            if args.stage == "audit":
-                audit(work, raw, design, predictions)
-            else:
-                census(work, raw, design, predictions)
+            return
+        design = read_json(OUT / "design.json")
+        predictions = {r["id"]: r for r in read_csv(BATCH)}
+        if args.stage == "replay":
+            fresh = budget_design(work)
+            if any(v != design[k] for k, v in fresh.items()):
+                raise ValueError("budget comparison differs from the frozen design")
+        for stage in (audit, census):
+            name = stage.__name__
+            if args.stage in (name, "replay"):
+                result = stage(work, raw, design, predictions)
+                path = OUT / f"{name}.json"
+                if args.stage != "replay":
+                    write_json(path, result)
+                elif result != read_json(path):
+                    raise ValueError(f"{name} differs from the archived result")
+                print(name, result)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,12 @@
 # CAAT roadmap
 
+## 1.1 development
+
+Preview verdict probabilities and grading costs on an unlabeled batch,
+then draw the audit sample at the chosen budget. The UCI letter study
+selected 300 labels and used all 30 blocks before reaching an inconclusive
+verdict. [Budget forecast](guide/reports.md#plan) · [Letter audit](research/letter-audit.md)
+
 ## 1.0.0
 
 Take a saved batch from scoring through a routing decision, then use the same policy to audit the next labeled batch. When a cutoff misses its target, a labeler can still draw a fixed-budget audit sample and stop once every possible completion gives the same verdict. [Policy walkthrough](../README.md#reuse-one-fitted-policy-from-routing-through-audit) · [Audit handoff](guide/queue.md#issue-audit-labels-in-blocks)

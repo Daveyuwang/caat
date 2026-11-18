@@ -1,0 +1,8 @@
+{
+  "eligible": 1458,
+  "errors": 47,
+  "expected_labels": 298.6051008574095,
+  "expected_requests": 29.860510085740945,
+  "bulk_labels": 300,
+  "bulk_requests": 1
+}
