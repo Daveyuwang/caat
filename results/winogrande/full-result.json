@@ -1,0 +1,9 @@
+{
+  "accepted": 100,
+  "errors": 31,
+  "risk_lower_errors": 160,
+  "risk_upper_errors": 259,
+  "risk_lower_bound": 0.239880059970015,
+  "risk_upper_bound": 0.3883058470764618,
+  "batch_verdict": "exceeds"
+}
