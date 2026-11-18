@@ -229,6 +229,16 @@ records this count.
 
 ## Plan
 
+To compare label budgets on a new batch, set a hard ceiling and two plausible error rates on opposite sides of the policy target.
+
+```bash
+caat plan --forecast --threshold-report results/letter_audit/policy.json --batch-predictions results/letter_audit/predictions.csv --budget-ceiling 500 --error-scenarios .02 .08 --power .8 --request-cost 1 --output offers.json
+```
+
+Both offers meet the required directional power in each design scenario. `smallest-cap` minimizes the tested cap, then expected cost. `lowest-cost` minimizes the larger of the two scenario costs for one grader (labels plus the request price times requests), then the cap. Ties prefer fewer expected requests. The letter example reserves 300 or 325 labels, with worst scenario costs of 268.30 or 261.46. The report also gives expected work at the largest population error count that meets the target.
+
+The grid includes the effective ceiling and the first qualifying single-stage cap, found by scanning integer caps. Other caps start at 200 and step by 25. Below 200 they start at 25. For each cap CAAT compares every fixed block size and first checkpoints from 50 in steps of 25, plus two thirds of the cap rounded down. With at most 25 available labels it tries every cap and first checkpoint. The JSON lists the caps tested. Exit 1 means no tested design qualified.
+
 Two checkpoints are available in the [1.1 series supplement](https://github.com/Daveyuwang/caat/releases/tag/v1.1.0).
 To compare them with the fixed-cap audit, add an interim label
 count and two plausible error rates bracketing the saved target.

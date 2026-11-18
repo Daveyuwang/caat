@@ -3,7 +3,6 @@
 from fractions import Fraction
 from math import ceil, comb, floor, fsum, isfinite
 
-from .finite import hypergeometric_cdf
 from .plan import (
     forecast_verdict,
     pending_probability,
@@ -13,15 +12,37 @@ from .plan import (
 
 
 def _mass(size, errors, cap):
-    return [comb(errors, y) * comb(size - errors, cap - y) for y in range(cap + 1)]
+    lower, upper = max(0, cap - size + errors), min(errors, cap)
+    mass = [0] * (cap + 1)
+    mass[lower] = comb(errors, lower) * comb(size - errors, cap - lower)
+    for y in range(lower, upper):
+        mass[y + 1] = (
+            mass[y]
+            * (errors - y)
+            * (cap - y)
+            // ((y + 1) * (size - errors - cap + y + 1))
+        )
+    return mass
 
 
 def _crossing_counts(cap, look, maximum):
-    """Number of interim subsets crossing the lower boundary, given each final count."""
+    """Counts conditional on y final errors, as one correct item turns into an error."""
     ways = comb(cap, look)
-    return [
-        int(ways * hypergeometric_cdf(cap, y, look, maximum)) for y in range(cap + 1)
-    ]
+    if maximum < 0:
+        return [0] * (cap + 1)
+    if maximum >= look:
+        return [ways] * (cap + 1)
+    counts = [ways] * (cap + 1)
+    # A crossing disappears if the subset contains the changed item and
+    # exactly maximum of the previous errors. Update this mass by its ratio.
+    last = cap - look + maximum
+    lost = comb(cap - maximum - 1, look - maximum - 1)
+    for y in range(maximum, last + 1):
+        counts[y + 1] = counts[y] - lost
+        if y < last:
+            lost = lost * (y + 1) * (last - y) // ((y + 1 - maximum) * (cap - 1 - y))
+    counts[last + 1 :] = [0] * (cap - last)
+    return counts
 
 
 def _last_boundary(mass, crossed, ways, alpha):
@@ -107,7 +128,7 @@ def _outcomes(mass, early_low, early_high, ways, first, final, low, high):
     )
 
 
-def _single_comparison(size, cap, limits, rates, price):
+def single_comparison(size, cap, limits, rates, price):
     """Compare all constant block sizes using the same pending probabilities."""
     scenarios = []
     schedules = []
@@ -123,22 +144,32 @@ def _single_comparison(size, cap, limits, rates, price):
             costs.append((labels + price * requests, labels, requests))
         schedules.append(costs)
         scenarios.append(dict(rate=rate, errors=k, **result["verdict_probabilities"]))
-    idx = min(range(cap), key=lambda i: max(s[i][0] for s in schedules))
+    idx = min(
+        range(cap),
+        key=lambda i: (
+            max(s[i][0] for s in schedules),
+            max(s[i][2] for s in schedules),
+        ),
+    )
     for s, costs in zip(scenarios, schedules):
         s["cost"], s["expected_labels"], s["expected_requests"] = costs[idx]
     return dict(block_size=idx + 1, scenarios=scenarios)
 
 
-def design(size, cap, first, target, confidence, rates, power, price):
-    if not 0 < first < cap <= size:
-        raise ValueError(
-            "interim labels must be strictly between zero and the effective cap"
-        )
+def validate_settings(target, rates, power, price):
     if not 0 <= rates[0] < target < rates[1] <= 1:
         raise ValueError("error scenarios must bracket the saved target")
     if not 0 < power < 1 or not isfinite(price) or price < 0:
         raise ValueError(
             "use power between 0 and 1 and a finite nonnegative request cost"
+        )
+
+
+def checkpoint_design(size, cap, first, target, confidence, rates, power, price):
+    validate_settings(target, rates, power, price)
+    if not 0 < first < cap <= size:
+        raise ValueError(
+            "interim labels must be strictly between zero and the effective cap"
         )
     alpha = 1 - Fraction(str(confidence))
     allowed = floor(Fraction(str(target)) * size)
@@ -168,7 +199,12 @@ def design(size, cap, first, target, confidence, rates, power, price):
             s["expected_labels"] + Fraction(str(price)) * s["expected_requests"]
             for s in scenarios
         ]
-        rank = (not feasible, 0 if feasible else -attained, max(costs))
+        rank = (
+            not feasible,
+            0 if feasible else -attained,
+            max(costs),
+            max(s["expected_requests"] for s in scenarios),
+        )
         if best is None or rank < best[0]:
             rows = [
                 dict(
@@ -187,9 +223,15 @@ def design(size, cap, first, target, confidence, rates, power, price):
                     scenarios=rows,
                 ),
             )
-    result = best[1]
+    return best[1]
+
+
+def design(size, cap, first, target, confidence, rates, power, price):
+    result = checkpoint_design(
+        size, cap, first, target, confidence, rates, power, price
+    )
     limits = sample_error_limits(size, cap, target, confidence)
     result["single_stage"] = dict(
-        **limits, **_single_comparison(size, cap, limits, rates, price)
+        **limits, **single_comparison(size, cap, limits, rates, price)
     )
     return result

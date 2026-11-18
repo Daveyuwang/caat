@@ -208,6 +208,15 @@ The report shows grades returned, observed errors and the range of possible erro
 
 ## Issue audit labels in blocks
 
+Use either offer from the [budget comparison](reports.md#plan) to draw a sample and issue the first request.
+
+```bash
+caat plan --threshold-report results/letter_audit/policy.json --batch-predictions results/letter_audit/predictions.csv --from-comparison offers.json --choose lowest-cost --sample-output replay/letters.csv --output replay/letters-plan.json
+caat audit-block --threshold-report results/letter_audit/policy.json --batch-predictions results/letter_audit/predictions.csv --plan-report replay/letters-plan.json --handoff replay/letters --grader dataset
+```
+
+Choose `smallest-cap` to reserve fewer labels. Both choices carry their schedule into the handoff. The planner checks that the policy and eligible batch match the preview. Fixed-block plans drawn with earlier versions still take their block size from `audit-block --block-size`.
+
 For a two-stage plan, use the same checkpoint, scenarios and cap as the
 forecast. Replace `--forecast` with `--sample-output` and save the plan.
 The journal issues the first checkpoint in one request. Each grader who
